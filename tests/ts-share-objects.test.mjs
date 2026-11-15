@@ -269,7 +269,9 @@ const unsupported = [
   ["recursive property update", `const state = {value: 0}; function f(n: number) { state.value++; if (n > 0) f(n - 1); } f(2);`, /recursive|iterative/i],
   ["object cast to any", `const object = { value: 1 }; console.log(String(object as any));`, /any|shape/i],
   ["untyped parameter", `function f(object) { return object.value; } console.log(f({ value: 1 }));`, /annotat|shape/i],
-  ["optional property", `function f(object: { value?: number }) { return object.value; } console.log(f({ value: 1 }));`, /present|optional/i],
+  // Optional properties are supported since docs/ts-nullable.md; an unchecked
+  // read of a possibly undefined value still needs narrowing.
+  ["unchecked optional property arithmetic", `function f(object: { value?: number }) { return object.value + 1; } console.log(f({ value: 1 }));`, /null or undefined|narrow/i],
   ["object/scalar equality", `const object = { value: 1 }; console.log(object === 1);`, /compar|scalar/i],
   ["object array join", `const objects = [{value:1}]; console.log(objects.join(","));`, /coercion|scalar/i],
   ["object conditional", `const object = true ? {value:1} : {value:2};`, /if\/else|conditional/i],

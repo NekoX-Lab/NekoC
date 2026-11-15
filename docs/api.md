@@ -13,6 +13,26 @@ blocks, method values and runtime field additions are rejected. See
 [TypeScript classes](ts-classes.md) for class-id intervals, construction order,
 initialization safety, per-call frames and the complete supported subset.
 
+## null, undefined and optional chaining
+
+Types that spell out `null` or `undefined` (`T | null`, `T | undefined`, optional
+properties `x?: T` and optional or nullable class fields) store runtime sentinels:
+the texts `"null"` / `"undefined"` for numbers, booleans, arrays and object/class
+references, and the numbers `-1` / `-2` for strings. Kitten N equality never
+coerces between text and numbers, so a sentinel never equals a legal value.
+Object literals may omit optional properties, which read as `undefined`.
+Supported: `a?.b`, `a?.b.c`, `a?.[i]`, `a?.m()` (receiver evaluated once,
+arguments skipped on short-circuit), `a ?? b` (fallback evaluated lazily),
+standalone `a ??= b`, `=== null`, `!== undefined`, `== null`, truthiness tests and
+checker narrowing. `console.log`, string concatenation, templates and `String()`
+print `null` / `undefined` as JavaScript does. Rejected with a source location:
+null/undefined arithmetic or relational comparisons, reading a maybe-null value
+without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
+`??=` as an expression, mixed unions such as `string | number | null`, nulls in
+`any`/`unknown`, `pop`/`shift`/`find` results used as undefined, `delete` and
+`Map`. Programs without null/undefined compile exactly as before. See
+[null / undefined](ts-nullable.md).
+
 ## TypeScript arrays
 
 - `a[i]` reads the zero-based element with the share-player `list_item` block.
@@ -851,7 +871,9 @@ TypeScript data objects compile to opaque numeric handles in a hidden list heap,
 not `_object_*` blocks, so they can run in the official share player. Read/write
 initialized properties with `obj.x` or a compile-time constant key; aliases,
 nested objects, arrays of objects and function arguments/returns share identity.
-Dynamic/missing/optional keys, object coercion/logging/JSON, `delete`, methods,
-spread and value-producing property updates are rejected. Use scalar properties
+Optional properties declared in the type may be omitted and read as `undefined`
+([null / undefined](ts-nullable.md)). Dynamic or undeclared keys, object
+coercion/logging/JSON, `delete`, methods, spread and value-producing property
+updates are rejected. Use scalar properties
 for output and separate update statements. See [object compilation and official
 source evidence](ts-share-objects.md) for the full support boundary.
