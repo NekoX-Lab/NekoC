@@ -6,10 +6,12 @@ Complete reference for all functions and APIs available in NekoC TypeScript proj
 
 Class declarations, fields, constructors (including parameter properties), `new`,
 instance methods and `this` use the existing share-object heap and custom
-procedures. Method calls require one statically known concrete receiver class.
-Inheritance, static members, accessors, method values and runtime field additions
-are rejected. See [TypeScript classes, stage 1](ts-classes.md) for initialization
-order, per-call recursion frames and the complete supported subset.
+procedures. Single inheritance, super, abstract members, instanceof, virtual
+method/accessor dispatch and explicit-class static fields/methods are supported.
+Receivers require a statically known class or base type. Static this/inheritance/
+blocks, method values and runtime field additions are rejected. See
+[TypeScript classes](ts-classes.md) for class-id intervals, construction order,
+initialization safety, per-call frames and the complete supported subset.
 
 ## TypeScript arrays
 

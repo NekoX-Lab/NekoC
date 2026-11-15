@@ -115,16 +115,9 @@ for (const [name, source] of positives) {
 }
 
 const unsupported = [
-  ["extends", `class Base { x = 1; } class Derived extends Base {}`, /extends|inheritance/i],
   ["super", `class C { x = 1; method() { super.method(); } }`, /super/i],
-  ["abstract class", `abstract class C { x = 1; }`, /abstract/i],
   ["abstract method", `class C { abstract method(): number; }`, /abstract/i],
-  ["instanceof", `class C { x = 1; } console.log(new C() instanceof C);`, /instanceof/i],
-  ["static field", `class C { static x = 1; }`, /static/i],
-  ["static method", `class C { static method() { return 1; } }`, /static/i],
   ["private identifier field", `class C { #x = 1; read() { return this.#x; } }`, /private|#x/i],
-  ["getter", `class C { get x() { return 1; } }`, /getter|accessor/i],
-  ["setter", `class C { set x(value: number) {} }`, /setter|accessor/i],
   ["index signature", `class C { [key: string]: number; x = 1; }`, /index signature/i],
   ["method read as a value", `class C { x = 1; m() { return this.x; } } const c = new C(); const f = c.m;`, /method[\s\S]*(?:value|direct|call)|bound/i],
   ["method passed as a callback", `class C { x = 1; m(n: number) { return this.x + n; } } const c = new C(); [1].map(c.m);`, /method[\s\S]*(?:value|direct|call)|bound/i],
