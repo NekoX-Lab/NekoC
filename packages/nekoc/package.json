@@ -1,6 +1,6 @@
 {
   "name": "@fttawa/nekoc",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "description": "TypeScript → 编程猫 Kitten N (.bcmkn) 编译器与播放器（WASM，无需 Rust）",
   "license": "MIT",
   "repository": {
