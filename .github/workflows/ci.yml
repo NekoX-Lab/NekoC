@@ -26,6 +26,8 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: node packages/nekoc/build.mjs
       - run: npm --prefix packages/nekoc test
+      - name: Smoke test the npm package
+        run: bash tools/smoke-npm-package.sh
       - run: node tools/build-pages.mjs dist/pages
       - run: node tools/build-extension.mjs dist/pickcat-rust
   test:
@@ -48,7 +50,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
 
-      - run: npm ci
+      - run: npm ci --ignore-scripts
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
