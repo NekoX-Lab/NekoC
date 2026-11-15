@@ -260,7 +260,7 @@ interface NekoSpriteSelf {
 
   // --- Console ---
   consoleLog(value: NekoValue): void;
-  "console.log"(value: NekoValue): void;
+  "console.log"(...values: NekoValue[]): void;
 
   // --- Ranking ---
   showRanking(type: string): void;

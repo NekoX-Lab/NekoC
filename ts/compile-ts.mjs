@@ -3356,7 +3356,12 @@ class WorkspaceCompiler {
       type: "console_log",
       parent_id: parentId,
     });
-    const valueId = this.compileExpression(call.arguments[0], id);
+    // JS 的 console.log(a, b, ...) 用单个空格拼接所有参数；多参数时拼成 text_join，
+    // 每个参数仍按单参数时的方式编译。
+    const args = call.arguments;
+    const valueId = args.length > 1
+      ? this.compileTextJoin(args.flatMap((expression, index) => index === 0 ? [{ expression }] : [{ text: " " }, { expression }]), id)
+      : this.compileExpression(args[0], id);
     this.connectInput(id, valueId, "console_log", "value");
     return id;
   }
