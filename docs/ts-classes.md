@@ -175,7 +175,10 @@ static 字段降低成隐藏全局变量，static 方法是没有 this 首参的
 语句保持时序。使用 DeclaringClass.field / DeclaringClass.method()。
 字段必须有显式初始值；初始化时沿调用路径检查未完成 static 字段的读取，
 避免把 undefined 变成 VM 的默认 0。
-检查包括方法、访问器、构造函数以及同步数组回调中的间接读取。
+检查包括方法、访问器、构造函数、实际执行的默认参数以及同步回调中的
+间接读取；显式传入实参时跳过对应默认表达式。通过函数间接 new 也必须
+发生在目标 class 声明求值之后。初始化期间不能证明安全的回调会保守拒绝，
+请把依赖后续 static 字段的调用移到 class 声明之后。
 
 明确拒绝 static 成员里的 this、static 继承访问（Sub.inheritedStatic）、
 static getter/setter 及 static 块。改用显式声明类名、普通静态方法和
@@ -191,7 +194,8 @@ static getter/setter 及 static 块。改用显式声明类名、普通静态方
 - 方法值、方法回调、`.bind`、`.call`、`.apply`：直接调用 `obj.method(args)`，或者声明
   接收实例参数的普通函数。
 - 可能跨让出边界存活的 `this` 或其别名捕获：改用直接方法调用和显式实例参数。
-  普通嵌套函数自身的动态 `this` 绑定也不支持。
+  `super` 成员访问同样隐式捕获 this；检查包含虚方法重写、访问器和默认参数
+  中的间接让出。普通嵌套函数自身的动态 `this` 绑定也不支持。
 - class 表达式、嵌套运行时 class、装饰器：使用顶层具名 class 和显式初始化。
 - 运行时添加实例属性：在 class 中声明并初始化所有字段。
 - 方法重载、泛型 class / 方法、async / generator 方法、函数值字段：使用具体
@@ -224,6 +228,8 @@ static getter/setter 及 static 块。改用显式声明类名、普通静态方
   instanceof、访问器、static、优化及拒绝诊断。
 - `tests/fixtures/ts-classes-inherit.ts`：23 条标量日志，在 Node、解释器和
   JIT 中逐条一致。既有 289 条 JS 差分用例继续运行。
+- `tests/ts-classes-inherit-safety.test.mjs`：默认参数、class 声明时序、
+  静态初始化间接读取、super/虚调用/访问器的让出捕获，以及未使用类回归。
 
 生成的 class 示例还须执行 `node tools/editor-compat.mjs <作品.bcmkn>`，只有
 `ok: true` 视为通过编辑器兼容检查；这不替代运行语义及完整分享发布链路验证。

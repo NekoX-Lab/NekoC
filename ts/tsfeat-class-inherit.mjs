@@ -162,6 +162,14 @@ export function lowerClassInheritance(input) {
   const staticClass = node => ts.isIdentifier(unwrap(node)) ? bySymbol.get(checker.getSymbolAtLocation(unwrap(node))) : null;
   const accessKey = node => ts.isPropertyAccessExpression(node) ? node.name.text
     : ts.isElementAccessExpression(node) && (ts.isStringLiteralLike(unwrap(node.argumentExpression)) || ts.isNumericLiteral(unwrap(node.argumentExpression))) ? unwrap(node.argumentExpression).text : null;
+  const accessorUse = node => {
+    let n = node; while (n.parent && unwrap(n.parent) === node) n = n.parent;
+    const p = n.parent, assignment = ts.isBinaryExpression(p) && p.left === n
+      && p.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && p.operatorToken.kind <= ts.SyntaxKind.LastAssignment;
+    const update = (ts.isPrefixUnaryExpression(p) || ts.isPostfixUnaryExpression(p))
+      && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(p.operator);
+    return { get: !assignment || p.operatorToken.kind !== ts.SyntaxKind.EqualsToken, set: assignment || update };
+  };
   const enclosingClass = node => { while (node && !ts.isClassDeclaration(node)) node = node.parent; return byNode.get(node); };
   const access = node => {
     node = unwrap(node);
@@ -257,7 +265,7 @@ export function lowerClassInheritance(input) {
         if (state.has(0)) fail(node, "this or super member access before super() is not allowed", "call super before using this");
       }
       if (ts.isFunctionLike(node)) {
-        let captures = false; walk(node, child => { captures ||= child.kind === ts.SyntaxKind.ThisKeyword; });
+        let captures = false; walk(node, child => { captures ||= child.kind === ts.SyntaxKind.ThisKeyword || child.kind === ts.SyntaxKind.SuperKeyword; });
         if (captures && state.has(0)) fail(node, "Capturing this before super() is not supported", "create the closure after super");
         return state;
       }
@@ -414,30 +422,55 @@ export function lowerClassInheritance(input) {
   // Static fields are real globals, but a read before their class declaration
   // or initializer must never observe the VM's implicit zero. Follow static
   // and ordinary method bodies transitively while checking each initializer.
-  const staticReady = new Set();
+  const staticReady = new Set(), staticClasses = new Set();
+  let initializingClass = null;
+  const requireClassReady = (node, r) => {
+    if (r && !staticClasses.has(r) && !(initializingClass === r && enclosingClass(node) === r)) fail(node,
+      "A class or static member cannot be accessed before its class declaration has finished evaluating", "move the call or access after the class declaration");
+  };
+  const omittedDefault = (args, i) => i >= args.length
+    || ts.isIdentifier(unwrap(args[i])) && unwrap(args[i]).text === "undefined" && !checker.getSymbolAtLocation(unwrap(args[i]))?.declarations?.length;
   const staticReads = (node, seen = new Set()) => {
     if (!node || ts.isTypeNode(node) || ts.isFunctionLike(node)) return;
-    const inspectBody = declaration => {
-      if (declaration?.body && !seen.has(declaration)) {
-        seen.add(declaration); staticReads(declaration.body, seen);
+    const inspectBody = (declaration, args = []) => {
+      if (declaration && !seen.has(declaration)) {
+        seen.add(declaration);
+        for (const [i, p] of (declaration.parameters ?? []).entries()) if (p.initializer && omittedDefault(args, i)) staticReads(p.initializer, seen);
+        staticReads(declaration.body, seen);
+        seen.delete(declaration);
       }
     };
+    const inspectConstruction = (r, args) => {
+      if (!r || seen.has(r)) return;
+      seen.add(r);
+      if (!r.ctor && r.parent) inspectConstruction(r.parent, args);
+      if (r.ctor) inspectBody(r.ctor, args);
+      for (const field of r.fields.values()) if (field.initializer) staticReads(field.initializer, seen);
+      seen.delete(r);
+    };
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword) requireClassReady(node.right, staticClass(node.right));
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
       const a = access(node);
-      if (a?.static && !staticClasses.has(a.r)) fail(node, "A static class member cannot be used before its class declaration", "move the access after the class declaration");
+      if (a?.static) requireClassReady(node, a.r);
       if (a?.static && !a.method && !staticReady.has(a.member)) fail(node, "Static field is read before its declaration initializer has executed", "move the read after the field and class initialization");
-      if (a?.pair?.get) {
-        for (const c of a.super ? [a.r] : descendants(a.r)) inspectBody(findAccessor(c, a.name)?.get?.node);
+      if (a?.pair) {
+        const usage = accessorUse(node);
+        for (const c of a.super ? [a.r] : descendants(a.r)) {
+          const pair = findAccessor(c, a.name);
+          if (usage.get) inspectBody(pair?.get?.node);
+          if (usage.set) inspectBody(pair?.set?.node, [node]);
+        }
       }
     }
     if (ts.isCallExpression(node)) {
       const declaration = checker.getResolvedSignature(node)?.declaration;
-      inspectBody(declaration);
+      inspectBody(declaration, node.arguments);
       const a = access(node.expression);
-      if (a?.method && !a.static) for (const c of a.super ? [a.r] : descendants(a.r)) inspectBody(findMethod(c, a.name)?.node);
+      if (a?.method && !a.static) for (const c of a.super ? [a.r] : descendants(a.r)) inspectBody(findMethod(c, a.name)?.node, node.arguments);
       const callee = unwrap(node.expression);
+      if (callee.kind === ts.SyntaxKind.SuperKeyword) inspectConstruction(enclosingClass(node)?.parent, node.arguments);
       const synchronousCallbacks = new Set(["map", "filter", "forEach", "reduce", "find", "findIndex", "every", "some", "sort", "from", "warp"]);
-      if (synchronousCallbacks.has(callee.name?.text ?? callee.text)) {
+      if (declaration?.body || synchronousCallbacks.has(callee.name?.text ?? callee.text)) {
         for (const arg of node.arguments) {
           const callback = unwrap(arg);
           if (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback)) {
@@ -450,25 +483,21 @@ export function lowerClassInheritance(input) {
       }
     }
     if (ts.isNewExpression(node)) {
-      let r = staticClass(node.expression);
-      while (r && !seen.has(r)) {
-        seen.add(r);
-        for (const field of r.fields.values()) if (field.initializer) staticReads(field.initializer, seen);
-        if (r.ctor) staticReads(r.ctor.body, seen);
-        r = r.parent;
-      }
+      const r = staticClass(node.expression);
+      requireClassReady(node, r);
+      inspectConstruction(r, node.arguments ?? []);
     }
     ts.forEachChild(node, child => staticReads(child, seen));
   };
-  const staticClasses = new Set();
   for (const statement of file.statements) {
     const r = byNode.get(statement);
     if (r) {
-      staticClasses.add(r);
+      initializingClass = r;
       for (const member of r.node.members) {
         const field = [...r.statics.values()].find(s => s.node === member && !s.helper);
         if (field) { if (field.initializer) staticReads(field.initializer); staticReady.add(field); }
       }
+      staticClasses.add(r); initializingClass = null;
     } else staticReads(statement);
   }
 
@@ -551,9 +580,39 @@ export function lowerClassInheritance(input) {
   // Capture checking follows resolved calls to catch indirect yield boundaries.
   const yieldNames = new Set(["wait", "waitUntil", "ask", "askChoice", "glideTo", "glideChangeX", "glideChangeY", "broadcastAndWait", "tellAndWait", "syncTell", "playAudioAndWait", "say", "think", "stageDialog", "fadeVisibility", "appearWith"]);
   const canYield = (node, seen = new Set()) => {
-    if (!node || seen.has(node)) return false; seen.add(node);
+    if (!node || seen.has(node) || ts.isTypeNode(node) || ts.isFunctionLike(node)) return false; seen.add(node);
+    const invocationYields = (declaration, args = []) => {
+      if (!declaration || seen.has(declaration)) return false;
+      seen.add(declaration);
+      const yields = (declaration.parameters ?? []).some((p, i) => p.initializer && omittedDefault(args, i) && canYield(p.initializer, seen))
+        || canYield(declaration.body, seen);
+      seen.delete(declaration); return yields;
+    };
     if (ts.isCallExpression(node)) {
-      if (yieldNames.has(node.expression.name?.text ?? node.expression.text) || canYield(checker.getResolvedSignature(node)?.declaration?.body, seen)) return true;
+      const callee = unwrap(node.expression);
+      if (yieldNames.has(callee.name?.text ?? callee.text) || invocationYields(checker.getResolvedSignature(node)?.declaration, node.arguments)) return true;
+      const a = access(callee);
+      if (a?.method && !a.static && (a.super ? [a.r] : descendants(a.r)).some(c => invocationYields(findMethod(c, a.name)?.node, node.arguments))) return true;
+      for (const arg of node.arguments) {
+        const callback = unwrap(arg);
+        if (ts.isFunctionLike(callback) && invocationYields(callback)) return true;
+        if (ts.isIdentifier(callback) && checker.getSymbolAtLocation(callback)?.declarations?.some(d => invocationYields(d.initializer ?? d))) return true;
+      }
+    }
+    if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+      const a = access(node);
+      const usage = accessorUse(node);
+      if (a?.pair && (a.super ? [a.r] : descendants(a.r)).some(c => {
+        const pair = findAccessor(c, a.name);
+        return usage.get && invocationYields(pair?.get?.node) || usage.set && invocationYields(pair?.set?.node, [node]);
+      })) return true;
+    }
+    if (ts.isNewExpression(node)) {
+      let r = staticClass(node.expression);
+      while (r) {
+        if (invocationYields(r.ctor, node.arguments ?? []) || [...r.fields.values()].some(field => canYield(field.initializer, seen))) return true;
+        r = r.parent;
+      }
     }
     return !!ts.forEachChild(node, c => canYield(c, seen));
   };
@@ -569,12 +628,12 @@ export function lowerClassInheritance(input) {
     }); }
     walk(member, n => {
       if (!ts.isArrowFunction(n) && !ts.isFunctionExpression(n) && !ts.isFunctionDeclaration(n)) return;
-      let captured = false; walk(n.body, c => { captured ||= c.kind === ts.SyntaxKind.ThisKeyword || ts.isIdentifier(c) && aliases.has(checker.getSymbolAtLocation(c)); });
+      let captured = false; walk(n, c => { captured ||= c.kind === ts.SyntaxKind.ThisKeyword || c.kind === ts.SyntaxKind.SuperKeyword || ts.isIdentifier(c) && aliases.has(checker.getSymbolAtLocation(c)); });
       if (!captured) return;
       let wrapper = n; while (ts.isParenthesizedExpression(wrapper.parent)) wrapper = wrapper.parent;
       const call = wrapper.parent;
       const immediate = ts.isCallExpression(call) && (call.expression === wrapper || ts.isIdentifier(call.expression) && call.expression.text === "warp" && call.arguments.includes(wrapper));
-      if (!ts.isArrowFunction(n) || !immediate || canYield(n.body)) fail(n, "Closures capturing this across yield boundaries and dynamic function this are not supported", "use a direct instance method or explicit instance parameter");
+      if (!ts.isArrowFunction(n) || !immediate || canYield(call)) fail(n, "Closures capturing this across yield boundaries and dynamic function this are not supported", "use a direct instance method or explicit instance parameter");
     });
   }
 
@@ -715,7 +774,8 @@ export function lowerClassInheritance(input) {
         const concreteBody = ts.visitNode(body, replaceReturn);
         const signature = checker.getReturnTypeOfSignature(checker.getSignatureFromDeclaration(m.node));
         const returns = n => ts.isReturnStatement(n) && !!n.expression || ts.isBlock(n) && n.statements.some(returns) || ts.isIfStatement(n) && n.elseStatement && returns(n.thenStatement) && returns(n.elseStatement);
-        let bare = false; walk(m.node.body, n => { if (ts.isReturnStatement(n) && !n.expression) bare = true; });
+        const hasBareReturn = n => !ts.isFunctionLike(n) && (ts.isReturnStatement(n) && !n.expression || !!ts.forEachChild(n, hasBareReturn));
+        const bare = hasBareReturn(m.node.body);
         if (!(signature.flags & ts.TypeFlags.Void) && (!returns(m.node.body) || bare)) fail(m.node, "Value-returning methods must return a concrete value on every path", "add an explicit final return");
         const args = [m.static ? "" : `${r.self}: ${r.name}`, parameters(m.node.parameters, r)].filter(Boolean).join(", " );
         addHelper(m.helper, `function ${m.helper}(${args}): ${returnType(m)} { ${concreteBody.statements.map(print).join("\n")} ${signature.flags & ts.TypeFlags.Void ? "return 0;" : ""} }`, m.node);
@@ -802,7 +862,22 @@ export function lowerClassInheritance(input) {
       const lines = text.slice(e.start,e.end).match(/\n/g)?.length ?? 0;
       text = text.slice(0,e.start) + e.text.replace(/\r?\n\s*/g, " ") + "\n".repeat(lines) + text.slice(e.end);
     }
-    text += "\n" + [...declarations.entries()].filter(([name]) => !records.some(r => r.name === name)).map(([,code]) => code).join("\n") + "\n" + helpers.join("\n") + "\n";
+    // Unused class helpers can contain field accesses without any allocation
+    // anywhere in the program. Do not send those unreachable bodies through
+    // the ordinary compiler, which correctly has no heap in that case.
+    const reachable = new Set();
+    let changed = true, references = text;
+    while (changed) {
+      changed = false;
+      for (const code of helpers) {
+        const name = /^function (\w+)/.exec(code)[1];
+        if (!reachable.has(name) && new RegExp(`\\b${name}\\b`).test(references)) {
+          reachable.add(name); references += "\n" + code; changed = true;
+        }
+      }
+    }
+    text += "\n" + [...declarations.entries()].filter(([name]) => !records.some(r => r.name === name)).map(([,code]) => code).join("\n")
+      + "\n" + helpers.filter(code => reachable.has(/^function (\w+)/.exec(code)[1])).join("\n") + "\n";
     const output = ts.createSourceFile(input.fileName, text, input.languageVersion, true, input.scriptKind);
     classSourceOrigins.set(output, origins);
     return output;
