@@ -62,8 +62,10 @@ JavaScript 的 `undefined` 被用户读取。
 属性的计算。`constructor(public x: number)`、TypeScript 的 `private` /
 `protected` / `readonly` 参数属性均可声明实例字段；`#x` 私有名字不支持。
 
-运行时尚无 `undefined` 字段存储。无初始值的字段必须在所有构造函数路径
-结束前赋值。前向字段读取、未初始化字段读取及字段初始化完成前让 `this`
+可选字段 `x?: T` 和类型含 `null` / `undefined` 的无初始值字段在分配时写入
+undefined 哨兵，读出 `undefined`；`next: Node | null = null` 这类可空字段照常
+初始化（见 [null / undefined 与可选链](ts-nullable.md)）。其他无初始值的字段
+必须在所有构造函数路径结束前赋值。前向字段读取、未初始化字段读取及字段初始化完成前让 `this`
 逃逸会产生带源码位置的错误。请显式初始化字段，或使用标量有效性标记。
 编译器不会将堆中保留的 `0` 解释成 JavaScript 的缺失字段值。
 构造函数默认参数可能被显式实参跳过，因此其中的字段赋值不能作为必定
@@ -85,7 +87,8 @@ JavaScript 的 `undefined` 被用户读取。
 保存局部变量和需要跨递归调用保留的临时值；不同实例之间的递归调用保持
 各自的 `this`。属性复合赋值在右侧求值前保存接收者和旧字段值。
 无返回值的方法只能作为独立语句调用；有返回值的方法必须在每条路径显式
-返回具体值，不能读取隐式的 `undefined` 结果。当前返回路径证明支持顺序
+返回具体值，不能读取隐式的 `undefined` 结果；返回类型含 `undefined` 时，
+`return;` 和 `return undefined;` 都返回 undefined 哨兵。当前返回路径证明支持顺序
 语句及完整的 `if` / `else` 分支；复杂控制流可在末尾增加显式返回。
 
 带参数的自制积木继续使用官方参数 id：定义中的

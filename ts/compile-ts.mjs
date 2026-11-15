@@ -17,6 +17,8 @@ import { lowerTsSequences } from "./tsfeat-sequences.mjs";
 import { lowerTsFeatures } from "./tsfeat-lowering.mjs";
 import { lowerTsMethods } from "./tsfeat-methods.mjs";
 import { lowerTsClasses } from "./tsfeat-classes.mjs";
+import { lowerTsNullable } from "./tsfeat-nullable.mjs";
+import { compileNilIntrinsic, nilIntrinsic } from "./nil-intrinsics.mjs";
 import { classFunctionNames, classSourceOrigins, markClassHelpers } from "./class-metadata.mjs";
 
 /** A compile error. `location` is { file, line, column } (1-based) when known. */
@@ -67,7 +69,7 @@ function rejectParseDiagnostics(sourceFile) {
 
 function lowerFrontendFeatures(sourceFile) {
   try {
-    const classes = lowerTsClasses(sourceFile);
+    const classes = lowerTsClasses(lowerTsNullable(sourceFile));
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
       .map(node => node.name.text));
@@ -3998,6 +4000,8 @@ class WorkspaceCompiler {
 
   compileExpressionCall(call, parentId) {
     const name = calleeName(call.expression);
+    const nil = nilIntrinsic(name);
+    if (nil) return compileNilIntrinsic(this, nil, call, parentId);
     if (name === "Array.isArray") {
       if (call.arguments.length !== 1) this.unsupported(call, "Array.isArray expects one argument");
       const arg = stripParens(call.arguments[0]);

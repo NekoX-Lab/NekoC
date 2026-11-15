@@ -35,7 +35,9 @@ Data objects use numeric references into a hidden global list heap (not private
 initialized properties, nested/aliased values, objects in arrays, function
 parameters/returns and root timers preserve reference identity. `obj.key` and
 `obj[key]` require compile-time constant keys. Standalone property updates and
-compound assignments are supported; missing/optional properties, dynamic keys,
+compound assignments are supported; optional properties declared as `x?: T` may
+be omitted and read `undefined` (see [null / undefined](ts-nullable.md));
+undeclared properties, dynamic keys,
 object coercion/logging/JSON, `delete`, and value-producing property updates are
 compile errors. Log scalar properties instead. Object programs use custom
 procedures rather than argument-substituting inlining; recursive object mutation
@@ -142,8 +144,9 @@ onStart(() => {
   every increment after `continue`. Commas in conditional operands or loop tests
   are compile errors; split them into statements in the corresponding body.
 - `null`/uninitialized `let` comparisons and `typeof` fold when values are
-  statically known and unchanged. Runtime nullish storage is rejected: use a
-  concrete initialized value plus an explicit validity/type flag.
+  statically known and unchanged. Runtime null/undefined storage is supported
+  for types that spell out `null`/`undefined` (`T | null`, `x?: T`); see
+  [null / undefined](ts-nullable.md). Nulls in `any`/`unknown` remain errors.
 - Constant `toFixed`, numeric `toString(radix)`, `isNaN`, `Number.isNaN`,
   `charCodeAt`, `String.fromCharCode`, string `at` and `slice` follow JS semantics.
   Dynamic numeric decimal `toString()` and string `slice` with constant bounds
@@ -290,7 +293,7 @@ Labels are preserved as control targets. Labeled break can leave nested loops or
 
 ### Lazy Values and Updates
 
-`&&`, `||` and `?:` compile to reporter procedures containing statement-level branches, evaluating only the selected operand and preserving its value. `Math.max`, `Math.min`, `Math.trunc` and boolean-to-number conversion use the same reporter shape: each argument is evaluated once, and no `logic_ternary` (missing from the share player) is emitted. Value-producing `a++`, `++a`, `a--`, `--a` support mutable simple variables; parameter/property updates in expression slots are rejected. `??` currently accepts statically non-nullish numeric, string or boolean operands, including a binding whose declarations and assignments all prove primitive literals; other nullable operands are compile errors, not truthiness tests (`let a = 0; a ?? 7` remains `0`).
+`&&`, `||` and `?:` compile to reporter procedures containing statement-level branches, evaluating only the selected operand and preserving its value. `Math.max`, `Math.min`, `Math.trunc` and boolean-to-number conversion use the same reporter shape: each argument is evaluated once, and no `logic_ternary` (missing from the share player) is emitted. Value-producing `a++`, `++a`, `a--`, `--a` support mutable simple variables; parameter/property updates in expression slots are rejected. `??` currently accepts statically non-nullish numeric, string or boolean operands, including a binding whose declarations and assignments all prove primitive literals; operands whose type spells out `null`/`undefined` test the runtime sentinel and evaluate the fallback lazily ([null / undefined](ts-nullable.md)); `??` is never a truthiness test (`let a = 0; a ?? 7` remains `0`).
 
 ### Empty Statements
 
@@ -382,7 +385,12 @@ const item = arr[0];
 
 ```ts
 const value = expr ?? defaultValue;
+config.width ??= 100;
+const size = node?.next?.value ?? 0;
 ```
+
+`?.`, `??` and `??=` work on values typed with `null`/`undefined`; see
+[null / undefined and optional chaining](ts-nullable.md).
 
 ### Async/Await (Stripped)
 
