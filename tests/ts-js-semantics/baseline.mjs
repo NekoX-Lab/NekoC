@@ -15,7 +15,7 @@ const errors = {
   182: "new Set() is not supported",
   183: "Reading a null/undefined variable at runtime is not supported",
   185: "Unsupported expression call: Date.now",
-  186: "instanceof is not supported in class stage 1",
+  186: "instanceof requires a statically known class identifier",
   187: "Unsupported binary expression operator",
   188: "delete is not supported",
   190: "Cannot determine JavaScript + / += semantics for any, union or non-primitive operands",

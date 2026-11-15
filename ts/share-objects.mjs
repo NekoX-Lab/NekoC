@@ -46,7 +46,8 @@ export function objectTypes(sourceFiles, origins = new WeakMap()) {
       return resolved ? { resolvedFileName: resolved, extension: ts.Extension.Ts } : undefined;
     }),
   };
-  const checker = ts.createProgram([...files.keys()], { noLib: true, strictNullChecks: true }, host).getTypeChecker();
+  const program = ts.createProgram([...files.keys()], { noLib: true, strictNullChecks: true }, host);
+  const checker = program.getTypeChecker();
   // The compiler reuses source nodes in synthetic inline expressions. Snapshot
   // types while the source tree still has its original parents; querying the
   // checker after lowering can otherwise crash inside TypeScript.
@@ -128,7 +129,7 @@ export function objectTypes(sourceFiles, origins = new WeakMap()) {
       || [...state.targets].some(node => byNode.get(node)?.yields))) { state.yields = true; changed = true; }
   }
   const unsafeLocals = new Set([...functions.values()].filter(s => s.locals && s.yields).map(s => s.node));
-  return { array, object, objectType, contains, key, string, type, symbol, checker, dataObjects, unsafeLocals };
+  return { array, object, objectType, contains, key, string, type, symbol, checker, program, dataObjects, unsafeLocals };
 }
 
 export function validateObjectOperations(file, types, reject) {

@@ -1,10 +1,12 @@
 import ts from "typescript";
 import { objectTypes } from "./share-objects.mjs";
 import { classSourceOrigins } from "./class-metadata.mjs";
+import { needsClassInheritance, lowerClassInheritance } from "./tsfeat-class-inherit.mjs";
 
 // Classes are statically bound functions plus ordinary share-object handles.
 // No prototype lookup, method values or host objects reach the block compiler.
 export function lowerTsClasses(input) {
+  if (needsClassInheritance(input)) return lowerClassInheritance(input);
   const ambient = node => !!(node.flags & ts.NodeFlags.Ambient)
     || node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.DeclareKeyword);
   const hasClasses = node => !ambient(node) && !ts.isTypeNode(node) && (ts.isClassDeclaration(node) || ts.isClassExpression(node)

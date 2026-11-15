@@ -66,3 +66,56 @@ fn classes_preserve_javascript_scalar_logs_in_interpreter_and_jit() {
         assert_eq!(logs, expected, "jit={jit}");
     }
 }
+
+#[test]
+fn inheritance_preserves_javascript_scalar_logs_in_interpreter_and_jit() {
+    let dir = tempdir().unwrap();
+    let input = dir.path().join("inheritance.ts");
+    let output = dir.path().join("inheritance.bcmkn");
+    fs::write(&input, include_str!("fixtures/ts-classes-inherit.ts")).unwrap();
+    bcmkn_compiler::compile_ts_bcmkn(&input, "samples/kitten-n-0.27.4.bcmkn", &output).unwrap();
+    let project: Value = serde_json::from_slice(&fs::read(output).unwrap()).unwrap();
+    let expected = [
+        "before-super;base-field;base-body;cat-field;after-super;kitten-field;",
+        "cat!3",
+        "base-field;base-body;dog-field;",
+        "cat!",
+        "true",
+        "true",
+        "1",
+        "dog",
+        "true",
+        "false",
+        "cat",
+        "true",
+        "true",
+        "cat!3",
+        "2",
+        "5",
+        "10",
+        "7",
+        "true",
+        "static-one;static-two;after-class;",
+        "2",
+        "4",
+        "4",
+    ];
+    for jit in [false, true] {
+        let mut engine = Engine::new(Program::compile(&project).unwrap());
+        if !jit {
+            engine.disable_jit();
+        }
+        engine.use_virtual_clock();
+        engine.start();
+        let mut logs = Vec::new();
+        for _ in 0..120 {
+            logs.extend(
+                engine
+                    .advance(1.0 / 60.0, 100_000, Duration::from_secs(2))
+                    .unwrap()
+                    .logs,
+            );
+        }
+        assert_eq!(logs, expected, "jit={jit}");
+    }
+}
