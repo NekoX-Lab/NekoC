@@ -54,6 +54,7 @@ export function lowerClassInheritance(input) {
     if (!node.name || !(ts.isIdentifier(node.name) || ts.isStringLiteralLike(node.name) || ts.isNumericLiteral(node.name))) fail(node,
       "Dynamic class member names are not supported", "use a literal field or method name");
     if (node.name.text === "__proto__") fail(node, "__proto__ members are not supported", "choose an ordinary name");
+    if (node.name.text.startsWith("__nekocClass_")) fail(node.name, "Class member names starting with __nekocClass_ are reserved", "rename the field or method");
     return node.name.text;
   };
   const decorated = node => ts.canHaveDecorators(node) && ts.getDecorators(node)?.length;
@@ -147,7 +148,14 @@ export function lowerClassInheritance(input) {
   const related = (a, b) => a.root === b.root && (a.pre >= b.pre && a.pre <= b.post || b.pre >= a.pre && b.pre <= a.post);
   const classFromType = t => {
     if (t?.isThisType) return classFromType(t.getConstraint());
-    if (!t || t.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Union | ts.TypeFlags.Intersection | ts.TypeFlags.TypeParameter)) return null;
+    if (!t || t.flags & (ts.TypeFlags.Any | ts.TypeFlags.Unknown | ts.TypeFlags.Intersection | ts.TypeFlags.TypeParameter)) return null;
+    if (t.isUnion()) {
+      const classes = t.types.map(classFromType);
+      if (classes.some(c => !c) || classes.some(c => c.root !== classes[0].root)) return null;
+      let common = classes[0];
+      while (common && classes.some(c => c.pre < common.pre || c.pre > common.post)) common = common.parent;
+      return common;
+    }
     return bySymbol.get(t.getSymbol()) ?? null;
   };
   const classOf = node => classFromType(checker.getTypeAtLocation(node));
@@ -203,7 +211,8 @@ export function lowerClassInheritance(input) {
     seen.get(from).add(to);
     if (from.isUnion()) { for (const t of from.types) preserve(node, t, to, seen); return; }
     if (to.isUnion()) {
-      if (classFromType(from) && !to.types.some(t => classFromType(t) && related(classFromType(from), classFromType(t)))) fail(node, "Class references cannot be erased into unrelated unions");
+      const source = classFromType(from);
+      if (source && !to.types.some(t => { const target = classFromType(t); return target && source.root === target.root && source.pre >= target.pre && source.pre <= target.post; })) fail(node, "Class references cannot be erased into unrelated unions or unchecked downcasts");
       return;
     }
     const a = classFromType(from), b = classFromType(to);
@@ -342,13 +351,17 @@ export function lowerClassInheritance(input) {
         const callee = unwrap(node.expression);
         if (ts.isArrowFunction(callee) || ts.isFunctionExpression(callee)) {
           for (const arg of node.arguments) expr(arg, state, active);
-          if (ts.isBlock(callee.body)) stmt(callee.body, state, active);
-          else expr(callee.body, state, active);
+          const next = new Set(active).add(callee);
+          if (ts.isBlock(callee.body)) {
+            const local = new Set(state), exits = [];
+            if (!stmt(callee.body, local, next, exits)) exits.push(local);
+            for (const name of r.allFields.keys()) if (exits.length && exits.every(s => s.has(name))) state.add(name);
+          } else expr(callee.body, state, next);
           return;
         }
         if (node.expression.kind === ts.SyntaxKind.SuperKeyword) { for (const a of node.arguments) expr(a, state, active); return; }
         const a = access(node.expression);
-        if (a?.method && !a.static && (a.super || unwrap(node.expression.expression)?.kind === ts.SyntaxKind.ThisKeyword)) {
+        if (a?.method && !a.static && (a.super || unwrap(callee.expression)?.kind === ts.SyntaxKind.ThisKeyword)) {
           const m = a.method;
           if (!a.super && descendants(r).some(c => findMethod(c, m.name) !== m)) fail(node,
             "Virtual call during construction may reach an override before subclass fields are initialized", "move the call after new, or call a non-overridden initialization helper");
@@ -387,7 +400,10 @@ export function lowerClassInheritance(input) {
       expr(node, state, active); return false;
     };
     for (const field of r.fields.values()) if (!field.parameter) {
-      initialized.delete(field.name); if (field.initializer) { expr(field.initializer, initialized); initialized.add(field.name); }
+      // JS evaluates an initializer before defining the own field. A same-name
+      // inherited value is still available while evaluating the RHS.
+      if (field.initializer) { expr(field.initializer, initialized); initialized.add(field.name); }
+      else initialized.delete(field.name);
     }
     for (const p of r.ctor?.parameters ?? []) if (p.initializer) expr(p.initializer, new Set(initialized));
     for (const field of r.fields.values()) if (field.parameter) initialized.add(field.name);
@@ -401,15 +417,36 @@ export function lowerClassInheritance(input) {
   const staticReady = new Set();
   const staticReads = (node, seen = new Set()) => {
     if (!node || ts.isTypeNode(node) || ts.isFunctionLike(node)) return;
+    const inspectBody = declaration => {
+      if (declaration?.body && !seen.has(declaration)) {
+        seen.add(declaration); staticReads(declaration.body, seen);
+      }
+    };
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
       const a = access(node);
       if (a?.static && !staticClasses.has(a.r)) fail(node, "A static class member cannot be used before its class declaration", "move the access after the class declaration");
       if (a?.static && !a.method && !staticReady.has(a.member)) fail(node, "Static field is read before its declaration initializer has executed", "move the read after the field and class initialization");
+      if (a?.pair?.get) {
+        for (const c of a.super ? [a.r] : descendants(a.r)) inspectBody(findAccessor(c, a.name)?.get?.node);
+      }
     }
     if (ts.isCallExpression(node)) {
       const declaration = checker.getResolvedSignature(node)?.declaration;
-      if (declaration?.body && !seen.has(declaration)) {
-        seen.add(declaration); staticReads(declaration.body, seen);
+      inspectBody(declaration);
+      const a = access(node.expression);
+      if (a?.method && !a.static) for (const c of a.super ? [a.r] : descendants(a.r)) inspectBody(findMethod(c, a.name)?.node);
+      const callee = unwrap(node.expression);
+      const synchronousCallbacks = new Set(["map", "filter", "forEach", "reduce", "find", "findIndex", "every", "some", "sort", "from", "warp"]);
+      if (synchronousCallbacks.has(callee.name?.text ?? callee.text)) {
+        for (const arg of node.arguments) {
+          const callback = unwrap(arg);
+          if (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback)) {
+            inspectBody(callback);
+            if (!ts.isBlock(callback.body)) staticReads(callback.body, seen);
+          } else if (ts.isIdentifier(callback)) {
+            for (const decl of checker.getSymbolAtLocation(callback)?.declarations ?? []) inspectBody(decl.initializer ?? decl);
+          }
+        }
       }
     }
     if (ts.isNewExpression(node)) {
@@ -545,12 +582,19 @@ export function lowerClassInheritance(input) {
   // when a derived handle is passed through a base-typed procedure. These are
   // private type declarations; users cannot access another class's fields.
   const treeFields = new Map();
+  const storageType = field => {
+    const type = checker.getTypeAtLocation(field.node.name);
+    if (type.flags & ts.TypeFlags.StringLike) return "string";
+    if (type.flags & ts.TypeFlags.NumberLike) return "number";
+    if (type.flags & ts.TypeFlags.BooleanLike) return "boolean";
+    return typeText(field.type);
+  };
   for (const r of records.filter(r => !r.parent)) {
     const fields = new Map();
     for (const c of descendants(r)) for (const [name, field] of c.fields) {
       const old = fields.get(name);
-      if (old && typeText(old.type) !== typeText(field.type) && (checker.getTypeAtLocation(old.node.name).flags & ts.TypeFlags.Object || checker.getTypeAtLocation(field.node.name).flags & ts.TypeFlags.Object)) fail(field.node,
-        "Inherited/shared reference fields must keep the same type", "use matching field types or distinct names");
+      if (old && storageType(old) !== storageType(field)) fail(field.node,
+        "Inherited/shared fields must keep the same type throughout an inheritance tree", "use matching field types or distinct names");
       fields.set(name, field);
     }
     treeFields.set(r, fields);
@@ -560,6 +604,7 @@ export function lowerClassInheritance(input) {
   const target = (r, name, kind, direct = false, arity = undefined) => {
     const m = implementation(r, name, kind);
     if (!m) fail(r.node, "Missing " + kind + " implementation for " + name);
+    if (direct && m.abstract) fail(m.node, "super cannot call an abstract member without an implementation", "call a concrete ancestor implementation or use a virtual this call after construction");
     const concrete = descendants(r).filter(c => !c.abstract);
     const choices = concrete.map(c => ({ c, m: implementation(c, name, kind) }));
     if (direct || !m.abstract && choices.every(choice => choice.m === m)) return m.helper;
@@ -605,7 +650,7 @@ export function lowerClassInheritance(input) {
       }
       const a = access(node.expression);
       if (a?.method) return call(a.static ? a.method.helper : target(a.r, a.name, "method", a.super, node.arguments.length),
-        [...a.static ? [] : [a.super ? id(self) : transformed(node.expression.expression, self, owner)], ...node.arguments.map(arg => transformed(arg, self, owner))]);
+        [...a.static ? [] : [a.super ? id(self) : transformed(unwrap(node.expression).expression, self, owner)], ...node.arguments.map(arg => transformed(arg, self, owner))]);
     }
     if (ts.isNewExpression(node)) {
       const r = staticClass(node.expression);
@@ -735,7 +780,9 @@ export function lowerClassInheritance(input) {
       const ps = d.m.node.parameters.slice(0, d.arity), receiver = fresh("receiver"), classId = fresh("classId"), names = ps.map((_, i) => fresh("arg" + i));
       const groups = [];
       for (const choice of d.choices) {
-        if (!choice.m || choice.m.abstract) fail(d.r.node, "Concrete class lacks an abstract implementation");
+        if (!choice.m) fail(choice.c.node, `Class ${choice.c.name} accessor ${d.m.name} has no ${d.m.kind === "set" ? "setter" : "getter"} implementation`,
+          "declare matching getter and setter implementations in the overriding class");
+        if (choice.m.abstract) fail(choice.c.node, "Concrete class lacks an abstract implementation");
         const last = groups.at(-1);
         if (last?.m === choice.m && last.end + 1 === choice.c.pre) last.end = choice.c.pre;
         else groups.push({start:choice.c.pre, end:choice.c.pre, m:choice.m});
@@ -743,7 +790,10 @@ export function lowerClassInheritance(input) {
       // With no concrete descendant no valid handle can enter this dispatcher.
       // Keep an uninhabited recursive continuation rather than inventing a
       // result (in particular an invalid object zero) for abstract-only trees.
-      const body = groups.length ? groups.map((g, i) => `${i === groups.length - 1 ? "" : `if (${classId} >= ${g.start} && ${classId} <= ${g.end}) `}{ return ${g.m.helper}(${receiver}${names.length ? ", " + names.join(", ") : ""}); }`).join("\n")
+      const body = groups.length ? groups.map((g, i) => {
+        const forwarded = names.slice(0, g.m.node.parameters.length);
+        return `${i === groups.length - 1 ? "" : `if (${classId} >= ${g.start} && ${classId} <= ${g.end}) `}{ return ${g.m.helper}(${receiver}${forwarded.length ? ", " + forwarded.join(", ") : ""}); }`;
+      }).join("\n")
         : `return ${d.name}(${receiver}${names.length ? ", " + names.join(", ") : ""});`;
       addHelper(d.name, `function ${d.name}(${receiver}: ${d.r.name}${names.length ? ", " + names.map((n, i) => n + ": " + typeText(ps[i].type ?? inferredType(ps[i].name))).join(", ") : ""}): ${returnType(d.m)} { const ${classId} = ${receiver}[${JSON.stringify(tag)}]; ${body} }`, d.m.node);
     }
