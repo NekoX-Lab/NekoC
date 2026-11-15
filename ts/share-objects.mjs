@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { classAllocationPlaceholders } from "./class-metadata.mjs";
 
 const REGEX_MESSAGE = "Regular expressions are not supported; use string methods such as includes, indexOf or split";
 
@@ -182,6 +183,10 @@ export function validateObjectOperations(file, types, reject) {
     return signature && checker.getReturnTypeOfSignature(signature);
   };
   const visit = node => {
+    // A newly allocated instance reserves every field before running any user
+    // initializer. These inaccessible slots have been checked by the class
+    // pass; a user cast must still pass the ordinary reference-shape rules.
+    if (classAllocationPlaceholders.has(node)) return;
     if (types.dataObjects && types.unsafeLocals.has(node)) reject(node, "Functions with local state cannot yield or call yielding functions in object programs; rewrite as a state machine or pass explicit per-event state parameters");
     if (types.dataObjects && ts.isThrowStatement(node)) reject(node, "Throw across object allocation/procedure boundaries is not supported; return an explicit scalar status and branch before creating objects instead");
     if (ts.isObjectLiteralExpression(node) && node.properties.some(p => p.name && ts.isComputedPropertyName(p.name))) {

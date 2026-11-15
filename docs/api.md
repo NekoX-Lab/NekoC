@@ -2,6 +2,15 @@
 
 Complete reference for all functions and APIs available in NekoC TypeScript projects.
 
+## TypeScript classes
+
+Class declarations, fields, constructors (including parameter properties), `new`,
+instance methods and `this` use the existing share-object heap and custom
+procedures. Method calls require one statically known concrete receiver class.
+Inheritance, static members, accessors, method values and runtime field additions
+are rejected. See [TypeScript classes, stage 1](ts-classes.md) for initialization
+order, per-call recursion frames and the complete supported subset.
+
 ## TypeScript arrays
 
 - `a[i]` reads the zero-based element with the share-player `list_item` block.

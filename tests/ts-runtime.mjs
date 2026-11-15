@@ -8,10 +8,10 @@ import ts from "typescript";
 // Exercise the real compiler and VM, then compare with the same source in JS.
 // A retained artifact directory lets integration runs check the generated works
 // with the official editor and share-player registry afterwards.
-export function assertJsLogs(source) {
+export function assertJsLogs(source, compilerOptions = {}) {
   const expected = [];
   const javascript = ts.transpileModule(source, {
-    compilerOptions: { target: ts.ScriptTarget.ES2020 },
+    compilerOptions: { target: ts.ScriptTarget.ES2020, ...compilerOptions },
   }).outputText;
   vm.runInNewContext(javascript, {
     onStart: callback => callback(),
