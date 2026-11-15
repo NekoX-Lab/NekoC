@@ -88,7 +88,9 @@ export function objectTypes(sourceFiles, origins = new WeakMap()) {
   const functions = new Map();
   const scanFunctions = node => {
     if (ts.isObjectLiteralExpression(node)) {
-      const p = node.parent;
+      // 舞台/角色声明的参数可以嵌套对象和数组（如 costumes 列表），沿字面量向上找到所在调用。
+      let p = node.parent;
+      while (ts.isArrayLiteralExpression(p) || ts.isPropertyAssignment(p) || ts.isObjectLiteralExpression(p) || ts.isParenthesizedExpression(p)) p = p.parent;
       const name = ts.isCallExpression(p) ? p.expression.getText() : "";
       if (!["stage", "sprite", "screen", "Array.from", "defineProc", "defineReporter", "keyButton"].includes(name)) dataObjects = true;
     }

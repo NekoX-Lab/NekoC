@@ -312,6 +312,14 @@ test("object type queries do not change scalar nested-array helper inference", (
   assert.ok(reportBlocks(report).some(({block}) => block.type === "list_item"));
 });
 
+test("nested costume objects in sprite declarations do not turn on object-program rules", () => {
+  // samples/stage_demo.nk.ts：costumes 数组里的对象属于角色声明，等待中的循环变量不应被拒绝。
+  const report = compileSource(`sprite("cat", { costumes: [{ name: "idle", url: "a.png" }, { name: "walk", url: "b.png" }] }, (self) => {
+  self.onStart(() => { for (let step = 0; step < 3; step++) { self.changeX(10); self.wait(0.1); } console.log("done"); });
+});`);
+  assert.ok(reportBlocks(report).length > 0);
+});
+
 const valuedUpdates = [
   ["postfix initialization", `const object = { value: 1 }; const result = object.value++; console.log(result);`],
   ["prefix initialization", `const object = { value: 1 }; const result = ++object.value; console.log(result);`],
