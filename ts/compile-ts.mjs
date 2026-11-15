@@ -16,6 +16,8 @@ import { lowerTsValues } from "./tsfeat-values.mjs";
 import { lowerTsSequences } from "./tsfeat-sequences.mjs";
 import { lowerTsFeatures } from "./tsfeat-lowering.mjs";
 import { lowerTsMethods } from "./tsfeat-methods.mjs";
+import { lowerTsClasses } from "./tsfeat-classes.mjs";
+import { classFunctionNames, classSourceOrigins, markClassHelpers } from "./class-metadata.mjs";
 
 /** A compile error. `location` is { file, line, column } (1-based) when known. */
 export class CompileError extends Error {
@@ -65,7 +67,25 @@ function rejectParseDiagnostics(sourceFile) {
 
 function lowerFrontendFeatures(sourceFile) {
   try {
-    return lowerTsFeatures(lowerTsSequences(lowerTsValues(lowerTsMethods(sourceFile))));
+    const classes = lowerTsClasses(sourceFile);
+    const names = new Set(classes === sourceFile ? [] : classes.statements
+      .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
+      .map(node => node.name.text));
+    const lowered = lowerTsFeatures(lowerTsSequences(lowerTsValues(lowerTsMethods(classes))));
+    if (names.size) {
+      const file = ts.getOriginalNode(lowered);
+      markClassHelpers(file, names);
+      const origins = classSourceOrigins.get(classes);
+      const mark = (node, origin) => {
+        helperOrigins.set(node, origin);
+        ts.forEachChild(node, child => mark(child, origin));
+      };
+      for (const statement of file.statements) {
+        const origin = origins?.get(statement.name?.text);
+        if (origin) mark(statement, origin);
+      }
+    }
+    return lowered;
   } catch (error) {
     if (error instanceof CompileError) throw error;
     throw new CompileError(error.message, error.location ?? nodeLocation(sourceFile));
@@ -579,6 +599,7 @@ class WorkspaceCompiler {
     }
     this.inlineFunctions.set(name, {
       name,
+      classGenerated: classFunctionNames.get(ts.getOriginalNode(statement.getSourceFile()))?.has(name) ?? false,
       params: params.map((param) => {
         if (!ts.isIdentifier(param.name)) {
           this.unsupported(param, "Only identifier function parameters are supported");
@@ -629,7 +650,7 @@ class WorkspaceCompiler {
     const generated = fn => Number(functionSourceFile(fn).fileName.startsWith("__nekoc_"));
     const functions = [...this.inlineFunctions].sort(([, a], [, b]) => generated(a) - generated(b));
     for (const [name, fn] of functions) {
-      if (this.objectSlots.size && reaches(name, name)) {
+      if (this.objectSlots.size && reaches(name, name) && !fn.classGenerated) {
         let mutableObjectState = false;
         visitFunctionBody(fn.body, node => {
           mutableObjectState ||= ts.isObjectLiteralExpression(node)
@@ -659,7 +680,7 @@ class WorkspaceCompiler {
         && statements.slice(0, -1).every((statement) => ts.isVariableStatement(statement))
       );
       const simpleStatement = ts.isBlock(fn.body) && !hasReturn;
-      if (!this.objectSlots.size && !reaches(name, name) && (simpleExpression || simpleStatement)) {
+      if (!this.objectSlots.size && !fn.classGenerated && !reaches(name, name) && (simpleExpression || simpleStatement)) {
         continue;
       }
       if (this.procedureSpecs.has(name)) {
@@ -783,7 +804,8 @@ class WorkspaceCompiler {
         }
         this.connectInput(defId, firstChild, "STACK", "statement");
       }
-      const generatedLocal = name => /^__(?:flow_|for_|thrown|error)/.test(name);
+      const generatedLocal = name => /^__(?:flow_|for_|thrown|error)/.test(name)
+        || fn.classGenerated && /^__objectTarget\d+$/.test(name);
       const locals = new Set([...this.globalVariables].filter((name) => declared.has(name)
         || (!outerVariables.has(name) && generatedLocal(name))));
       // Named-variable APIs can introduce genuine project globals during a
