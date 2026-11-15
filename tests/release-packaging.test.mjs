@@ -4,6 +4,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { targets, docs, samples, works, launchers, frontendFiles, checksums, packageRelease } from "../tools/package-release.mjs";
 
 test("release manifest includes only supported platforms and redistributable assets", async () => {
@@ -14,6 +15,21 @@ test("release manifest includes only supported platforms and redistributable ass
   assert.ok(docs.includes("install.md"));
   for (const file of [...docs.map(n => `docs/${n}`), ...samples.map(n => `samples/${n}`), ...frontendFiles.map(n => `ts/${n}`)]) {
     assert.ok((await fs.stat(new URL(`../${file}`, import.meta.url))).isFile(), file);
+  }
+});
+
+test("all TypeScript samples pass frontend --check", async t => {
+  const names = (await fs.readdir(new URL("../samples/", import.meta.url)))
+    .filter(name => name.endsWith(".ts")).sort();
+  assert.ok(names.length > 0);
+  for (const name of names) {
+    await t.test(name, () => {
+      const result = spawnSync(process.execPath, ["ts/compile-ts.mjs", "--check", `samples/${name}`], {
+        cwd: new URL("../", import.meta.url), encoding: "utf8",
+      });
+      assert.ifError(result.error);
+      assert.equal(result.status, 0, `samples/${name}\n${result.stdout}${result.stderr}`);
+    });
   }
 });
 
