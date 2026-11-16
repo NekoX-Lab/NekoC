@@ -1,11 +1,16 @@
 // Shared by the editor, standalone player and packaged extension. Events retain quick down/up pairs.
 export class StageInput {
-  constructor(canvas,renderer,active){
+  constructor(canvas,renderer,active,onOverflow=message=>console.warn(message)){
     this.canvas=canvas;this.renderer=renderer;this.active=active;this.pressed=new Set();this.events=[];this.mouse={x:0,y:0};this.pointer=null;
+    this.onOverflow=onOverflow;this.queueStats={coalesced:0,rejected:0,highWater:0};this.overflowNotified=false;
     canvas.addEventListener('keydown',event=>{
       if(!active()||event.ctrlKey||event.metaKey||event.altKey||event.key==='Tab')return;
       const key=this.key(event.keyCode);if(key===null)return;
-      if(!this.pressed.has(key)){this.pressed.add(key);this.push({kind:'key',key,down:true});}
+      if(!this.pressed.has(key)){
+        // Admit the pair atomically: a down must leave room for its up.
+        if(!this.room(3)){this.reject('key down');return;}
+        this.pressed.add(key);this.push({kind:'key',key,down:true});
+      }
       event.preventDefault();
     });
     window.addEventListener('keyup',event=>{const key=this.key(event.keyCode);if(key!==null&&this.pressed.delete(key))this.push({kind:'key',key,down:false});});
@@ -37,6 +42,8 @@ export class StageInput {
       // maxPointers check disqualifies the entire gesture from a swipe.
       if(this.pointer&&this.pointer.id!==event.pointerId)this.pointer.maxPointers=2;
       if(!active()||event.button!==0||!event.isPrimary||this.pointer)return;
+      // Reserve the final drag, up to two swipes, old-target clear/up and click.
+      if(!this.room(7)){this.reject('pointer down');return;}
       canvas.focus({preventScroll:true});this.position(event);
       const target=renderer.hitTest(this.mouse.x,this.mouse.y),sprite=target&&renderer.sprites.find(a=>a.id===target);
       this.pointer={id:event.pointerId,target,start:{...this.mouse,time:performance.now()},client:{x:event.clientX,y:event.clientY},maxPointers:1,
@@ -83,11 +90,32 @@ export class StageInput {
     canvas.addEventListener('lostpointercapture',event=>{if(this.pointer?.id===event.pointerId)this.releasePointer();});
   }
   key(code){if(code>=96&&code<=105)code-=48;return code===13||code===32||code>=37&&code<=40||code>=48&&code<=57||code>=65&&code<=90?String(code):null;}
-  push(event){if(this.events.length<256)this.events.push(event);}
+  // Only adjacent absolute drag positions may be replaced. Every other event
+  // is a barrier, including a down/up, target change, answer or scene action.
+  // K4 has already accumulated pointer deltas before reaching this queue.
+  // A held key also reserves a drag barrier slot: key-up may interrupt a
+  // saturated gesture, whose next move must still retain its final position.
+  room(extra,drag=false){return this.events.length+extra+this.pressed.size*2+(this.pointer?(drag?5:6):0)<=256;}
+  recordQueue(){this.queueStats.highWater=Math.max(this.queueStats.highWater,this.events.length);}
+  reject(kind){
+    this.queueStats.rejected++;
+    if(!this.overflowNotified){this.overflowNotified=true;this.onOverflow(`输入队列已满，未接受 ${kind}；请等待下一帧后重试。`);}
+    return false;
+  }
+  push(event){
+    const last=this.events.at(-1);
+    if(event.kind==='drag'&&last?.kind==='drag'&&last.target===event.target){
+      this.events[this.events.length-1]=event;
+      this.queueStats.coalesced++;return true;
+    }
+    const drag=event.kind==='drag'&&this.pointer?.drag?.id===event.target;
+    if(!this.room(1,drag))return this.reject(event.kind);
+    this.events.push(event);this.recordQueue();return true;
+  }
   position(event){const box=this.canvas.getBoundingClientRect();if(box.width&&box.height)this.mouse={x:(event.clientX-box.left)/box.width*this.renderer.width-this.renderer.width/2,y:this.renderer.height/2-(event.clientY-box.top)/box.height*this.renderer.height};}
   pointerEvent(state,target){this.push({kind:'pointer',state,target:target||'',...this.mouse});}
   releasePointer(){const p=this.pointer;if(!p)return;this.pointer=null;this.pointerEvent(this.renderer.kitten4?'':'mouse_up',p.target);if(this.canvas.hasPointerCapture(p.id))this.canvas.releasePointerCapture(p.id);}
-  release(){for(const key of this.pressed)this.push({kind:'key',key,down:false});this.pressed.clear();this.releasePointer();}
-  reset(){this.release();this.events=[];}
-  take(){return {events:this.events.splice(0),pressed:[...this.pressed],mouse:{...this.mouse}};}
+  release(){for(const key of this.pressed){this.pressed.delete(key);this.push({kind:'key',key,down:false});}this.releasePointer();}
+  reset(){this.events=[];this.release();this.events=[];this.overflowNotified=false;}
+  take(){this.overflowNotified=false;return {events:this.events.splice(0),pressed:[...this.pressed],mouse:{...this.mouse}};}
 }

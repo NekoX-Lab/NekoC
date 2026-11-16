@@ -5,6 +5,7 @@ export class ProjectAudio {
     this.onError=onError;this.onDone=onDone;this.voices=new Map();this.settings=new Map();
     this.paused=true;this.serial=0;this.speech=new Set();this.resources={};this.order=[];
     this.midiContext=null;this.midiVoices=new Set();
+    this.completions=new Set();
   }
   load(project) {
     this.stop();this.resources=project.audios?.audiosDict||{};
@@ -46,11 +47,12 @@ export class ProjectAudio {
   }
   finish(voice) {
     voice.wanted=false;voice.generation++;
-    for(const id of voice.waits.splice(0))this.onDone(id);
+    for(const id of voice.waits.splice(0))this.complete(id);
     if([...this.voices.values()].some(v=>v!==voice&&v.id===voice.id&&!v.wanted))this.release(voice);
   }
   apply(frame) {
     if(frame.reset){const paused=this.paused;this.stop();this.paused=paused;if(!paused)globalThis.speechSynthesis?.resume();}
+    this.flushCompletions();
     const commands=frame.audio_commands||[],speech=frame.speech_commands||[];
     for(const command of frame.k4_media||[])if(command.kind==='midi')this.playMidi(command);
     for(let i=0;i<=commands.length;i++) {
@@ -83,7 +85,7 @@ export class ProjectAudio {
         continue;
       }
       const resource=this.resolve(command.audio);
-      if(!resource){this.onError(`找不到音频：${command.audio}`);if(command.wait)this.onDone(command.wait);continue;}
+      if(!resource){this.onError(`找不到音频：${command.audio}`);if(command.wait)this.complete(command.wait);continue;}
       const id=this.resourceId(resource);
       // K4 Howler permits overlapping plays. Never complete an older waiter just
       // because another thread plays the same resource.
@@ -127,8 +129,8 @@ export class ProjectAudio {
     };
   }
   speak(command) {
-    if(this.speech.size>=128){this.onError('语音等待队列已满');if(command.wait)this.onDone(command.wait);return;}
-    const done=()=>{if(!this.speech.delete(item))return;if(command.wait)this.onDone(command.wait);};
+    if(this.speech.size>=128){this.onError('语音等待队列已满');if(command.wait)this.complete(command.wait);return;}
+    const done=()=>{if(!this.speech.delete(item))return;if(command.wait)this.complete(command.wait);};
     const item={command,utterance:null,done};this.speech.add(item);
     if(!globalThis.speechSynthesis||!globalThis.SpeechSynthesisUtterance){
       this.onError('此浏览器不支持离线语音合成');done();return;
@@ -150,6 +152,16 @@ export class ProjectAudio {
   cancelSpeech(notify) {
     for(const item of [...this.speech]){if(notify)item.done();else this.speech.delete(item);}
     globalThis.speechSynthesis?.cancel();
+  }
+  complete(id){
+    this.flushCompletions();
+    if(!this.completions.size&&this.onDone(id)!==false)return;
+    // Retry on the next VM frame, never grow an unbounded side queue.
+    if(this.completions.size<256)this.completions.add(id);
+    else this.onError('音频结束通知积压超过 256，请重新启动作品以恢复等待线程');
+  }
+  flushCompletions(){
+    for(const id of this.completions){if(this.onDone(id)===false)break;this.completions.delete(id);}
   }
   playMidi(command) {
     // Rust emits a number for numeric keys and a string for midi_get object
@@ -190,6 +202,7 @@ export class ProjectAudio {
     for(const item of this.speech)if(!item.started&&item.utterance){item.started=true;speechSynthesis.speak(item.utterance);}
   }
   stop(){
+    this.completions.clear();
     this.pause();this.cancelSpeech(false);
     for(const voice of this.voices.values()){
       voice.wanted=false;voice.generation++;voice.waits=[];

@@ -259,6 +259,6 @@ $('#apply-json').onclick=async()=>{if(started||starting){notify('请先停止运
   catch(e){handleError(e);}finally{button.disabled=false;}
 };
 window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
-try{renderer=new StageRenderer($('#stage'));input=new StageInput($('#stage'),renderer,()=>running);overlay=new StageOverlay($('#stage').parentElement,renderer,event=>input.push(event));renderer.onError=message=>log(message,true);await loadProject(await(await fetch('/api/project')).json());requestAnimationFrame(loop);}catch(e){handleError(e);if(renderer)requestAnimationFrame(loop);}
+try{renderer=new StageRenderer($('#stage'));input=new StageInput($('#stage'),renderer,()=>running,message=>log(message,true));overlay=new StageOverlay($('#stage').parentElement,renderer,event=>input.push(event));renderer.onError=message=>log(message,true);await loadProject(await(await fetch('/api/project')).json());requestAnimationFrame(loop);}catch(e){handleError(e);if(renderer)requestAnimationFrame(loop);}
 // Read-only diagnostics for local performance/renderer verification.
 window.nekoDiagnostics=()=>({renderer:{...renderer?.stats},sprites:renderer?.sprites,frame:lastFrame,bytes:lastBytes,running,started,pipeline:{...pipeline},framebuffer:[renderer?.canvas.width,renderer?.canvas.height]});
