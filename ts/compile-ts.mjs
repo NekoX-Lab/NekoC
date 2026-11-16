@@ -195,15 +195,15 @@ class WorkspaceCompiler {
       ts.forEachChild(node, validateAddition);
     };
     for (const file of this.typeSourceFiles.values()) validateAddition(file);
-    this.synthesizeHelpers(sourceFile);
     const collectArrays = (node) => {
       if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
         this.arrayDeclarations.set(node.name.text, node);
-        if (this.callbackCaptures.get(node.name.text) === node) this.globalVariables.add(node.name.text);
       }
       ts.forEachChild(node, collectArrays);
     };
     collectArrays(sourceFile);
+    this.synthesizeHelpers(sourceFile);
+    for (const name of this.callbackCaptures.keys()) this.globalVariables.add(name);
     // Helpers are compiled before event bodies: preserve captured string types
     // (including aliases) before lowering their + expressions.
     for (let pass = 0; pass < this.arrayDeclarations.size; pass++) {
@@ -682,7 +682,11 @@ class WorkspaceCompiler {
         && statements.slice(0, -1).every((statement) => ts.isVariableStatement(statement))
       );
       const simpleStatement = ts.isBlock(fn.body) && !hasReturn;
-      if (!this.objectSlots.size && !fn.classGenerated && !reaches(name, name) && (simpleExpression || simpleStatement)) {
+      // Array helpers and their callbacks must freeze reference arguments and
+      // keep mutable loop state in the invocation frame, even for simple bodies.
+      const arrayHelper = name.startsWith("__arr") || /^__(cb|map|filter|forEach|reduce|find|findIndex|some|every)\d+$/.test(name);
+      if (!this.objectSlots.size && !fn.classGenerated && !arrayHelper
+        && !reaches(name, name) && (simpleExpression || simpleStatement)) {
         continue;
       }
       if (this.procedureSpecs.has(name)) {
@@ -1035,6 +1039,28 @@ class WorkspaceCompiler {
       }
       if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
         const method = node.expression.name.text;
+        if (this.isArrayExpression(node.expression.expression)) {
+          this.checkArrayMethodArguments(node);
+          if (method === "concat") {
+            for (const argument of node.arguments) {
+              const kind = this.expressionType?.concatKind(argument);
+              if (kind === "unknown" || !this.isArrayExpression(argument) && kind !== "scalar") {
+                this.unsupported(argument, "Array.concat arguments must be statically arrays or scalar values; narrow any/unknown or array/scalar unions before this call");
+              }
+            }
+            const n = ++this.helperCount;
+            const name = `__arrConcat${n}`;
+            const params = node.arguments.map((_, i) => `__concatArg${n}_${i}`);
+            const copy = (value, array, index) => array
+              ? `for (const __concatItem${n}_${index} of ${value}) { __concatOut${n}.push(__concatItem${n}_${index}); }`
+              : `__concatOut${n}.push(${value});`;
+            parts.push(`function ${name}(__arrL, ${params.map((p, i) => p + (this.isArrayExpression(node.arguments[i]) ? ": any[]" : "")).join(",")}) { const __concatOut${n} = [];
+              ${copy("__arrL", true, "source")} ${params.map((p, i) => copy(p, this.isArrayExpression(node.arguments[i]), i)).join("\n")}
+              return __concatOut${n}; }`);
+            this.helperSourceOrigins.set(name, { call: node });
+            this.helperCalls.set(node, { name, extra: [...node.arguments] });
+          }
+        }
         used.add(method);
         const callback = node.arguments[0];
         if (CALLBACK_METHODS.has(method) && callback && (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback))) {
@@ -1154,7 +1180,14 @@ class WorkspaceCompiler {
     const args = (...names) => names.slice(0, params.length).join(", ");
     const x = `__x${n}`;
     const i = `__i${n}`;
-    const loop = (inner) => `let ${i} = 0; for (const ${x} of __arrL) { ${inner} ${i}++; }`;
+    // JS callbacks snapshot length, but fetch the value at the current index.
+    // Dense arrays can lose trailing positions via pop/splice/clear. map would
+    // need holes, and find visits missing positions with undefined; reject those
+    // shapes separately rather than leaking the list block's NaN placeholder.
+    if (["map", "find", "findIndex"].includes(method)) this.checkCallbackShrink(call, method);
+    const limit = `__limit${n}`;
+    const loop = (inner) => `const ${limit} = __arrL.length; let ${i} = 0;
+      while (${i} < ${limit}) { if (${i} < __arrL.length) { const ${x} = __arrL[${i}]; ${inner} } ${i}++; }`;
     let helper;
     switch (method) {
       case "map":
@@ -1168,7 +1201,7 @@ class WorkspaceCompiler {
         break;
       case "reduce":
         if (call.arguments.length < 2) {
-          helper = `function ${name}(__arrL) { let __acc${n} = __arrL[0]; let ${i} = 1; while (${i} < __arrL.length) { __acc${n} = ${cb}(${args(`__acc${n}`, `__arrL[${i}]`, i, "__arrL")}); ${i}++; } return __acc${n}; }`;
+          helper = `function ${name}(__arrL) { const ${limit} = __arrL.length; let __acc${n} = __arrL[0]; let ${i} = 1; while (${i} < ${limit}) { if (${i} < __arrL.length) { __acc${n} = ${cb}(${args(`__acc${n}`, `__arrL[${i}]`, i, "__arrL")}); } ${i}++; } return __acc${n}; }`;
         } else {
           helper = `function ${name}(__arrL, __init${n}) { let __acc${n} = __init${n}; ${loop(`__acc${n} = ${cb}(${args(`__acc${n}`, x, i, "__arrL")});`)} return __acc${n}; }`;
         }
@@ -2342,20 +2375,6 @@ class WorkspaceCompiler {
         const statement = this.compileMethodStatement(call, parentId);
         if (statement !== undefined) return statement;
       }
-        if (ts.isPropertyAccessExpression(call.expression) && call.expression.name.text === "push"
-          && this.isArrayExpression(call.expression.expression)) {
-          let firstId = null;
-          let previousId = null;
-          for (const argument of call.arguments) {
-            const id = this.addBlock({ type: "list_append", parent_id: parentId });
-            this.connectInput(id, this.compileExpression(call.expression.expression, id), "list", "value");
-            this.connectInput(id, this.compileExpression(argument, id), "list_item_value", "value");
-            if (previousId) this.connectNext(previousId, id);
-            firstId ??= id;
-            previousId = id;
-          }
-          return firstId;
-        }
         if (this.functionProcedures.has(name)) {
           return this.compileFunctionProcedureCall(call, parentId, false);
         }
@@ -5286,6 +5305,7 @@ class WorkspaceCompiler {
     node = stripParens(node);
     if (!node || seen.has(node)) return false;
     seen.add(node);
+    if (this.expressionType?.array(node)) return true;
     if (this.objectTypes?.array(node)) return true;
     if (this.helperCalls.get(node)?.factoryArgs) return true;
     if (ts.isArrayLiteralExpression(node)) return true;
@@ -5347,6 +5367,7 @@ class WorkspaceCompiler {
     if (!ts.isPropertyAccessExpression(call.expression)) return undefined;
     const target = call.expression.expression;
     const method = call.expression.name.text;
+    if (this.isArrayExpression(target)) this.checkArrayMethodArguments(call);
     const synthesized = this.helperCalls.get(call);
     if (synthesized) {
       if (synthesized.reduceNoInitial) this.checkReduceNonempty(call, target);
@@ -5358,29 +5379,39 @@ class WorkspaceCompiler {
       }
       return undefined;
     }
-    const insertAt = (index, value) => listBlock("list_insert_value", target, null, [
-      ["list_item_value", (id) => this.compileExpression(value, id)],
-      ["list_index", (id) => index(id)],
-    ]);
-    const number = (value) => (id) => this.addBlock({ type: "math_number", parent_id: id, fields: { NUM: String(value) }, is_output: true });
     switch (method) {
-      case "unshift":
-        return chainAll(Array.from(call.arguments).reverse().map((value) => insertAt(number(1), value)));
+      case "push": case "unshift":
       case "splice": {
-        const [start, count, ...items] = call.arguments;
-        if (!start) this.unsupported(call, "splice needs a start index");
-        const startValue = constantNumber(start);
-        if (startValue !== null && startValue < 0) this.unsupported(start, "splice with a negative start is not supported");
-        const ids = [];
-        const deletes = this.addBlock({ type: "repeat_n_times", parent_id: parentId });
-        this.connectInput(deletes, count ? this.compileExpression(count, deletes) : this.compileLength(target, deletes), "times", "value");
-        const del = this.addBlock({ type: "delete_list_item", parent_id: deletes, fields: { item: "any" } });
-        this.connectInput(del, this.compileExpression(target, del), "list", "value");
-        this.connectInput(del, this.compilePlusOne(start, del), "list_index", "value");
-        this.connectInput(deletes, del, "DO", "statement");
-        ids.push(deletes);
-        items.slice().reverse().forEach((item) => ids.push(insertAt((id) => this.compilePlusOne(start, id), item)));
-        return chainAll(ids);
+        if (method === "splice" && call.arguments[0] && constantNumber(call.arguments[0]) < 0) {
+          this.unsupported(call.arguments[0], "splice with a negative start is not supported; use a nonnegative index");
+        }
+        // Parameters are invocation-local, including across nested/recursive
+        // argument calls and yields. Freeze the receiver before every argument.
+        return evaluatedStatement(this, [target, ...call.arguments], parentId, ([list, ...args], definition) => {
+          const valueBlock = (type, value, index) => {
+            const id = this.addBlock({ type, parent_id: definition });
+            this.connectInput(id, this.compileExpression(list, id), "list", "value");
+            this.connectInput(id, this.compileExpression(value, id), "list_item_value", "value");
+            if (index) this.connectInput(id, this.compilePlusOne(index, id), "list_index", "value");
+            return id;
+          };
+          if (method === "push") return chainAll(args.map(value => valueBlock("list_append", value)));
+          if (method === "unshift") return chainAll(args.reverse().map(value => valueBlock("list_insert_value", value, ts.factory.createNumericLiteral(0))));
+          if (!args.length) return null;
+          const [start, count, ...items] = args;
+          const deletes = this.addBlock({ type: "repeat_n_times", parent_id: definition });
+          const length = () => {
+            const id = this.addBlock({ type: "list_length", parent_id: deletes, is_output: true });
+            this.connectInput(id, this.compileExpression(list, id), "list", "value");
+            return id;
+          };
+          this.connectInput(deletes, count ? this.compileExpression(count, deletes) : length(), "times", "value");
+          const del = this.addBlock({ type: "delete_list_item", parent_id: deletes, fields: { item: "any" } });
+          this.connectInput(del, this.compileExpression(list, del), "list", "value");
+          this.connectInput(del, this.compilePlusOne(start, del), "list_index", "value");
+          this.connectInput(deletes, del, "DO", "statement");
+          return chainAll([deletes, ...items.reverse().map(value => valueBlock("list_insert_value", value, start))]);
+        });
       }
       case "reverse":
         return this.compileHelperCall("__arr_reverse", target, [], parentId, false);
@@ -5392,6 +5423,64 @@ class WorkspaceCompiler {
       }
     }
     return undefined;
+  }
+
+  checkArrayMethodArguments(call) {
+    const method = call.expression.name.text;
+    const limits = { includes: [1, 2], indexOf: [1, 2], lastIndexOf: [1, 2],
+      concat: [0, Infinity], push: [0, Infinity], unshift: [0, Infinity], splice: [0, Infinity],
+      pop: [0, 0], shift: [0, 0], reverse: [0, 0], sort: [0, 1],
+      join: [0, 1], slice: [0, 2], at: [1, 1], flat: [0, 1],
+      map: [1, 1], filter: [1, 1], forEach: [1, 1], reduce: [1, 2],
+      some: [1, 1], every: [1, 1], find: [1, 1], findIndex: [1, 1] };
+    if (!Object.hasOwn(limits, method)) return;
+    const [min, max] = limits[method];
+    if (call.arguments.length < min || call.arguments.length > max) {
+      this.unsupported(call, `Array.${method} supports ${min === max ? min : `${min}..${max}`} arguments; remove extra arguments (thisArg overloads are not supported)`);
+    }
+    for (const arg of call.arguments) {
+      if (ts.isSpreadElement(arg)) this.unsupported(arg, `Array.${method} spread arguments are not supported; pass each argument explicitly`);
+      if (ts.isIdentifier(stripParens(arg)) && stripParens(arg).text === "undefined") {
+        this.unsupported(arg, `Array.${method} explicit undefined arguments are not supported; omit the optional argument or pass an explicit value`);
+      }
+    }
+    if (["includes", "indexOf", "lastIndexOf"].includes(method) && call.arguments[1]
+      && this.expressionType?.(call.arguments[1]) !== "number") {
+      this.unsupported(call.arguments[1], `Array.${method} fromIndex must be a number; omit undefined or convert the value before this call`);
+    }
+  }
+
+  checkCallbackShrink(call, method) {
+    const functions = new Map();
+    const collect = node => {
+      if (ts.isFunctionDeclaration(node) && node.name) functions.set(node.name.text, node.body);
+      if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer
+        && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))) functions.set(node.name.text, node.initializer.body);
+      ts.forEachChild(node, collect);
+    };
+    for (const file of this.typeSourceFiles.values()) collect(file);
+    collect(this.sourceFile);
+    const seen = new Set();
+    const visit = node => {
+      if (!node || seen.has(node)) return;
+      seen.add(node);
+      if (ts.isCallExpression(node)) {
+        if (ts.isPropertyAccessExpression(node.expression) && ["pop", "shift", "splice"].includes(node.expression.name.text)) {
+          this.unsupported(call, `Array.${method} callbacks may not shrink arrays (including through aliases/functions); move removals after traversal or use an explicit loop`);
+        }
+        visit(functions.get(calleeName(node.expression)));
+        if (["wait", "waitUntil", "ask", "glideTo", "broadcast", "broadcastAndWait", "tell", "tellAndWait"]
+          .includes(selfApiName(calleeName(node.expression)))) {
+          this.unsupported(call, `Array.${method} callbacks cannot yield or dispatch events while checking for missing positions; move that work after traversal or use an explicit loop`);
+        }
+      }
+      if (ts.isBinaryExpression(node) && assignmentOperatorSpec(node.operatorToken.kind)
+        && ts.isPropertyAccessExpression(stripParens(node.left)) && stripParens(node.left).name.text === "length") {
+        this.unsupported(call, `Array.${method} callbacks may not shrink arrays (including through aliases/functions); move length changes after traversal or use an explicit loop`);
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(call.arguments[0]);
   }
 
   // String and array methods: s.includes / slice / substring / charAt /
@@ -5458,6 +5547,7 @@ class WorkspaceCompiler {
     const target = call.expression.expression;
     const method = call.expression.name.text;
     const args = call.arguments;
+    if (this.isArrayExpression(target)) this.checkArrayMethodArguments(call);
     const literal = (value) => (typeof value === "number" ? ts.factory.createNumericLiteral(value) : ts.factory.createStringLiteral(value));
     const lengthOf = () => ts.factory.createPropertyAccessExpression(target, "length");
     const helper = (name, ...extra) => this.compileHelperCall(name, target, extra, parentId);
@@ -5468,19 +5558,11 @@ class WorkspaceCompiler {
     }
     if (this.isArrayExpression(target)) {
       switch (method) {
-        case "indexOf": {
-          // list_index_of is 1-based with 0 for missing.
-          const id = this.addBlock({ type: "math_arithmetic", parent_id: parentId, fields: { type: "minus" }, is_output: true });
-          const find = this.addBlock({ type: "list_index_of", parent_id: id, is_output: true });
-          this.connectInput(find, this.compileExpression(target, find), "list", "value");
-          this.connectInput(find, this.compileExpression(args[0], find), "list_item_value", "value");
-          this.connectInput(id, find, "A", "value");
-          this.connectInput(id, this.addBlock({ type: "math_number", parent_id: id, fields: { NUM: "1" }, is_output: true }), "B", "value");
-          return id;
-        }
-        case "lastIndexOf": return helper("__arr_lastIndexOf", args[0]);
+        case "includes": return helper("__arr_includes", args[0], args[1] ?? literal(0), literal(this.expressionType?.(args[0]) === "number" ? 1 : 0));
+        case "indexOf": return helper("__arr_indexOf", args[0], args[1] ?? literal(0), literal(this.expressionType?.(args[0]) === "number" ? 1 : 0));
+        case "lastIndexOf": return helper("__arr_lastIndexOf", args[0], args[1] ?? literal(0), literal(args.length > 1 ? 1 : 0), literal(this.expressionType?.(args[0]) === "number" ? 1 : 0));
         case "join": return helper("__arr_join", args[0] ?? literal(","));
-        case "concat": return helper("__arr_concat", args[0]);
+        case "concat": this.unsupported(call, "Array.concat requires statically known argument types; annotate arrays and pass each argument explicitly");
         case "slice":
           if (args.some((arg) => { const v = constantNumber(arg); return v !== null && v < 0; })) {
             this.unsupported(call, "slice with negative indices is not supported");
@@ -5504,12 +5586,6 @@ class WorkspaceCompiler {
         case "pop": return helper("__arr_pop");
         case "shift": return helper("__arr_shift");
         case "sort": return helper("__arr_sort");
-      }
-      if (method === "includes") {
-        const id = this.addBlock({ type: "list_is_exist", parent_id: parentId, is_output: true });
-        this.connectInput(id, this.compileExpression(target, id), "list", "value");
-        this.connectInput(id, this.compileExpression(args[0], id), "list_item_value", "value");
-        return id;
       }
       return null;
     }
@@ -6102,12 +6178,13 @@ function sortHelper(name, greater, n) {
 
 const SHARED_HELPERS = {
   __arr_join: { source: `function __arr_join(__arrL, __sep) { let __jS = ""; let __jK = 0; for (const __jX of __arrL) { if (__jK > 0) { __jS = join(__jS, __sep); } __jS = join(__jS, __jX); __jK++; } return __jS; }` },
-  __arr_concat: { source: `function __arr_concat(__arrL, __arrB) { const __cO = []; for (const __cX of __arrL) { __cO.push(__cX); } for (const __cY of __arrB) { __cO.push(__cY); } return __cO; }` },
   __arr_slice: { source: `function __arr_slice(__arrL, __sFrom, __sTo) { const __sO = []; for (let __sK = __sFrom; __sK < __sTo; __sK++) { __sO.push(__arrL[__sK]); } return __sO; }` },
   __arr_reverse: { source: `function __arr_reverse(__arrL) { let __rK = 0; while (__rK < Math.floor(__arrL.length / 2)) { const __rV = __arrL[__rK]; __arrL[__rK] = __arrL[__arrL.length - 1 - __rK]; __arrL[__arrL.length - 1 - __rK] = __rV; __rK++; } return __arrL; }` },
   __arr_at: { source: `function __arr_at(__arrL, __atIndex) { let __atI = Math.trunc(__atIndex); if (!(__atI >= 0) && !(__atI < 0)) { __atI = 0; } if (__atI < 0) { __atI = __arrL.length + __atI; } return __arrL[__atI]; }` },
   __arr_flat: { source: `function __arr_flat(__arrL) { const __flatOut = []; let __flatI = 0; while (__flatI < __arrL.length) { const __arrFlatItem = __arrL[__flatI]; let __flatJ = 0; while (__flatJ < __arrFlatItem.length) { __flatOut.push(__arrFlatItem[__flatJ]); __flatJ++; } __flatI++; } return __flatOut; }` },
-  __arr_lastIndexOf: { source: `function __arr_lastIndexOf(__arrL, __lV) { for (let __lK = __arrL.length - 1; __lK >= 0; __lK--) { if (__arrL[__lK] === __lV) { return __lK; } } return -1; }` },
+  __arr_includes: { source: `function __arr_includes(__arrL, __value, __from, __numeric) { const __size = __arrL.length; let __index = Math.trunc(__from); if (!(__index >= 0) && !(__index < 0)) __index = 0; if (__index < 0) __index = Math.max(0, __size + __index); while (__index < __size) { const __item = __arrL[__index]; if (__item === __value) return true; if (__numeric && String(__value) === "NaN" && String(__item) === "NaN") return true; __index++; } return false; }` },
+  __arr_indexOf: { source: `function __arr_indexOf(__arrL, __value, __from, __numeric) { const __size = __arrL.length; let __index = Math.trunc(__from); if (__numeric && String(__value) === "NaN") return -1; if (!(__index >= 0) && !(__index < 0)) __index = 0; if (__index < 0) __index = Math.max(0, __size + __index); while (__index < __size) { if (__arrL[__index] === __value) return __index; __index++; } return -1; }` },
+  __arr_lastIndexOf: { source: `function __arr_lastIndexOf(__arrL, __value, __from, __given, __numeric) { const __size = __arrL.length; let __index = Math.trunc(__from); if (__numeric && String(__value) === "NaN") return -1; if (!(__index >= 0) && !(__index < 0)) __index = 0; if (!__given) __index = __size - 1; else if (__index < 0) __index = __size + __index; else __index = Math.min(__index, __size - 1); while (__index >= 0) { if (__arrL[__index] === __value) return __index; __index--; } return -1; }` },
   __arr_pop: { source: `function __arr_pop(__arrL) { const __pV = __arrL[__arrL.length - 1]; __listDeleteLast(__arrL); return __pV; }` },
   __arr_shift: { source: `function __arr_shift(__arrL) { const __hV = __arrL[0]; __listDelete(__arrL, 1); return __hV; }` },
   // Official convert_type(type=string) calls String(value); logic_compare
@@ -6131,10 +6208,10 @@ const SHARED_HELPERS = {
 
 // Method name -> shared helpers it may need (array or string form).
 const METHOD_HELPERS = {
-  join: ["__arr_join"], concat: ["__arr_concat"], slice: ["__arr_slice"], reverse: ["__arr_reverse"],
+  join: ["__arr_join"], slice: ["__arr_slice"], reverse: ["__arr_reverse"],
   at: ["__arr_at"], flat: ["__arr_flat"],
   lastIndexOf: ["__arr_lastIndexOf", "__str_lastIndexOf"], pop: ["__arr_pop"], shift: ["__arr_shift"],
-  sort: ["__arr_sort"], indexOf: ["__str_indexOf"], startsWith: ["__str_startsWith"], endsWith: ["__str_endsWith"],
+  sort: ["__arr_sort"], includes: ["__arr_includes"], indexOf: ["__arr_indexOf", "__str_indexOf"], startsWith: ["__str_startsWith"], endsWith: ["__str_endsWith"],
   replace: ["__str_replace"], replaceAll: ["__str_replaceAll"], trim: ["__str_trim"], trimStart: ["__str_trimStart"],
   trimEnd: ["__str_trimEnd"], repeat: ["__str_repeat"], padStart: ["__str_padStart"], padEnd: ["__str_padEnd"],
   toUpperCase: ["__str_toUpperCase"], toLowerCase: ["__str_toLowerCase"],

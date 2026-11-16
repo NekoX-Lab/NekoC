@@ -13,7 +13,7 @@ type NekoExpression<T = any> = T;
 type NekoValue = any;
 
 // Native JS array syntax supported by the frontend: element reads (including
-// undefined for out-of-bounds), compound element assignments, length = 0,
+// Kitten N NaN for out-of-bounds), compound element assignments, length = 0,
 // reverse/sort in place, rest destructuring, and callback local captures.
 // flat currently requires an all-array literal initializer and depth 1;
 // reduce without an initial value requires a provably nonempty literal array.
@@ -23,6 +23,12 @@ type NekoValue = any;
 // static length and element-type proofs.
 // Deferred function mutations are considered regardless of declaration order;
 // parentheses, as, non-null and satisfies wrappers do not hide array mutations.
+// includes/indexOf/lastIndexOf accept numeric fromIndex (omit undefined).
+// concat accepts any number of statically known arrays/scalars, preserving refs.
+// push/unshift/statement splice freeze receiver then all args before mutation.
+// Callbacks snapshot length; filter/forEach/reduce/some/every skip removed tails.
+// map/find/findIndex reject shrinking/yielding callbacks: move removals outside.
+// Spread, thisArg and unsupported extra arguments produce located diagnostics.
 interface Array<T> {
   at(index: number): T | undefined;
 }

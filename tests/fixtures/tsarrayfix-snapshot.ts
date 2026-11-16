@@ -1,0 +1,48 @@
+const a = [1, 2];
+console.log(a.map((x, i) => { if (i === 0) a.push(3); return x; }).join(","));
+console.log(a.join(","));
+const growing = [1, 2];
+console.log(growing.map(x => { growing.push(3); return x; }).join(","), growing.length);
+const changed = [1, 2, 3];
+console.log(changed.map((x, i) => { if (i === 0) changed[1] = 8; return x; }).join(","));
+const filtered = [1, 2];
+console.log(filtered.filter(x => { filtered.push(3); return true; }).join(","), filtered.length);
+const each = [1, 2];
+let visits = 0;
+each.forEach(x => { each.push(3); visits++; });
+console.log(visits, each.length);
+const reduced = [1, 2];
+console.log(reduced.reduce((acc, x) => { reduced.push(3); return acc + x; }, 0), reduced.length);
+const short = [1, 2];
+console.log(short.some(x => { short.push(3); return false; }), short.length);
+const all = [1, 2];
+console.log(all.every(x => { all.push(3); return true; }), all.length);
+const found = [1, 2];
+console.log(found.find(x => { found.push(3); return x === 2; }), found.length);
+const foundIndex = [1, 2];
+console.log(foundIndex.findIndex(x => { foundIndex.push(3); return x === 2; }), foundIndex.length);
+let stopped = 0;
+console.log([1, 2, 3].some(x => { stopped++; return true; }), stopped);
+console.log([1, 2, 3].every(x => { stopped++; return false; }), stopped);
+const cleared = [1, 2, 3];
+let clearedVisits = 0;
+cleared.forEach(x => { cleared.length = 0; clearedVisits++; });
+console.log(clearedVisits, cleared.length);
+const shrinking = [1, 2, 3];
+console.log(shrinking.filter(x => { shrinking.pop(); return true; }).join(","), shrinking.join(","));
+const reducedClear = [1, 2, 3];
+console.log(reducedClear.reduce((acc, x) => { reducedClear.length = 0; return acc + x; }, 0));
+const someClear = [1, 2];
+console.log(someClear.some(x => { someClear.length = 0; return false; }));
+const everyClear = [1, 2];
+console.log(everyClear.every(x => { everyClear.length = 0; return true; }));
+const live = [1, 2];
+let liveTrace = "";
+for (const x of live) { if (x === 1) live.push(3); liveTrace += x; }
+console.log(liveTrace);
+function nested(n: number): number {
+  if (n === 0) return 1;
+  return [n, n].map(x => nested(x - 1)).reduce((acc, x) => acc + x, 0);
+}
+console.log(nested(3));
+console.log([1, 2, 3].reduce((acc, x, i, arr) => { arr.push(4); return acc + x + i; }));

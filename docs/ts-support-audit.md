@@ -78,7 +78,11 @@
 - 支持 `a[i]`（读第 i + 1 项）、`a[i] = v`、`a.length`、`a.push(x)`、`a.includes(x)`。读越界下标得到 Kitten N 的空值 `NaN`，不是 JS 的 `undefined`。
 - `map`、`filter`、`forEach`、`reduce`（需要初始值）、`find`（找不到时返回空字符串）、`findIndex`、`some`、`every`、`sort`（可带比较函数，原地排序）、`indexOf`、`lastIndexOf`、`join`、`concat`、`slice`、`reverse`、`pop`、`shift`、`unshift`、`splice`。可以链式调用，如 `a.map(...).filter(...).join(",")`。
   - 回调里可以使用外面的变量；但不能使用外层自制积木（递归函数等）的参数，需要先复制到变量。
-  - 作为语句写的 `a.reverse()` 会把结果写回 `a`；写在表达式里的 `reverse()` 返回新数组，不改原数组。
+  - `reverse()` 原地修改数组并返回同一引用。
+  - 语句位置 `push/unshift/splice` 先保存接收者，再从左到右保存全部实参，之后才修改原列表。保存值属于每次调用，嵌套和递归调用不会覆盖；`splice` 仍限现有非负起点子集。
+  - `includes/indexOf/lastIndexOf` 支持数字 `fromIndex`：小数向零截断，负数从末尾计数，NaN 按 0，省略 `lastIndexOf` 起点时从末项开始。显式 `undefined` 定位报错并提示省略参数。数字 NaN 仅能被 `includes` 找到；不扩展混合类型相等规则。
+  - `concat()` 支持零个、一个或多个静态可知的数组/标量实参，先求值全部实参再按顺序浅复制，源数组和元素引用身份保持。未知类型、数组/标量联合类型需先收窄；spread、thisArg 及多余实参明确报错。
+  - `map/filter/forEach/reduce/some/every/find/findIndex` 固定初始遍历长度，每轮读取实际元素；追加不延长回调遍历，修改后续元素会被看到。`filter/forEach/reduce/some/every` 跳过缩短后已不存在的位置。`map` 的空洞结果、`find/findIndex` 对缺失项的 undefined 访问暂不支持，因此保守拒绝回调直接或经别名/函数缩短数组，以及让出/广播的情况，并提示移出遍历或改用显式循环。普通 `for...of` 保持实时长度。
 - 项目列表用 `appendList`、`listItem`、`listLength`、`deleteListItem` 等 API 或 `self.list("名字")`。
 - `Array.from({length: n}, (_, i) => ...)`、`Array(n).fill(v)` 和 `new Array(n).fill(v)`。长度限定为有限非负整数；`Array.from` 负数截到 0、小数向下取整。映射的第一参数是目标平台的未定义占位值 0（不是 JS undefined），不支持 thisArg。fill 值求值一次，对象元素共享同一引用。
 

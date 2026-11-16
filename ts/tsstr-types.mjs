@@ -16,7 +16,9 @@ interface Array<T> {
   reduce<U>(fn: (acc: U, value: T, index: number) => U, initial: U): U;
   find(fn: (value: T, index: number) => any): T | undefined;
   findIndex(fn: (value: T, index: number) => any): number;
-  indexOf(value: T): number; includes(value: T): boolean;
+  indexOf(value: T, fromIndex?: number): number;
+  lastIndexOf(value: T, fromIndex?: number): number;
+  includes(value: T, fromIndex?: number): boolean;
   some(fn: (value: T, index: number) => any): boolean;
   every(fn: (value: T, index: number) => any): boolean;
   pop(): T | undefined; shift(): T | undefined;
@@ -165,17 +167,36 @@ export function createExpressionTypes(files, declarations = "", path = portableP
   // re-parent them onto the lowered tree, where the checker would crash.
   // Classify every parsed expression once, under its parsed parents.
   const kinds = new WeakMap();
+  const arrays = new WeakSet();
+  const concatKinds = new WeakMap();
+  const concatKind = type => {
+    if (type.isUnion()) {
+      const values = new Set(type.types.map(concatKind));
+      return values.size === 1 ? [...values][0] : "unknown";
+    }
+    if (checker.isArrayType(type) || checker.isTupleType(type)) return "array";
+    if (type.flags & (ts.TypeFlags.StringLike | ts.TypeFlags.NumberLike | ts.TypeFlags.BooleanLike | ts.TypeFlags.Object)) return "scalar";
+    return "unknown";
+  };
   withParsedParents(files.values(), () => {
     const visit = node => {
-      if (ts.isExpression(node)) kinds.set(node, expressionKind(node));
+      if (ts.isExpression(node)) {
+        kinds.set(node, expressionKind(node));
+        const type = checker.getTypeAtLocation(node);
+        if (checker.isArrayType(type) || checker.isTupleType(type)) arrays.add(node);
+        concatKinds.set(node, concatKind(declaredReadType(node) ?? type));
+      }
       ts.forEachChild(node, visit);
     };
     for (const file of files.values()) visit(file);
   });
-  return node => {
+  const result = node => {
     const original = node && ts.getOriginalNode(node);
     return kinds.has(original) ? kinds.get(original) : null;
   };
+  result.array = node => arrays.has(node && ts.getOriginalNode(node));
+  result.concatKind = node => concatKinds.get(node && ts.getOriginalNode(node));
+  return result;
 }
 
 // Temporarily give parsed files their own parent links back, then restore
