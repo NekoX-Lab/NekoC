@@ -70,6 +70,15 @@ function rejectParseDiagnostics(sourceFile) {
 
 function lowerFrontendFeatures(sourceFile) {
   try {
+    // Validate raw entry/module identifiers before lexical renaming or helper
+    // registration can hide a collision with the compiler's bitwise procedures.
+    const reserveBitwiseNames = node => {
+      if (ts.isIdentifier(node) && node.text.startsWith("__nekocBit_")) {
+        fail("Names starting with __nekocBit_ are reserved for bitwise lowering; rename this identifier", nodeLocation(node));
+      }
+      ts.forEachChild(node, reserveBitwiseNames);
+    };
+    reserveBitwiseNames(sourceFile);
     const classes = lowerTsClasses(lowerTsNullable(sourceFile));
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))

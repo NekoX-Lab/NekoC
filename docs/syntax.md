@@ -164,6 +164,8 @@ onStart(() => {
   arithmetic paths. General `& | ^` use up to 32 iterations inside a warp custom
   block, using only share-player blocks. Operands must have numeric types;
   assignment values remain unsupported (split them into statements).
+  The `__nekocBit_` identifier prefix is reserved for compiler helpers in entry
+  files and imported modules; rename user identifiers with this prefix.
 
 ### If/Else
 

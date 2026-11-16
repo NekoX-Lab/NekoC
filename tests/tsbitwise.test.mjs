@@ -63,3 +63,38 @@ test("tsbitwise helpers are available in imports, callbacks, classes and sprite 
   assert.ok(report.procedures.some(p => /__nekocBit_xor/.test(p.name)));
   assert.ok(report.resources.sprites.length > 0);
 });
+
+test("tsbitwise reserves helper names before lowering entry and imported source files", () => {
+  const entry = path.resolve("bitwise-collision/main.ts");
+  const library = path.resolve("bitwise-collision/lib.ts");
+  const dependency = path.resolve("bitwise-collision/dependency.ts");
+  const cases = [
+    { file: library, source: "\nfunction __nekocBit_uint(x: number): number { return 7; }\nexport function mix(x: number): number { return x >>> 0; }" },
+    { file: library, source: "\nexport function __nekocBit_uint(x: number): number { return 7; }\nexport function mix(x: number): number { return x >>> 0; }" },
+    { file: entry, source: "\nfunction __nekocBit_uint(x: number): number { return 7; }\nlet x = 123; console.log(x >>> 0);" },
+    { file: entry, source: "\nlet __nekocBit_uint = 7;\nlet x = 123; console.log(x >>> 0);" },
+    { file: entry, source: "\nfunction mix(__nekocBit_xor: number): number { return __nekocBit_xor ^ 3; }\nconsole.log(mix(123));" },
+    { file: dependency, source: "\nfunction __nekocBit_futureHelper(x: number): number { return x; }\nexport function mix(x: number): number { return x >>> 0; }" },
+  ];
+  for (const c of cases) {
+    const files = new Map([
+      [entry, 'import { mix } from "./lib"; console.log(mix(123));'],
+      [library, 'import { mix as inner } from "./dependency"; export function mix(x: number): number { return inner(x); }'],
+      [dependency, "export function mix(x: number): number { return x >>> 0; }"],
+      [c.file, c.source],
+    ]);
+    const host = { readFile: name => files.get(path.resolve(name)) };
+    assert.throws(() => compileFile(entry, host), error => {
+      assert.match(error.message, /__nekocBit_.*reserved.*rename/i);
+      assert.equal(path.resolve(error.location.file), c.file);
+      assert.equal(error.location.line, 2);
+      assert.ok(error.location.column > 0);
+      return true;
+    });
+    const checked = checkFile(entry, { types: false, host });
+    assert.equal(checked.ok, false);
+    assert.match(checked.diagnostics[0].message, /__nekocBit_.*reserved.*rename/i);
+    assert.equal(path.resolve(checked.diagnostics[0].file), c.file);
+    assert.equal(checked.diagnostics[0].line, 2);
+  }
+});
