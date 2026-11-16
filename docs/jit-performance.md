@@ -1,5 +1,8 @@
 # JIT 分项计时与 region 入口复用
 
+不可变文本 `.length` 的共享免复制路径及本地配对基准见
+[UTF-16 长度缓存](textlenfast.md)；不沿用本页历史字符串加速数据。
+
 ## 定位开销
 
 ```powershell
