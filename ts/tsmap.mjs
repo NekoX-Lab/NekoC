@@ -121,6 +121,16 @@ function ${r.fn}_clear(m: ${r.name}): void {
     return r;
   };
   const collection = node => record(checker.getTypeAtLocation(node), node);
+  const nullableCollection = (node, optional = false) => {
+    // A definitely-null variable can be flow-narrowed to null/never. Its
+    // declared collection type still determines the optional-call diagnostic.
+    const symbol = checker.getSymbolAtLocation(node);
+    const type = optional && symbol?.valueDeclaration
+      ? checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration)
+      : checker.getTypeAtLocation(node);
+    return parts(type).some(t => t.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined))
+      && record(checker.getNonNullableType(type), node);
+  };
   const unwrap = node => {
     while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isNonNullExpression(node))) node = node.expression;
     return node;
@@ -198,10 +208,15 @@ function ${r.fn}_clear(m: ${r.name}): void {
           if (!guard) fail(node, "Map.get non-null assertion needs a matching if (map.has(key)) guard; store the result and check !== undefined otherwise");
           const scan = n => {
             if (n.end <= guard.expression.end || n.getStart(file) >= call.getStart(file)) return;
+            // console.log is a compiler intrinsic, with no runtime property
+            // lookup. All actual property/index reads can invoke accessors.
+            const intrinsicLog = ts.isPropertyAccessExpression(n) && n.getText(file) === "console.log"
+              && !checker.getSymbolAtLocation(n.expression);
             if (n.end <= call.getStart(file) && (ts.isCallExpression(n) || ts.isNewExpression(n) || ts.isPostfixUnaryExpression(n)
               || ts.isPrefixUnaryExpression(n) && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(n.operator)
-              || ts.isBinaryExpression(n) && n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && n.operatorToken.kind <= ts.SyntaxKind.LastAssignment)) {
-              fail(node, "Map.get assertion after calls or writes may invalidate has(key); store get's result and check !== undefined");
+              || ts.isBinaryExpression(n) && n.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && n.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+              || ts.isPropertyAccessExpression(n) && !intrinsicLog || ts.isElementAccessExpression(n))) {
+              fail(node, "Map.get assertion after calls, writes or property reads may invalidate has(key); store get's result and check !== undefined");
             }
             ts.forEachChild(n, scan);
           };
@@ -257,12 +272,22 @@ function ${r.fn}_clear(m: ${r.name}): void {
     }
     if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
       const receiver = node.expression.expression, method = node.expression.name.text;
+      if (nullableCollection(receiver, ts.isOptionalChain(node)) || ts.isOptionalChain(node) && collection(receiver)) {
+        fail(node, "Optional or nullable collection method calls are not supported; save the receiver in a variable and check !== undefined and !== null before calling its method");
+      }
       const r = collection(receiver);
       if (r) {
         if (method === "forEach") {
           const cb = unwrap(node.arguments[0]);
           if (node.arguments.length !== 1 || !cb || !ts.isArrowFunction(cb) || cb.parameters.length > 3 || cb.parameters.some(p => !ts.isIdentifier(p.name) || p.dotDotDotToken || p.initializer)) fail(node, "Collection forEach requires an inline arrow with identifier parameters");
-          // Keep a callback function boundary, including return and local state.
+          // A label preserves return, but cannot supply a function's var scope.
+          // Reject var rather than silently binding it in the enclosing function.
+          const checkScope = n => {
+            if (ts.isFunctionLike(n)) return;
+            if (ts.isVariableDeclarationList(n) && !(n.flags & ts.NodeFlags.BlockScoped)) fail(n, "Collection forEach callback var declarations are not supported; use let/const and initialize callback locals explicitly");
+            ts.forEachChild(n, checkScope);
+          };
+          checkScope(cb.body);
           const v = { r, receiver, mode: "entries" };
           const m = fresh("map");
           const label = fresh("callback");

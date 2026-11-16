@@ -6677,7 +6677,9 @@ export function compileFile(inputPath, host = defaultHost) {
     const sourceText = host.readFile(path.resolve(inputPath));
     if (typeof sourceText !== "string") fail(`Unable to read ${inputPath}`);
     let sourceFile = ts.createSourceFile(
-      inputPath,
+      // Imported modules already use resolved paths. Use the same identity for
+      // the entry so the multi-file type host can resolve its imports too.
+      path.isAbsolute(inputPath) ? inputPath : path.resolve(inputPath),
       sourceText,
       ts.ScriptTarget.Latest,
       true,

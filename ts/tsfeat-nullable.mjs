@@ -449,7 +449,9 @@ export function lowerTsNullable(input) {
       const signature = target?.getCallSignatures()[0];
       if (signature) return checker.getReturnTypeOfSignature(signature);
     } else if (ts.isNonNullExpression(n)) return target;
-    return declaredType(n);
+    // Unknown optional properties/calls must not recurse back through
+    // declaredType -> plainType on the same chain node.
+    return flowType(n);
   };
   const plainPure = n => {
     if (chainLink(n)) {

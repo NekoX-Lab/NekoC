@@ -880,4 +880,4 @@ source evidence](ts-share-objects.md) for the full support boundary.
 
 # Map / Set
 
-原生 ES2020 类型声明适用于 `Map<K,V>` / `Set<T>`。前端支持 string/number 键、set/get/has/delete/clear/size、add、直接 for-of 的 keys/values/entries 与内联 forEach；get 返回 `V | undefined`，可用 `??` 或判空。支持引用字段与别名；限制和复杂度见 [ts-map-set.md](ts-map-set.md)。
+原生 ES2020 类型声明适用于 `Map<K,V>` / `Set<T>`。前端支持 string/number 键、set/get/has/delete/clear/size、add、直接 for-of 的 keys/values/entries 与内联 forEach；get 返回 `V | undefined`，可用 `??` 或判空。支持引用字段与别名，明确标注的跨文件参数和返回值。forEach 回调局部变量使用显式初始化的 `let/const`，`var` 报错；可空集合方法先保存 receiver 并显式判空，可选方法调用报错（`?.size` 支持）。限制和复杂度见 [ts-map-set.md](ts-map-set.md)。
