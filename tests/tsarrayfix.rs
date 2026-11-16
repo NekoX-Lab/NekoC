@@ -5,7 +5,7 @@ use std::{fs, process::Command, time::Duration};
 #[test]
 fn array_fixtures_match_node_in_interpreter_and_jit_with_both_optimizations() {
     let dir = tempfile::tempdir().unwrap();
-    for name in ["eval", "args", "snapshot", "identity"] {
+    for name in ["eval", "args", "snapshot", "identity", "named", "modules"] {
         let input = format!("tests/fixtures/tsarrayfix-{name}.ts");
         let oracle = Command::new("node")
             .args(["tests/tsarrayfix-oracle.mjs", &input])

@@ -201,8 +201,10 @@ class WorkspaceCompiler {
       }
       ts.forEachChild(node, collectArrays);
     };
-    collectArrays(sourceFile);
-    this.synthesizeHelpers(sourceFile);
+    // Loading imports only registers user functions. All type sources must be
+    // available before any module helper performs argument/type validation.
+    for (const file of this.objectSourceFiles) collectArrays(file);
+    for (const file of this.objectSourceFiles) this.synthesizeHelpers(file);
     for (const name of this.callbackCaptures.keys()) this.globalVariables.add(name);
     // Helpers are compiled before event bodies: preserve captured string types
     // (including aliases) before lowering their + expressions.
@@ -408,7 +410,6 @@ class WorkspaceCompiler {
           this.registerInlineFunction(statement);
         }
       }
-      this.synthesizeHelpers(moduleSourceFile);
       exports = this.collectModuleExports(moduleSourceFile);
       this.moduleExports.set(resolvedPath, exports);
     }
@@ -5459,16 +5460,24 @@ class WorkspaceCompiler {
       ts.forEachChild(node, collect);
     };
     for (const file of this.typeSourceFiles.values()) collect(file);
-    collect(this.sourceFile);
+    for (const file of this.objectSourceFiles) collect(file);
     const seen = new Set();
     const visit = node => {
       if (!node || seen.has(node)) return;
       seen.add(node);
       if (ts.isCallExpression(node)) {
-        if (ts.isPropertyAccessExpression(node.expression) && ["pop", "shift", "splice"].includes(node.expression.name.text)) {
+        const name = calleeName(node.expression);
+        const handle = selfListHandleCall(node);
+        // getList aliases the named list, and copy replaces the target in place.
+        // Without alias/effect proof, any such deletion/replacement can remove
+        // positions from the callback receiver (even through another function).
+        if (ts.isPropertyAccessExpression(node.expression) && ["pop", "shift", "splice"].includes(node.expression.name.text)
+          || ["deleteListItem", "copyList", "__listDelete", "__listDeleteLast"].includes(selfApiName(name))
+          || handle && ["delete", "remove", "copyTo"].includes(handle.methodName)) {
           this.unsupported(call, `Array.${method} callbacks may not shrink arrays (including through aliases/functions); move removals after traversal or use an explicit loop`);
         }
-        visit(functions.get(calleeName(node.expression)));
+        visit(functions.get(name));
+        visit(this.inlineFunctions.get(name)?.body);
         if (["wait", "waitUntil", "ask", "glideTo", "broadcast", "broadcastAndWait", "tell", "tellAndWait"]
           .includes(selfApiName(calleeName(node.expression)))) {
           this.unsupported(call, `Array.${method} callbacks cannot yield or dispatch events while checking for missing positions; move that work after traversal or use an explicit loop`);

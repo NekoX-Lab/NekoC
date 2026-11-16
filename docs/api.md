@@ -79,6 +79,9 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   unions and unknown arguments require narrowing first. Spread and unsupported
   array-method overloads (including callback `thisArg`) produce diagnostics;
   extra arguments are never silently discarded.
+- These argument/type rules also apply inside relative imported modules,
+  including annotated array parameters and functions returning arrays. All
+  modules are loaded before helper synthesis and type validation.
 - `map`, `filter`, `forEach`, `reduce`, `some`, `every`, `find` and `findIndex`
   snapshot their initial length, then fetch each current value. Appending does
   not extend traversal; changing an unvisited element is visible. `filter`,
@@ -86,6 +89,10 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   Since sparse map results and missing-item `undefined` reads are unavailable,
   `map`/`find`/`findIndex` conservatively reject callbacks that shrink arrays,
   including through aliases or called functions, or yield/dispatch events.
+  This includes named-list `deleteListItem` / `self.deleteListItem`,
+  `self.list(...).delete/remove`, and replacement via `copyList` /
+  `self.list(...).copyTo`: `getList` shares the named list's identity. The
+  check conservatively rejects these operations even on unrelated lists.
   Move removals after traversal or use an explicit loop. Ordinary `for...of`
   continues to observe the live length and can visit appended items.
 - `Array.isArray(value)` folds statically known arrays and primitive literals;
