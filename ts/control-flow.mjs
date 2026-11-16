@@ -166,6 +166,10 @@ function compileSequence(c, expression, parent) {
 
 export function forStatement(c, statement, parent) {
   if (c.target.name === "kitten4") {
+    if (statement.initializer && ts.isVariableDeclarationList(statement.initializer)
+      && !(statement.initializer.flags & ts.NodeFlags.BlockScoped)) {
+      c.unsupported(statement.initializer, "Kitten 4 for (var ...) cannot preserve function/global-scoped var bindings; declare the variable outside the loop and use assignment-form for (i = ...; ...; ...)");
+    }
     // K4 export has no per-invocation frames yet. Site-unique globals isolate
     // disjoint start scripts, but not overlapping invocations of the same hat.
     // Fail closed rather than introduce shared induction/completion storage.

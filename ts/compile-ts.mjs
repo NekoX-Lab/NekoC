@@ -42,7 +42,7 @@ function fail(message, location = null, code = "NEKOC") {
 const helperOrigins = new WeakMap();
 
 function nodeLocation(node) {
-  const origin = node && helperOrigins.get(node);
+  const origin = node && (helperOrigins.get(node) ?? helperOrigins.get(ts.getOriginalNode(node)));
   if (origin) {
     const { line, character } = origin.file.getLineAndCharacterOfPosition(origin.offset);
     return { file: origin.file.fileName, line: line + 1, column: character + 1 };
@@ -95,6 +95,12 @@ function lowerFrontendFeatures(sourceFile) {
         ts.forEachChild(node, child => mark(child, origin));
       };
       for (const statement of file.statements) {
+        const origin = origins?.get(statement.name?.text);
+        if (origin) mark(statement, origin);
+      }
+      // These are the nodes actually consumed by the compiler; later passes
+      // can rebuild declarations/bodies without retaining their node identity.
+      for (const statement of lowered.statements) {
         const origin = origins?.get(statement.name?.text);
         if (origin) mark(statement, origin);
       }
@@ -625,6 +631,7 @@ class WorkspaceCompiler {
     }
     this.inlineFunctions.set(name, {
       name,
+      sourceNode: statement,
       classGenerated: classFunctionNames.get(ts.getOriginalNode(statement.getSourceFile()))?.has(name) ?? false,
       params: params.map((param) => {
         if (!ts.isIdentifier(param.name)) {
@@ -745,6 +752,8 @@ class WorkspaceCompiler {
     const saved = [this.blocks, this.connections, this.expressionBindings, this.inlineCallStack,
       this.rangeBindings, this.loopDepth, this.functionParams, this.tryStack, this.currentProcedureParams,
       this.globalVariables, this.arrayVariables, this.stringVariables];
+    const savedStatementNode = this.currentStatementNode;
+    if (this.target.name === "kitten4") this.currentStatementNode = fn.sourceNode;
     const outerVariables = this.globalVariables;
     this.globalVariables = new Set(outerVariables);
     this.arrayVariables = new Set(this.arrayVariables);
@@ -807,14 +816,14 @@ class WorkspaceCompiler {
           },
           deletable: false,
           editable: false,
-        });
+        }, fn.sourceNode);
         definition.params.forEach((param, index) => {
           if (param.type !== "String") return;
           const paramId = this.addBlockWithId(param.id, {
             type: "procedures_2_stable_parameter",
             parent_id: defId,
             fields: { param_name: param.name },
-          });
+          }, fn.sourceNode);
           this.connectInput(defId, paramId, `PARAMS${index}`, "value");
         });
         return defId;
@@ -889,6 +898,7 @@ class WorkspaceCompiler {
           [this.blocks, this.connections] = current;
         }
       };
+      if (this.target.name === "kitten4") this.currentStatementNode = fn.sourceNode;
       rewrite({ blocks: this.blocks, connections: this.connections }, frameParam.id);
       // Lazy control-expression helpers capture the same mutable frame through
       // functionParams, not a stale copy of each individual local value.
@@ -930,6 +940,7 @@ class WorkspaceCompiler {
       [this.blocks, this.connections, this.expressionBindings, this.inlineCallStack,
         this.rangeBindings, this.loopDepth, this.functionParams, this.tryStack, this.currentProcedureParams,
         this.globalVariables, this.arrayVariables, this.stringVariables] = saved;
+      if (this.target.name === "kitten4") this.currentStatementNode = savedStatementNode;
     }
   }
 
@@ -1153,6 +1164,7 @@ class WorkspaceCompiler {
   }
 
   mapHelperOrigin(statement, { callback, call }) {
+    const inherited = helperOrigins.get(call) ?? helperOrigins.get(ts.getOriginalNode(call));
     const file = call.getSourceFile();
     const copied = callback?.body.getText(file);
     const helperFile = statement.getSourceFile();
@@ -1161,7 +1173,7 @@ class WorkspaceCompiler {
       const position = node.getStart(helperFile);
       const offset = start >= 0 && position >= start && position < start + copied.length
         ? callback.body.getStart(file) + position - start : call.getStart(file);
-      helperOrigins.set(node, { file, offset });
+      helperOrigins.set(node, inherited ?? { file, offset });
       ts.forEachChild(node, visit);
     };
     visit(statement);
@@ -1657,7 +1669,7 @@ class WorkspaceCompiler {
       },
       deletable: false,
       editable: false,
-    });
+    }, call);
     spec.params.forEach((param, index) => {
       if (param.type !== "String") {
         return;
@@ -1666,7 +1678,7 @@ class WorkspaceCompiler {
         type: "procedures_2_stable_parameter",
         parent_id: defId,
         fields: { param_name: param.name },
-      });
+      }, call);
       this.connectInput(defId, paramId, `PARAMS${index}`, "value");
     });
     const firstChild = this.compileStatementList(body, defId);
@@ -5166,7 +5178,10 @@ class WorkspaceCompiler {
       }`);
     });
     const helpers = ts.createSourceFile("__nekoc_object_heap.ts", parts.join("\n"), ts.ScriptTarget.Latest, true);
-    for (const statement of helpers.statements) this.registerInlineFunction(statement);
+    for (const [index, statement] of helpers.statements.entries()) {
+      this.mapHelperOrigin(statement, { call: literals[index] });
+      this.registerInlineFunction(statement);
+    }
     // A list-shaped reporter cannot connect to the editor's scalar procedure
     // socket. Wrap literal lists in an any-shaped return reporter first. The
     // actual runtime value remains a list, including nested object handles.
@@ -5178,6 +5193,7 @@ class WorkspaceCompiler {
       this.objectArrayFactories.set(array, name);
       const params = array.elements.map((_, i) => `__nekocObjectArrayValue${n}_${i}`);
       const file = ts.createSourceFile(`${name}.ts`, `function ${name}(${params.join(",")}) { return [${params.join(",")}]; }`, ts.ScriptTarget.Latest, true);
+      this.mapHelperOrigin(file.statements[0], { call: array });
       this.registerInlineFunction(file.statements[0]);
     });
   }
@@ -6129,8 +6145,8 @@ class WorkspaceCompiler {
     return id;
   }
 
-  addBlockWithId(id, block) {
-    if (this.target.name === "kitten4") this.targetBlocks.push([block, this.currentStatementNode]);
+  addBlockWithId(id, block, sourceNode) {
+    if (this.target.name === "kitten4") this.targetBlocks.push([block, sourceNode || this.currentStatementNode]);
     this.blocks[id] = { id, ...block };
     return id;
   }

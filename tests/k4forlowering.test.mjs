@@ -13,6 +13,76 @@ const source = "onStart(() => { for (let i=0; i<10; i++) moveSteps(i); });";
 const host = text => ({ readFile: name => name === entry ? text : undefined });
 const compile = (text, target) => compileFile(entry, host(text), { target });
 
+test("k4forlowering: var loop declarations fail closed at the declaration, including repeated bindings", () => {
+  for (const text of [
+    'var i=99;\nfor(var i=0;i<3;i++) moveSteps(i);\nsetVar("result",i);',
+    'onStart(()=>{ var i=99;\n for(var i=0;i<3;i++) moveSteps(i);\n setVar("result",i); });',
+    'onStart(()=>{ var i=99;\n for(var i=0;i<3;i++) moveSteps(i);\n for(var i=0;i<3;i++) moveSteps(i); setVar("result",i); });',
+  ]) {
+    const result = checkFile(entry, { types: false, host: host(text), target: "kitten4" });
+    assert.equal(result.ok, false);
+    const diagnostic = result.diagnostics[0];
+    assert.match(diagnostic.message, /function\/global-scoped var.*assignment-form for \(i =/);
+    assert.equal(path.resolve(diagnostic.file), entry);
+    assert.equal(diagnostic.line, 2);
+    assert.equal(diagnostic.column, text.split("\n")[1].indexOf("var") + 1);
+    assert.throws(() => compile(text, "kitten4"), /assignment-form/);
+    // Only K4 is restricted; do not silently change the default KN graph.
+    assert.deepEqual(compile(text), compile(text, "kitten-n"));
+    assert.equal(checkFile(entry, { types: false, host: host(text.replaceAll("for(var i=", "for(i=")), target: "kitten4" }).ok, true);
+  }
+});
+
+test("k4forlowering: generated class procedures point exactly to real single-line, multiline and imported declarations", () => {
+  const single = 'class A{n:number=2;add(x:number){this.n+=x;}}const a=new A();onStart(()=>{for(let i=0;i<3;i++)a.add(i);setVar("result",a.n);});';
+  const multiline = '// heading\n\n  class A {\n n:number=2;\n add(x:number) { this.n+=x; }\n}\nconst a=new A();\nonStart(()=>{\n for(let i=0;i<3;i++) a.add(i);\n setVar("result",a.n);\n});';
+  const dependency = path.resolve("virtual/model.ts");
+  for (const [input, files, expectedFile, line, column] of [
+    [entry, new Map([[entry, single]]), entry, 1, 1],
+    [entry, new Map([[entry, multiline]]), entry, 3, 3],
+    [entry, new Map([[entry, 'import { run } from "./model"; onStart(()=>{run();});'], [dependency, '// model\n  class A { n:number=2; add(x:number){this.n+=x;} }\nexport function run(){ const a=new A(); for(let i=0;i<3;i++) a.add(i); }']]), dependency, 2, 3],
+  ]) {
+    const result = checkFile(input, { types: false, host: { readFile: name => files.get(name) }, target: "kitten4" });
+    assert.equal(result.ok, false);
+    const diagnostic = result.diagnostics[0];
+    assert.match(diagnostic.message, /procedures_2_defnoreturn.*custom procedures/);
+    assert.equal(path.resolve(diagnostic.file), expectedFile);
+    assert.equal(diagnostic.line, line);
+    assert.equal(diagnostic.column, column);
+    const lines = files.get(expectedFile).split("\n");
+    assert.ok(diagnostic.line <= lines.length);
+    assert.ok(diagnostic.column <= lines[diagnostic.line - 1].length);
+  }
+});
+
+test("k4forlowering: Node CLI rejects var and class with exact coordinates without overwriting output", () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "k4forlowering-review-"));
+  try {
+    const input = path.join(dir, "main.ts"), output = path.join(dir, "workspace.json");
+    for (const [text, line, column, hint] of [
+      ['onStart(()=>{var i=99;\n for(var i=0;i<3;i++)moveSteps(i);setVar("result",i);});', 2, 6, /assignment-form/],
+      ['class A{n:number=2;add(x:number){this.n+=x;}}const a=new A();onStart(()=>{for(let i=0;i<3;i++)a.add(i);});', 1, 1, /custom procedures/],
+      ['// heading\n  class A{n:number=2;add(x:number){this.n+=x;}}\nconst a=new A();onStart(()=>{for(let i=0;i<3;i++)a.add(i);});', 2, 3, /custom procedures/],
+    ]) {
+      writeFileSync(input, text);
+      writeFileSync(output, "keep");
+      const run = args => spawnSync(process.execPath, ["ts/compile-ts.mjs", ...args], { encoding: "utf8" });
+      const checked = run(["--check", "--json", "--target=kitten4", input]);
+      assert.equal(checked.status, 1);
+      const diagnostic = JSON.parse(checked.stdout).diagnostics[0];
+      assert.equal(path.resolve(diagnostic.file), input);
+      assert.equal(diagnostic.line, line);
+      assert.equal(diagnostic.column, column);
+      assert.match(diagnostic.message, hint);
+      const exported = run([input, output, "--target=kitten4"]);
+      assert.equal(exported.status, 1);
+      assert.ok(exported.stderr.includes(`main.ts:${line}:${column}`), exported.stderr);
+      assert.match(exported.stderr, hint);
+      assert.equal(readFileSync(output, "utf8"), "keep");
+    }
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("k4forlowering: K4 skips traversal, default KN graph is unchanged and share-supported", async () => {
   const kn = compile(source);
   assert.deepEqual(kn, compile(source, "kitten-n"));

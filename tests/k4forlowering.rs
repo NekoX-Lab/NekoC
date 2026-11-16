@@ -238,3 +238,169 @@ fn cli_target_check_and_native_export_agree_and_fail_without_overwriting() {
     assert!(kitten4_compiler::compile_ts_kitten4(&input, None, &output).is_err());
     assert_eq!(fs::read(&output).unwrap(), before);
 }
+
+#[test]
+fn var_declarations_and_class_helpers_have_exact_cli_locations_and_preserve_output() {
+    let dir = tempdir().unwrap();
+    let input = dir.path().join("main.ts");
+    let dependency = dir.path().join("model.ts");
+    let output = dir.path().join("keep.bcm");
+    let model = "// model\n  class A{n:number=2;add(x:number){this.n+=x;}}\nexport function run(){const a=new A();for(let i=0;i<3;i++)a.add(i);}";
+    fs::write(&dependency, model).unwrap();
+    for (source, file, line, column, hint) in [
+        (
+            "var i=99;\nfor(var i=0;i<3;i++)moveSteps(i);setVar(\"result\",i);",
+            &input,
+            2,
+            5,
+            "assignment-form",
+        ),
+        (
+            "onStart(()=>{var i=99;\n for(var i=0;i<3;i++)moveSteps(i);setVar(\"result\",i);});",
+            &input,
+            2,
+            6,
+            "assignment-form",
+        ),
+        (
+            "onStart(()=>{var i=99;\n for(var i=0;i<3;i++)moveSteps(i);for(var i=0;i<3;i++)moveSteps(i);setVar(\"result\",i);});",
+            &input,
+            2,
+            6,
+            "assignment-form",
+        ),
+        (
+            "class A{n:number=2;add(x:number){this.n+=x;}}const a=new A();onStart(()=>{for(let i=0;i<3;i++)a.add(i);setVar(\"result\",a.n);});",
+            &input,
+            1,
+            1,
+            "custom procedures",
+        ),
+        (
+            "// heading\n\n  class A{\n n:number=2;\n add(x:number){this.n+=x;}\n}\nconst a=new A();\nonStart(()=>{for(let i=0;i<3;i++)a.add(i);\nsetVar(\"result\",a.n);});",
+            &input,
+            3,
+            3,
+            "custom procedures",
+        ),
+        (
+            "import {run} from \"./model\";onStart(()=>{run();});",
+            &dependency,
+            2,
+            3,
+            "custom procedures",
+        ),
+    ] {
+        fs::write(&input, source).unwrap();
+        fs::write(&output, b"keep existing output").unwrap();
+        let check = Command::cargo_bin("nekoc")
+            .unwrap()
+            .args(["check", "--target", "kitten4", "--json"])
+            .arg(&input)
+            .output()
+            .unwrap();
+        assert!(!check.status.success());
+        let checked: Value = serde_json::from_slice(&check.stdout).unwrap();
+        let diagnostic = &checked["diagnostics"][0];
+        assert_eq!(
+            diagnostic["file"].as_str().unwrap().replace('\\', "/"),
+            file.to_string_lossy().replace('\\', "/")
+        );
+        assert_eq!(diagnostic["line"], line);
+        assert_eq!(diagnostic["column"], column);
+        assert!(diagnostic["message"].as_str().unwrap().contains(hint));
+        let real_source = fs::read_to_string(file).unwrap();
+        assert!(column as usize <= real_source.lines().nth(line as usize - 1).unwrap().len());
+        let export = Command::cargo_bin("nekoc")
+            .unwrap()
+            .arg("compile-ts-kitten4")
+            .arg(&input)
+            .arg("--out")
+            .arg(&output)
+            .output()
+            .unwrap();
+        assert!(!export.status.success());
+        let stderr = String::from_utf8_lossy(&export.stderr).replace('\\', "/");
+        assert!(
+            stderr.contains(&format!(
+                "{}:{line}:{column}",
+                file.to_string_lossy().replace('\\', "/")
+            )),
+            "{stderr}"
+        );
+        assert!(stderr.contains(hint), "{stderr}");
+        assert_eq!(fs::read(&output).unwrap(), b"keep existing output");
+    }
+}
+
+#[test]
+fn external_assignment_var_rewrite_matches_node_in_native_interpreter_and_jit() {
+    let dir = tempdir().unwrap();
+    let input = dir.path().join("rewrite.ts");
+    let output = dir.path().join("rewrite.bcm");
+    for source in [
+        "var i=99;for(i=0;i<3;i++)moveSteps(i);setVar(\"result\",i);",
+        "onStart(()=>{var i=99;for(i=0;i<3;i++)moveSteps(i);setVar(\"result\",i);});",
+        "onStart(()=>{var i=99;for(i=0;i<3;i++)moveSteps(i);for(i=0;i<3;i++)moveSteps(i);setVar(\"result\",i);});",
+    ] {
+        fs::write(&input, source).unwrap();
+        let oracle = Process::new("node")
+            .current_dir(root())
+            .args([
+                "--input-type=module",
+                "-e",
+                r#"import fs from 'node:fs';import vm from 'node:vm';
+            const result={x:0};vm.runInNewContext(fs.readFileSync(process.argv[1],'utf8'),
+            {onStart:f=>f(),moveSteps:n=>result.x+=n,setVar:(k,v)=>result[k]=v});
+            console.log(JSON.stringify(result));"#,
+            ])
+            .arg(&input)
+            .output()
+            .unwrap();
+        assert!(oracle.status.success());
+        let expected: Value = serde_json::from_slice(&oracle.stdout).unwrap();
+        assert_eq!(expected["result"], 3);
+        kitten4_compiler::compile_ts_kitten4(&input, None, &output).unwrap();
+        let native = project::load_project(&output).unwrap().value;
+        assert_schema(&native);
+        let canonical = kitten4::to_neko(&native).unwrap();
+        for jit in [false, true] {
+            let mut engine = Engine::new(Program::compile(&canonical).unwrap());
+            if !jit {
+                engine.disable_jit();
+            }
+            engine.use_virtual_clock();
+            engine.start();
+            for _ in 0..600 {
+                engine
+                    .advance(1.0 / 60.0, 1_000_000, Duration::from_secs(1))
+                    .unwrap();
+            }
+            assert_eq!(engine.active_tasks(), 0);
+            let snapshot = engine.debug_snapshot();
+            let id = native["variables"]
+                .as_object()
+                .unwrap()
+                .iter()
+                .find_map(|(id, v)| (v["name"] == "result").then_some(id))
+                .unwrap();
+            assert_eq!(
+                snapshot["variables"][id].as_f64(),
+                expected["result"].as_f64(),
+                "jit={jit}"
+            );
+            let actor = snapshot["actors"]
+                .as_object()
+                .unwrap()
+                .values()
+                .next()
+                .unwrap();
+            let x = actor["x"].as_f64().unwrap();
+            let y = actor["y"].as_f64().unwrap();
+            assert!(
+                (x.hypot(y) - expected["x"].as_f64().unwrap()).abs() < 1e-8,
+                "jit={jit}"
+            );
+        }
+    }
+}

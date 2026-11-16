@@ -20,7 +20,11 @@ cargo build --bin nekoc
 会降低为初始化赋值、实时条件的 `repeat_forever_until`、循环体与步进，
 不生成 KN 的 `traverse_number/param/value`。支持降序、空范围、小数、变量边界/步长、
 循环体修改归纳变量、嵌套循环、`continue`（仍执行步进）、`break`（不执行步进）及标签。
-循环声明使用唯一存储，互不遮盖外层或其他循环的同名变量。
+块级 `let/const` 循环声明使用唯一存储，互不遮盖外层或其他循环的同名变量。
+K4 暂不支持声明式 `for (var i = …; …; …)`：`var` 属于函数/全局作用域，不能按
+循环局部变量重命名；检查和导出会在源位置拒绝。请将声明移到循环外，例如
+`var i = 99; for (i = 0; i < 3; i++) moveSteps(i); setVar("result", i);`，
+循环后 `i` 为 `3`。默认 KN 行为不变。
 
 原生导出尚无每次调用的局部帧，因此 K4 目标在可能重入的 `onMessage/onKey/when`
 事件中拒绝普通 `for`（包括内联函数展开的循环），避免同一声明的并发执行共享归纳变量或
@@ -42,6 +46,8 @@ node ts/compile-ts.mjs --target=kitten4 game.ts workspace.json
 原生导出由 Rust CLI 完成。省略目标或选 `kitten-n` 保持原有 KN 图。
 目标预检对未映射积木在源位置报错并给出改法，最终导出器仍负责原生项目约束；
 这不承诺全部 class、nullable、位运算或 Map/Set 都能导出 K4。
+class 生成的过程（包括对象堆分配辅助过程）以原始类/方法声明作为诊断位置，
+不会使用追加辅助代码的坐标或之前编译的无关语句位置。
 
 回归测试 `tests/k4forlowering.rs` 以 Node 执行同源程序为语义基准，检查已有官方
 schema 的原生插口/连接，并在导入及往返后分别验收 Engine 解释器/JIT 的副作用次序、
