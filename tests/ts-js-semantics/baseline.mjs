@@ -6,7 +6,6 @@ const errors = {
   28: "Functions cannot be stored or returned as runtime values",
   30: "Rest parameters",
   53: "for...in enumerates property keys",
-  86: "Variable bitwise operators are not supported",
   105: "Dynamic toFixed is not supported: scaled rounding does not reproduce J",
   110: "Cannot determine JavaScript + / += semantics for any, union or non-primitive operands",
   136: "Regular expressions are not supported",
