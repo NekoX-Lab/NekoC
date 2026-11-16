@@ -42,6 +42,25 @@ VM 将按键/实体状态合并到 scheduler tick 入口，held hat 单实例重
 
 Web 输入层修正了键码、点击时限、取消/捕获清理、K4 拖拽 delta 与边界、CSS swipe。KN swipe 使用官方第二层有符号比较：up `dy<-50 && dy<dx`，left `dx<-50 && dx<dy`，right `dx>50 && dx>dy`，down `dy>50 && dy>dx`，按此顺序独立触发；不同于 K4 单主轴方向。两者原纹理 alpha 命中不依赖角色整体透明度。
 
+### Web 输入队列与过载
+
+`web/input.js` 的 `StageInput` 与 Rust/WASM 帧协议都保持 **256 条事件上限**，不靠增大队列解决慢帧输入：
+
+- 仅将**相邻、同目标**的 `drag` 替换成最后一个绝对坐标。任何非 drag 事件、目标变化、down/up/cancel、回答等都是合并屏障，不跨屏障搜索同目标事件。K4 先按原有规则累计 pointer delta、观察最新角色坐标、过滤舞台外移动，再合并结果；KN 保留抓取偏移和舞台外移动规则。
+- 接受新的 DOM key-down / pointer-down 前做容量预检。每个已按下键预留 key-up 和其后的一个 drag 屏障位置；活动手势预留最后 drag、最多两个 swipe、旧目标 clear、新目标 up/clear 和 click 的空间。普通事件不能消耗这些预留空间。释放先撤销本地按住状态、再使用预留槽位，因此即便期间普通事件已触发背压，up/cancel/blur/lost-capture 仍能按原顺序送出。KN cancel 仍释放键盘并送兼容 mouse_up；K4 cancel 仅清指针，不制造 up/click。
+- `push(event)` 返回 `true`（入队或合并）/ `false`（未接受）。有限队列不能无损保存无限不可合并事件：普通事件也满时**拒绝新事件，不逐出已接受的回答、音频结束、短点击或按键对**；无法完整预留的新 DOM 手势整个不接受，不产生半个 down/up。
+- 背压通过 `queueStats.{coalesced,rejected,highWater}` 累计计数和每次 `take()` 间至多一次的提示回调可观察；独立播放器在 `nekoPlayDiagnostics().inputQueue` 暴露计数，编辑器写日志。缺省回调写 `console.warn`，没有静默丢弃不可重放事件。
+- 已检查所有 `StageInput.push` 生产者：回答/选择、舞台对话和排行榜仅在返回非 `false` 后隐藏或标为已发送，满队列时可原地重试；音频/语音结束未接受时在 `ProjectAudio` 的有界（最多 256 个等待 ID）重试集合中保留，下一 VM 帧重试，重启时清空。重试集合本身也耗尽时明确报错要求重启，不假装成功。设备输入和扩展结果使用 `PlayerConnection` 原有独立背压队列，不挤掉 StageInput 事件。
+
+回归：`tests/playerinputqueue.test.mjs` 包含 fake-DOM 原始 256-move 探针、超过上限序列和顺序/上界断言；`tests/playerinputqueue-browser.test.mjs` 在真实浏览器中通过同一 `StageInput`/`PlayerConnection` 分别连接原生 Rust WebSocket 和 Rust/WASM Worker，确认过载后鼠标报告器为未按下、最后拖拽坐标保留、松手后不再拖动、等待释放的脚本恢复。该测试使用真实浏览器 down 获取 capture；move/cancel/blur 在同一 JS 任务中派发以确定性模拟帧消费暂停，不声称做过 OS 级触屏压力测试。
+
+复验浏览器测试（先通过全局 cargo wrapper 构建 `web` 和 `nekoc-wasm`，用与 `Cargo.lock` 相同版本的 wasm-bindgen 生成 web 绑定）：
+
+```bash
+# WASM 目录含 nekoc_wasm.js / nekoc_wasm_bg.wasm；不修改正式 web/ 资源。
+NEKOC_INPUT_WASM_DIR=dist/playerinputqueue/wasm NEKOC_PLAYERINPUTQUEUE_E2E=1 node --test tests/playerinputqueue-browser.test.mjs
+```
+
 ## 逐帧输入脚本
 
 ```json

@@ -116,7 +116,7 @@ export class StageOverlay {
     const header=create('div','ranking-header',`height:${size(90)};display:flex;align-items:center;justify-content:center`);
     const title=create('span','header-text',`font-size:${size(54.55)};color:#fff;-webkit-text-stroke:${size(2)} #4ca0ca`,'排行榜');
     const close=create('button','close-btn',`position:absolute;right:${size(5)};top:${size(5)};border:0;background:none;color:white;font-size:${size(44)};line-height:1;width:${size(38)};height:${size(38)};padding:0;cursor:pointer`,'×');close.type='button';close.setAttribute('aria-label','关闭排行榜');
-    close.onclick=()=>{panel.hidden=true;this.onAnswer({kind:'ranking_close'});};header.append(title,close);
+    close.onclick=()=>{if(this.onAnswer({kind:'ranking_close'})!==false)panel.hidden=true;};header.append(title,close);
     const user=create('div','current-user',`position:relative;margin:0 ${size(25)};height:${size(74)};border-radius:${size(20)};background:#fff;display:flex;align-items:center;box-shadow:0 ${size(2)} ${size(4)} #0004`);
     const rank=create('span','ranking-num',`margin-left:${size(22)};width:${size(33)};font-size:${size(27)};color:#ccc;text-align:center`,'-');
     const avatar=create('div','current-user-avatar',`margin:${size(10)};width:${size(50)};height:${size(50)};border:${size(2)} solid #ddd;border-radius:50%;background:#eee;flex-shrink:0`);avatar.setAttribute('role','img');avatar.setAttribute('aria-label','匿名头像');
@@ -162,8 +162,7 @@ export class StageOverlay {
     panel.onclick = event => {
       event.stopPropagation();
       if (panel.dataset.sent) return;
-      panel.dataset.sent = 'true';
-      this.onAnswer({ kind: 'stage_dialog_click', id: dialog.id });
+      if(this.onAnswer({ kind: 'stage_dialog_click', id: dialog.id })!==false)panel.dataset.sent = 'true';
     };
     panel.append(preview, name, text, next); this.root.append(panel); this.stageDialog = panel;
     this.focusControl(next);
@@ -182,7 +181,7 @@ export class StageOverlay {
     const panel = document.createElement('div'); panel.className = 'neko-ask';
     panel.setAttribute('role','group');panel.setAttribute('aria-label',ask.question||'回答问题');
     const question = document.createElement('p'); question.textContent = ask.question; panel.append(question);
-    const send = (text, choice) => { if (this.askId !== ask.id) return; this.onAnswer({ kind: 'answer', id: ask.id, text, ...(choice ? { choice } : {}) }); panel.remove(); this.ask = null; };
+    const send = (text, choice) => { if (this.askId !== ask.id) return; if(this.onAnswer({ kind: 'answer', id: ask.id, text, ...(choice ? { choice } : {}) })===false)return; panel.remove(); this.ask = null; };
     if (ask.choices) {
       if (this.renderer.kitten4) {
         panel.classList.add('k4-choice');
