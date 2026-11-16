@@ -4,12 +4,23 @@ import path from "node:path";
 import ts from "typescript";
 
 const logs = [];
+const procedures = new Map();
+const returned = Symbol("DSL return");
+const invoke = (name, args) => {
+  try { return procedures.get(name)(...args); }
+  catch (error) { if (error?.kind === returned) return error.value; throw error; }
+};
 const lists = new Map();
 const list = name => {
   if (!lists.has(name)) lists.set(name, []);
   return lists.get(name);
 };
 const api = {
+  defineProc: (name, params, body) => procedures.set(name, body),
+  defineReporter: (name, params, body) => procedures.set(name, body),
+  callProc: (name, ...args) => invoke(name, args),
+  callReporter: (name, ...args) => invoke(name, args),
+  returnValue: value => { throw { kind: returned, value }; },
   appendList: (name, value) => list(name).push(value),
   getList: list,
   deleteListItem: (name, mode, index) => {

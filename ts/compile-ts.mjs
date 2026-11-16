@@ -5453,10 +5453,22 @@ class WorkspaceCompiler {
 
   checkCallbackShrink(call, method) {
     const functions = new Map();
+    const procedures = new Map();
     const collect = node => {
       if (ts.isFunctionDeclaration(node) && node.name) functions.set(node.name.text, node.body);
       if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer
         && (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))) functions.set(node.name.text, node.initializer.body);
+      if (ts.isCallExpression(node) && ["defineProc", "defineReporter"].includes(selfApiName(calleeName(node.expression)))) {
+        const name = node.arguments[0], callback = node.arguments[2];
+        if (name && ts.isStringLiteral(name) && callback
+          && (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback))) {
+          // Keep every candidate: workspace scope/duplicate names must not make
+          // an unsafe definition disappear from this conservative effect scan.
+          const bodies = procedures.get(name.text) ?? new Set();
+          bodies.add(callback.body);
+          procedures.set(name.text, bodies);
+        }
+      }
       ts.forEachChild(node, collect);
     };
     for (const file of this.typeSourceFiles.values()) collect(file);
@@ -5478,6 +5490,14 @@ class WorkspaceCompiler {
         }
         visit(functions.get(name));
         visit(this.inlineFunctions.get(name)?.body);
+        if (["callProc", "callReporter"].includes(selfApiName(name))) {
+          const target = node.arguments[0];
+          const bodies = target && ts.isStringLiteral(target) && procedures.get(target.text);
+          if (!bodies) {
+            this.unsupported(call, `Array.${method} callbacks require a statically known DSL procedure body; use a literal callProc/callReporter target with a visible definition, move the call after traversal or use an explicit loop`);
+          }
+          for (const body of bodies) visit(body);
+        }
         if (["wait", "waitUntil", "ask", "glideTo", "broadcast", "broadcastAndWait", "tell", "tellAndWait"]
           .includes(selfApiName(calleeName(node.expression)))) {
           this.unsupported(call, `Array.${method} callbacks cannot yield or dispatch events while checking for missing positions; move that work after traversal or use an explicit loop`);

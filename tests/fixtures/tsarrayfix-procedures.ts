@@ -1,0 +1,11 @@
+defineProc("grow", [], () => { appendList("items", 3); });
+defineProc("nested", [], () => { callProc("grow"); });
+defineReporter("value", [], () => { returnValue(7); });
+appendList("items", 1); appendList("items", 2);
+const a = getList<number>("items");
+console.log(a.map(x => { callProc("nested"); return x; }).join(","), a.length);
+console.log([1, 2].map(x => x + callReporter<number>("value")).join(","));
+console.log([1, 2].find(x => { callProc("nested"); return x === 2; }));
+console.log([1, 2].findIndex(x => { callProc("nested"); return false; }));
+defineProc("shrink", [], () => { deleteListItem("items", "last", 1); });
+console.log(a.filter(x => { callProc("shrink"); return true; }).join(","), a.length);

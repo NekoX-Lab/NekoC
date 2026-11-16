@@ -12,7 +12,7 @@ const run = (command, args) => {
   assert.equal(result.status, 0, result.stderr || result.stdout);
   return result.stdout;
 };
-for (const name of ["eval", "args", "snapshot", "identity", "named", "modules"]) {
+for (const name of ["eval", "args", "snapshot", "identity", "named", "modules", "procedures"]) {
   test(`tsarrayfix: ${name} matches Node with and without optimization and uses share blocks`, async () => {
     const input = `tests/fixtures/tsarrayfix-${name}.ts`;
     const expected = JSON.parse(run(process.execPath, ["tests/tsarrayfix-oracle.mjs", input]));
@@ -41,6 +41,42 @@ test("tsarrayfix: yielded reentry keeps invocation-local inputs and share-compat
     assert.equal(checkProject(JSON.parse(readFileSync(output, "utf8")), manifest).ok, true);
   }
 });
+
+for (const [name, expected] of [["map", ["3 2 1,2, 1"]], ["find", ["-1 3 0"]]]) {
+  test(`tsarrayfix: DSL procedure ${name} review reproducer is rejected`, () => {
+    const input = `tests/fixtures/tsarrayfix-proc-${name}-rejected.ts`;
+    assert.deepEqual(JSON.parse(run(process.execPath, ["tests/tsarrayfix-oracle.mjs", input])), expected);
+    assert.throws(() => compileFile(input), error => error instanceof CompileError
+      && error.location?.line === 5 && /may not shrink.*move removals/.test(error.message));
+    const check = checkFile(input);
+    assert.equal(check.ok, false);
+    assert.ok(check.diagnostics.some(d => d.line === 5 && /may not shrink/.test(d.message)));
+  });
+}
+
+for (const method of ["map", "find", "findIndex"]) {
+  for (const [label, definitions, invoke, diagnostic] of [
+    ["direct", 'defineProc("bad", [], () => { deleteListItem("items", "last", 1); });', 'callProc("bad");', /may not shrink/],
+    ["nested", 'defineProc("outer", [], () => { callProc("bad"); }); defineProc("bad", [], () => { copyList([], "items"); });', 'callProc("outer");', /may not shrink/],
+    ["self", 'defineProc("bad", [], () => { self.list("items").remove("all", 1); });', 'self.callProc("bad");', /may not shrink/],
+    ["function wrapper", 'defineProc("bad", [], () => { deleteListItem("items", "last", 1); }); function wrap() { callProc("bad"); }', 'wrap();', /may not shrink/],
+    ["reporter", 'defineReporter("bad", [], () => { deleteListItem("items", "last", 1); returnValue(1); });', 'callReporter("bad");', /may not shrink/],
+    ["self reporter", 'defineReporter("bad", [], () => { self.deleteListItem("items", "all", 1); returnValue(1); });', 'self.callReporter("bad");', /may not shrink/],
+    ["recursive", 'defineProc("bad", [], () => { callProc("bad"); deleteListItem("items", "last", 1); });', 'callProc("bad");', /may not shrink/],
+    ["mutual recursion", 'defineProc("outer", [], () => { callProc("bad"); }); defineProc("bad", [], () => { callProc("outer"); wait(0.1); });', 'callProc("outer");', /cannot yield/],
+    ["reporter dispatch", 'defineReporter("bad", [], () => { broadcast("change"); returnValue(1); });', 'callReporter("bad");', /cannot yield/],
+    ["unknown target", '', 'callProc("missing");', /statically known DSL procedure body/],
+    ["nonliteral target", 'const target = "bad"; defineProc("bad", [], () => { deleteListItem("items", "last", 1); });', 'callProc(target);', /statically known DSL procedure body/],
+  ]) test(`tsarrayfix: ${method} propagates DSL effects: ${label}`, () => {
+    const source = `${definitions}\nconst a = [1, 2, 3];\na.${method}(x => { ${invoke} return x; });`;
+    assert.throws(() => compileFile("tsarrayfix.ts", { readFile: () => source }), error =>
+      error instanceof CompileError && error.location?.line === 3 && diagnostic.test(error.message)
+      && /move|use/.test(error.message));
+    const check = checkFile("tsarrayfix.ts", { types: false, host: { readFile: () => source } });
+    assert.equal(check.ok, false);
+    assert.ok(check.diagnostics.some(d => d.line === 3 && diagnostic.test(d.message)));
+  });
+}
 
 const rejected = [
   'const a = [1]; a.includes(1, 0, 2);',

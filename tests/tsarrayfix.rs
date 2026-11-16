@@ -5,7 +5,15 @@ use std::{fs, process::Command, time::Duration};
 #[test]
 fn array_fixtures_match_node_in_interpreter_and_jit_with_both_optimizations() {
     let dir = tempfile::tempdir().unwrap();
-    for name in ["eval", "args", "snapshot", "identity", "named", "modules"] {
+    for name in [
+        "eval",
+        "args",
+        "snapshot",
+        "identity",
+        "named",
+        "modules",
+        "procedures",
+    ] {
         let input = format!("tests/fixtures/tsarrayfix-{name}.ts");
         let oracle = Command::new("node")
             .args(["tests/tsarrayfix-oracle.mjs", &input])
@@ -39,6 +47,45 @@ fn array_fixtures_match_node_in_interpreter_and_jit_with_both_optimizations() {
                 }
                 assert_eq!(logs, expected, "{name}, optimize={optimize}, jit={jit}");
             }
+        }
+    }
+}
+
+#[test]
+fn unsafe_dsl_procedure_callbacks_are_rejected_before_emitting_works() {
+    let dir = tempfile::tempdir().unwrap();
+    for name in ["map", "find"] {
+        let input = format!("tests/fixtures/tsarrayfix-proc-{name}-rejected.ts");
+        let check = Command::new(env!("CARGO_BIN_EXE_nekoc"))
+            .args(["check", &input, "--json"])
+            .output()
+            .unwrap();
+        assert!(!check.status.success());
+        let diagnostics: Value = serde_json::from_slice(&check.stdout).unwrap();
+        assert_eq!(diagnostics["ok"], false);
+        assert!(
+            diagnostics["diagnostics"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|d| {
+                    d["line"] == 5
+                        && d["message"]
+                            .as_str()
+                            .is_some_and(|s| s.contains("may not shrink"))
+                })
+        );
+        for optimize in [false, true] {
+            let output = dir.path().join(format!("{name}-{optimize}.bcmkn"));
+            let mut build = Command::new(env!("CARGO_BIN_EXE_nekoc"));
+            build.args(["build", &input, "-o"]).arg(&output);
+            if optimize {
+                build.arg("--optimize");
+            }
+            let result = build.output().unwrap();
+            assert!(!result.status.success(), "{result:?}");
+            assert!(String::from_utf8_lossy(&result.stderr).contains("may not shrink"));
+            assert!(!output.exists());
         }
     }
 }

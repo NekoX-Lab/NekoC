@@ -93,6 +93,13 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   `self.list(...).delete/remove`, and replacement via `copyList` /
   `self.list(...).copyTo`: `getList` shares the named list's identity. The
   check conservatively rejects these operations even on unrelated lists.
+  Effects propagate through literal-target `callProc` / `callReporter` (also
+  with a `self` prefix), nested DSL procedures/reporters and ordinary function
+  wrappers. Recursive calls are checked without repeatedly visiting the same
+  body. If the target or body cannot be resolved statically, these three array
+  methods reject the call: use a literal target with a visible definition,
+  move it after traversal, or use an explicit loop. Known nonshrinking,
+  nonyielding DSL procedures remain supported.
   Move removals after traversal or use an explicit loop. Ordinary `for...of`
   continues to observe the live length and can visit appended items.
 - `Array.isArray(value)` folds statically known arrays and primitive literals;
