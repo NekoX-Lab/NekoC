@@ -400,13 +400,22 @@ const size = node?.next?.value ?? 0;
 `?.`, `??` and `??=` work on values typed with `null`/`undefined`; see
 [null / undefined and optional chaining](ts-nullable.md).
 
-### Async/Await (Stripped)
+### Async/Await (Unsupported)
 
 ```ts
 await somePromise;
 ```
 
-`await` is stripped. Promises are not supported.
+`async` functions/callbacks, `await` expressions and `for await...of` produce
+compile errors before lowering, including in unused functions and imported
+modules. Diagnostics point to the original keyword. This also applies with
+`--no-types` and in npm/browser frontends; Promise and microtask semantics are
+not implemented.
+
+For synchronous code, remove `async`/`await` and use ordinary functions. Use
+`wait(seconds)` for cooperative delays or an explicit event state machine for
+asynchronous sequencing. These alternatives do not reproduce JavaScript
+Promise/microtask ordering.
 
 ### Void Operator
 
