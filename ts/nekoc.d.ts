@@ -36,6 +36,14 @@ interface ReadonlyArray<T> {
   at(index: number): T | undefined;
 }
 
+// Native ES2020 Map/Set declarations provide the public signatures (including
+// Map.get: V | undefined). NekoC lowers concrete string/number keys to heap
+// references; values may be scalars or initialized object/class/collection
+// references. Array values, WeakMap/WeakSet, detached methods and escaping
+// iterators are rejected. Iterate directly with for-of or inline forEach;
+// Array.from(collection iterator) and collection spread are not supported.
+// Details and the conservative has/get! guard rule: docs/ts-map-set.md.
+
 type NekoStatementBody = () => void;
 /** Cooperative Kitten N timer handle; delays are milliseconds, frame-quantized. */
 interface NekoTimer { readonly active: boolean; readonly delay: number; }

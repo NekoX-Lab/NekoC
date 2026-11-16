@@ -331,6 +331,13 @@ export function lowerTsNullable(input) {
     const c = climb(node);
     const p = c.parent;
     if (!p) return "bad";
+    if (ts.isAsExpression(p)) {
+      // The collection pass reserves this helper namespace and proves the
+      // matching has/get guard before generating a non-null result signature.
+      let owner = p.parent;
+      while (owner && !ts.isFunctionDeclaration(owner)) owner = owner.parent;
+      if (owner?.name?.text.match(/^__nekocMap_\d+_\d+_op_known$/)) return "flow";
+    }
     if ((ts.isIfStatement(p) || ts.isWhileStatement(p) || ts.isDoStatement(p)) && p.expression === c) return "truthy";
     if (ts.isForStatement(p)) return p.condition === c ? "truthy" : "discard";
     if (ts.isConditionalExpression(p)) return p.condition === c ? "truthy" : "flow";
@@ -442,7 +449,9 @@ export function lowerTsNullable(input) {
       const signature = target?.getCallSignatures()[0];
       if (signature) return checker.getReturnTypeOfSignature(signature);
     } else if (ts.isNonNullExpression(n)) return target;
-    return declaredType(n);
+    // Unknown optional properties/calls must not recurse back through
+    // declaredType -> plainType on the same chain node.
+    return flowType(n);
   };
   const plainPure = n => {
     if (chainLink(n)) {
