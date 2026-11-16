@@ -26,7 +26,7 @@ test("checkFile returns no diagnostics for a valid program and a report", () => 
 });
 
 test("compat errors carry a 1-based location and the types pass can be skipped", () => {
-  withSource(`onStart(() => {\n  const x = new Map();\n});\n`, file => {
+  withSource(`onStart(() => {\n  const x = new WeakMap();\n});\n`, file => {
     const result = checkFile(file, { types: false });
     assert.equal(result.ok, false);
     const [diagnostic] = result.diagnostics;

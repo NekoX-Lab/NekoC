@@ -18,6 +18,7 @@ import { lowerTsFeatures } from "./tsfeat-lowering.mjs";
 import { lowerTsMethods } from "./tsfeat-methods.mjs";
 import { lowerTsClasses } from "./tsfeat-classes.mjs";
 import { lowerTsNullable } from "./tsfeat-nullable.mjs";
+import { lowerTsCollections } from "./tsmap.mjs";
 import { compileNilIntrinsic, nilIntrinsic } from "./nil-intrinsics.mjs";
 import { classFunctionNames, classSourceOrigins, markClassHelpers } from "./class-metadata.mjs";
 import { bitwiseAssignments, bitwisePlan, bitwiseTokens } from "./bitwise.mjs";
@@ -79,7 +80,7 @@ function lowerFrontendFeatures(sourceFile) {
       ts.forEachChild(node, reserveBitwiseNames);
     };
     reserveBitwiseNames(sourceFile);
-    const classes = lowerTsClasses(lowerTsNullable(sourceFile));
+    const classes = lowerTsClasses(lowerTsNullable(lowerTsCollections(sourceFile)));
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
       .map(node => node.name.text));
@@ -6722,7 +6723,9 @@ export function compileFile(inputPath, host = defaultHost) {
     const sourceText = host.readFile(path.resolve(inputPath));
     if (typeof sourceText !== "string") fail(`Unable to read ${inputPath}`);
     let sourceFile = ts.createSourceFile(
-      inputPath,
+      // Imported modules already use resolved paths. Use the same identity for
+      // the entry so the multi-file type host can resolve its imports too.
+      path.isAbsolute(inputPath) ? inputPath : path.resolve(inputPath),
       sourceText,
       ts.ScriptTarget.Latest,
       true,

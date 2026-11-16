@@ -1,5 +1,6 @@
 import ts from "typescript";
 import { classAllocationPlaceholders } from "./class-metadata.mjs";
+import { collectionTypes } from "./tsmap-types.mjs";
 
 const REGEX_MESSAGE = "Regular expressions are not supported; use string methods such as includes, indexOf or split";
 
@@ -9,7 +10,7 @@ export function objectTypes(sourceFiles, origins = new WeakMap()) {
   const files = new Map(sourceFiles.map(file => [normalize(file.fileName), file]));
   const lib = "/__nekoc_object_types.d.ts";
   files.set(lib, ts.createSourceFile(lib,
-    `interface Array<T> {
+    `${collectionTypes}\ninterface Array<T> {
       [n: number]: T; length: number;
       push(...items: T[]): number; unshift(...items: T[]): number;
       pop(): T | undefined; shift(): T | undefined;
@@ -46,7 +47,7 @@ export function objectTypes(sourceFiles, origins = new WeakMap()) {
       return resolved ? { resolvedFileName: resolved, extension: ts.Extension.Ts } : undefined;
     }),
   };
-  const program = ts.createProgram([...files.keys()], { noLib: true, strictNullChecks: true }, host);
+  const program = ts.createProgram([...files.keys()], { noLib: true, strictNullChecks: true, target: ts.ScriptTarget.ES2020 }, host);
   const checker = program.getTypeChecker();
   // The compiler reuses source nodes in synthetic inline expressions. Snapshot
   // types while the source tree still has its original parents; querying the
