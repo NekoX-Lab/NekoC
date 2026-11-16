@@ -13,6 +13,47 @@ cargo build --bin nekoc
 
 示例 [`kitten4-demo.ts`](../samples/kitten4-demo.ts) 绘制一个80步的蓝色正方形：方向键移动，空格画一段绿色线，C清屏。原生文件：[`kitten4-demo.bcm`](../samples/kitten4-demo.bcm)。
 
+### 普通 TypeScript `for` 与目标预检
+
+`compile-ts-kitten4` 自动选择 `kitten4` 前端目标。例如
+`onStart(() => { for (let i = 0; i < 10; i++) moveSteps(i); });`
+会降低为初始化赋值、实时条件的 `repeat_forever_until`、循环体与步进，
+不生成 KN 的 `traverse_number/param/value`。支持降序、空范围、小数、变量边界/步长、
+循环体修改归纳变量、嵌套循环、`continue`（仍执行步进）、`break`（不执行步进）及标签。
+循环声明使用唯一存储，互不遮盖外层或其他循环的同名变量。
+
+原生导出尚无每次调用的局部帧，因此 K4 目标在可能重入的 `onMessage/onKey/when`
+事件中拒绝普通 `for`（包括内联函数展开的循环），避免同一声明的并发执行共享归纳变量或
+控制标志。可移到 `onStart`，通过明确共享的状态通信；这不是 K4 原生遍历格式的猜测实现。
+通用循环与 KN 紧凑遍历的调度边界不同，**不承诺逐帧官方等价**。
+
+检查与生成使用相同目标：
+
+```sh
+nekoc check game.ts --target kitten4 --json
+nekoc compile-ts-kitten4 game.ts --out game.bcm
+node ts/compile-ts.mjs --check --target=kitten4 --json game.ts
+node ts/compile-ts.mjs --target=kitten4 game.ts workspace.json
+```
+
+直接调用前端可用 `compileFile(entry, host, { target: "kitten4" })` 与
+`checkFile(entry, { host, target: "kitten4" })`。Node/浏览器包的 `compile/check`
+也接受同名选项，但 `compile` 返回的仍是标准 `.bcmkn` 内部表示，不是原生 `.bcm`；
+原生导出由 Rust CLI 完成。省略目标或选 `kitten-n` 保持原有 KN 图。
+目标预检对未映射积木在源位置报错并给出改法，最终导出器仍负责原生项目约束；
+这不承诺全部 class、nullable、位运算或 Map/Set 都能导出 K4。
+
+回归测试 `tests/k4forlowering.rs` 以 Node 执行同源程序为语义基准，检查已有官方
+schema 的原生插口/连接，并在导入及往返后分别验收 Engine 解释器/JIT 的副作用次序、
+计数和坐标。适配器往返自洽不等于独立的官方运行证据；官方检查仍用下文现有验证入口。
+
+该组合循环样例已用 `tools/verify-kitten4.mjs` 在官方 4.11.20 / BCM 25、
+Edge 157.0.4341.60 中实测：844 个积木、843 条连接导入校验通过，
+`count=39`、`total=113.5`、`limit=2`、`outside=5`、最终坐标 `(113.5, 0)`，
+完整文本副作用序列与 Node 相同，原生错误及页面异常均为空。
+这只证明该样例的最终行为，不证明逐帧调度或所有语法。对应 K4 降低的标准表示也通过
+KN 0.27.4 官方编辑器检查（842 个积木）及分享播放器积木可用性静态检查。
+
 ## Web Studio
 
 ```powershell
@@ -69,7 +110,7 @@ TypeScript → 现有前端/标准积木表示 → Kitten 4 字段与连接适�
 
 - 适配器接受原生 **version 25**；其他版本报错。
 - 原生舞台规格为 **620×900（竖屏）/ 960×720（4:3）/ 1280×720（16:9）**。官方加载器按这些比例选择固定舞台，不接受任意画布尺寸；新导出使用对应规格，已有来源的原始尺寸可保真保留。
-- 新编译的 `forRange` / `traverse_number`、脚本局部变量、自制积木定义/调用，以及映射表之外的积木会阻止导出。错误包含对应积木类型；已有输出文件不因转换失败而被覆盖。
+- 普通 `for` 使用上述通用回退；专用 `forRange` / `traverse_number`、脚本局部变量、自制积木定义/调用，以及映射表之外的积木仍会阻止导出。源位置错误包含对应积木类型及改法；已有输出文件不因转换失败而被覆盖。
 - 已导入的未知积木、未映射菜单值和自制积木以 `kitten4::` 类型保留，能随项目导出；这些脚本的运行不计为已支持。
 - 克隆、云变量操作、扩展积木、硬件、音频播放等执行语义不在当前映射范围内。资源保留不等于对应指令可执行。
 - 文字印章暂作为未适配积木保留：官方文字朝向依赖原生角色角度，需要单独验证，不能沿用内部文字旋转方式。

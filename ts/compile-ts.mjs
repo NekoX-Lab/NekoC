@@ -12,6 +12,7 @@ import { createExpressionTypes, withParsedParents } from "./tsstr-types.mjs";
 import { evaluateStaticNumericCall } from "./tsstr-numeric.mjs";
 import { boxedValue, evaluatedChoice, evaluatedStatement, evaluatedValue, lazyChoice, nonNullishBinding, returnChoice, updateValue } from "./control-expressions.mjs";
 import * as controlFlow from "./control-flow.mjs";
+import { compileTarget, checkTargetBlock } from "./compile-target.mjs";
 import { lowerTsValues } from "./tsfeat-values.mjs";
 import { lowerTsSequences } from "./tsfeat-sequences.mjs";
 import { lowerTsFeatures } from "./tsfeat-lowering.mjs";
@@ -125,7 +126,9 @@ const BOOLEAN_OUTPUT_TYPES = new Set(`
 `.trim().split(/\s+/));
 
 class WorkspaceCompiler {
-  constructor(source, sourceFile, host) {
+  constructor(source, sourceFile, host, target) {
+    this.target = target;
+    this.targetBlocks = [];
     this.host = host;
     this.source = source;
     this.sourceFile = sourceFile;
@@ -6113,6 +6116,7 @@ class WorkspaceCompiler {
   }
 
   addBlock(block, sourceNode) {
+    if (this.target.name === "kitten4") this.targetBlocks.push([block, sourceNode || this.currentStatementNode]);
     const id = `b${this.nextId}`;
     this.nextId += 1;
     this.blocks[id] = { id, ...block };
@@ -6126,6 +6130,7 @@ class WorkspaceCompiler {
   }
 
   addBlockWithId(id, block) {
+    if (this.target.name === "kitten4") this.targetBlocks.push([block, this.currentStatementNode]);
     this.blocks[id] = { id, ...block };
     return id;
   }
@@ -6823,7 +6828,7 @@ function booleanLiteralValue(node, compiler) {
 }
 
 /** Compiles a TS/JS entry file (and its relative imports) to a workspace report. Throws CompileError. */
-export function compileFile(inputPath, host = defaultHost) {
+export function compileFile(inputPath, host = defaultHost, { target = "kitten-n" } = {}) {
   let compiler;
   try {
     const sourceText = host.readFile(path.resolve(inputPath));
@@ -6839,8 +6844,12 @@ export function compileFile(inputPath, host = defaultHost) {
     );
     rejectParseDiagnostics(sourceFile);
     sourceFile = lowerFrontendFeatures(sourceFile);
-    compiler = new WorkspaceCompiler(inputPath, sourceFile, host);
-    return compiler.compile(sourceFile);
+    compiler = new WorkspaceCompiler(inputPath, sourceFile, host, compileTarget(target));
+    const report = compiler.compile(sourceFile);
+    // Preserve target-independent source errors (including helper validation)
+    // before reporting target availability of the completed graph.
+    for (const [block, node] of compiler.targetBlocks) checkTargetBlock(compiler, block, node);
+    return report;
   } catch (error) {
     if (error instanceof CompileError) {
       // Unknown coordinates stay unknown instead of pointing at 1:1.
@@ -6905,15 +6914,15 @@ export function checkTypes(inputPath, host) {
 }
 
 /**
- * Check mode: type check plus Kitten N compatibility (the full compile), no output file.
+ * Check mode: type check plus target compatibility (the full compile), no output file.
  * Returns { ok, diagnostics, report } where report is the workspace report when compilation succeeded.
  */
-export function checkFile(inputPath, { types = true, host } = {}) {
+export function checkFile(inputPath, { types = true, host, target = "kitten-n" } = {}) {
   const diagnostics = [];
   let report = null;
   try {
     if (types) diagnostics.push(...checkTypes(inputPath, host));
-    report = compileFile(inputPath, host);
+    report = compileFile(inputPath, host, { target });
   } catch (error) {
     if (!(error instanceof CompileError)) {
       diagnostics.push({ severity: "error", source: "compat", code: "NEKOC_INTERNAL",
@@ -6996,13 +7005,14 @@ export function formatDiagnostic(d) {
 function main(argv) {
   const flags = new Set(argv.filter((arg) => arg.startsWith("--") && !arg.includes("=")));
   const reportOut = argv.find((arg) => arg.startsWith("--report-out="))?.slice("--report-out=".length);
+  const target = argv.find(arg => arg.startsWith("--target="))?.slice("--target=".length) ?? "kitten-n";
   const [inputPath, outputPath] = argv.filter((arg) => !arg.startsWith("--"));
   if (flags.has("--check")) {
     if (!inputPath) {
-      console.error("usage: node compile-ts.mjs --check [--json] [--no-types] [--report-out=<file>] <input.ts>");
+      console.error("usage: node compile-ts.mjs --check [--json] [--no-types] [--target=kitten-n|kitten4] [--report-out=<file>] <input.ts>");
       process.exit(2);
     }
-    const result = checkFile(inputPath, { types: !flags.has("--no-types") });
+    const result = checkFile(inputPath, { types: !flags.has("--no-types"), target });
     if (reportOut && result.report) {
       fs.writeFileSync(reportOut, `${JSON.stringify(result.report)}\n`, "utf8");
     }
@@ -7015,12 +7025,12 @@ function main(argv) {
     process.exit(result.ok ? 0 : 1);
   }
   if (!inputPath || !outputPath) {
-    console.error("usage: node compile-ts.mjs <input.ts> <output.json>\n       node compile-ts.mjs --check [--json] <input.ts>");
+    console.error("usage: node compile-ts.mjs [--target=kitten-n|kitten4] <input.ts> <output.json>\n       node compile-ts.mjs --check [--json] [--target=kitten-n|kitten4] <input.ts>");
     process.exit(2);
   }
   let report;
   try {
-    report = compileFile(inputPath);
+    report = compileFile(inputPath, defaultHost, { target });
   } catch (error) {
     if (!(error instanceof CompileError)) throw error;
     compileErrorDiagnostics(error, inputPath).forEach((d) => console.error(formatDiagnostic(d)));

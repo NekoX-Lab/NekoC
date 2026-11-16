@@ -51,10 +51,13 @@ enum Command {
         #[arg(long)]
         optimize: bool,
     },
-    /// Type and Kitten N compatibility check without writing a project
+    /// Type and target compatibility check without writing a project
     /// (TS/JS sources, .bcmkn, .bcm). Exits 1 when there are errors.
     Check {
         input: PathBuf,
+        /// Target-specific lowering and compatibility preflight.
+        #[arg(long, default_value = "kitten-n", value_parser = ["kitten-n", "kitten4"])]
+        target: String,
         /// Print `{ok, diagnostics}` as JSON on stdout.
         #[arg(long)]
         json: bool,
@@ -314,8 +317,16 @@ fn run_check(
     json: bool,
     types: bool,
     template: Option<&std::path::Path>,
+    target: &str,
 ) -> Result<()> {
-    let report = nekoc::check::check_file(input, &nekoc::check::CheckOptions { types, template })?;
+    let report = nekoc::check::check_file(
+        input,
+        &nekoc::check::CheckOptions {
+            types,
+            template,
+            target,
+        },
+    )?;
     if json {
         println!("{}", serde_json::to_string(&report)?);
     } else {
@@ -413,10 +424,11 @@ fn main() -> Result<()> {
         }
         Command::Check {
             input,
+            target,
             json,
             no_types,
             template,
-        } => run_check(&input, json, !no_types, template.as_deref())?,
+        } => run_check(&input, json, !no_types, template.as_deref(), &target)?,
         Command::Build {
             input,
             out,
@@ -426,7 +438,7 @@ fn main() -> Result<()> {
             json,
         } => {
             if check {
-                run_check(&input, json, true, template.as_deref())?;
+                run_check(&input, json, true, template.as_deref(), "kitten-n")?;
                 return Ok(());
             }
             let out = out.unwrap_or_else(|| {

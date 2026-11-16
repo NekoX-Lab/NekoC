@@ -1,7 +1,7 @@
 //! `nekoc check`: type and compatibility checks without writing a project.
 //!
 //! For TS/JS sources this runs the frontend's check mode (type check against
-//! `ts/nekoc.d.ts` plus the full Kitten N compile), then assembles the project
+//! `ts/nekoc.d.ts` plus the selected target's canonical compile), then assembles the project
 //! in memory and runs the structural checks the official runtime depends on.
 //! For `.bcmkn` / `.bcm` / `.json` inputs only the project checks run.
 use anyhow::Result;
@@ -13,7 +13,7 @@ use std::path::Path;
 pub struct Diagnostic {
     /// `error` or `warning`.
     pub severity: String,
-    /// `syntax`, `types`, `compat` (unsupported by Kitten N) or `project`.
+    /// `syntax`, `types`, `compat` (unsupported by the target) or `project`.
     pub source: String,
     pub code: String,
     pub message: String,
@@ -65,6 +65,8 @@ pub struct CheckOptions<'a> {
     pub types: bool,
     /// Template project for TS sources; the bundled empty work when `None`.
     pub template: Option<&'a Path>,
+    /// Frontend lowering/preflight target: `kitten-n` (default) or `kitten4`.
+    pub target: &'a str,
 }
 
 impl Default for CheckOptions<'_> {
@@ -72,6 +74,7 @@ impl Default for CheckOptions<'_> {
         Self {
             types: true,
             template: None,
+            target: "kitten-n",
         }
     }
 }
@@ -91,12 +94,20 @@ pub fn check_file(input: &Path, options: &CheckOptions) -> Result<CheckReport> {
     let project = if is_project_file(input) {
         Some(crate::project::load_project(input)?.value)
     } else {
-        let frontend = crate::ts_frontend::check_ts(input, options.types)?;
+        let frontend =
+            crate::ts_frontend::check_ts_for_target(input, options.types, options.target)?;
         diagnostics.extend(frontend.diagnostics.iter().map(Diagnostic::from_frontend));
         match frontend.report {
             Some(report) => {
                 let template = match options.template {
-                    Some(path) => crate::project::load_project(path)?.value,
+                    Some(path) => {
+                        let template = crate::project::load_project(path)?.value;
+                        if options.target == "kitten4" && crate::kitten4::is_kitten4(&template) {
+                            crate::kitten4::to_neko(&template)?
+                        } else {
+                            template
+                        }
+                    }
                     None => crate::bcmkn_compiler::default_template(),
                 };
                 Some(crate::bcmkn_compiler::assemble_workspace_bcmkn(
