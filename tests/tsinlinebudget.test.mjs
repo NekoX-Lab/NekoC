@@ -3,7 +3,7 @@ import { test } from "node:test";
 import path from "node:path";
 import { compileFile, checkFile } from "../ts/compile-ts.mjs";
 import { readManifest } from "../tools/compat/kn-share-player-check.mjs";
-import { baseline, chainSource, prepare, repeated } from "./tsinlinebudget-cases.mjs";
+import { baseline, chainSource, distinctSource, warpSource, prepare, repeated } from "./tsinlinebudget-cases.mjs";
 
 const compile = source => compileFile("tsinlinebudget.ts", { readFile: () => source });
 const blocks = report => [report.workspaceData, ...report.procedures.map(p => p.workspaceData)]
@@ -35,8 +35,53 @@ test("tsinlinebudget retains small arithmetic and uses call multiplicity, not ju
     .procedures.some(p => p.name === "twice"));
   const boundary = count => compile(`function boundary(value: number): number { return ${repeated("value", count)}; }
     console.log(boundary(getVar<number>("input")));`);
-  assert.ok(!boundary(85).procedures.some(p => p.name === "boundary"));
-  assert.ok(boundary(86).procedures.some(p => p.name === "boundary"));
+  assert.ok(!boundary(51).procedures.some(p => p.name === "boundary"));
+  assert.ok(boundary(52).procedures.some(p => p.name === "boundary"));
+});
+
+test("tsinlinebudget bounds actual nested arguments at entry/event call sites", () => {
+  for (const [depth, count, procedures] of [[2, 9, 0], [4, 33, 0], [6, 84, 3], [8, 122, 9], [10, 160, 15], [12, 198, 21]]) {
+    const source = distinctSource(depth);
+    const report = compile(source);
+    assert.equal(blocks(report).length, count, `depth=${depth}`);
+    assert.equal(report.procedures.length, procedures);
+    assert.ok(count < 1000);
+    const root = compile(source.replace("onStart(() => {", "").replace(/\}\);$/, ""));
+    assert.ok(blocks(root).length < 1000);
+    const sprite = compile(source.replace("onStart(() => {", 'sprite("test", {}, self => { self.onStart(() => {').replace(/\}\);$/, "}); });"));
+    assert.ok(sprite.procedures.some(p => /^f\d+$/.test(p.name)) || depth < 6);
+  }
+});
+
+test("tsinlinebudget counts static calls expanded inside control DSL callbacks", () => {
+  for (const [depth, count, procedures] of [[2, 44, 4], [4, 503, 33], [6, 518, 34], [8, 638, 44], [10, 785, 56], [12, 800, 57]]) {
+    const report = compile(warpSource(depth));
+    assert.equal(blocks(report).length, count, `warp depth=${depth}`);
+    assert.equal(report.procedures.length, procedures);
+    assert.ok(count < 1000);
+    if (depth >= 4) assert.ok(report.procedures.some(p => /^f\d+$/.test(p.name)));
+  }
+  for (const wrapper of ["repeat(1, () =>", "repeatTimes(1, () =>", "ifThen(true, () =>"]) {
+    const source = warpSource(8).replaceAll("warp(() =>", wrapper);
+    const report = compile(source);
+    assert.ok(blocks(report).length < 1000, wrapper);
+    assert.ok(report.procedures.some(p => /^f\d+$/.test(p.name)), wrapper);
+  }
+});
+
+test("tsinlinebudget preserves direct builtin RGB arguments and their transitive dependencies", () => {
+  const functions = `function rgb(x: number): number { return ${repeated("x")}; }
+    function indirect(x: number): number { return rgb(x); }`;
+  for (const body of ["setPenColor(rgb(1));", "setPenColor(indirect(1));",
+    "onStart(() => { setPenColor(rgb(1)); });",
+    'sprite("test", {}, self => { self.onStart(() => { self.setPenColor(indirect(1)); }); });']) {
+    const report = compile(functions + body);
+    assert.ok(!report.procedures.some(p => ["rgb", "indirect"].includes(p.name)), body);
+    const workspaces = [report.workspaceData, ...report.resources.sprites.map(s => s.workspaceData)];
+    const colors = workspaces.flatMap(w => Object.values(w.blocks)).filter(b => b.type === "self_set_pen_color");
+    assert.equal(colors.length, 1);
+    assert.equal(colors[0].fields.color, "#00008c");
+  }
 });
 
 test("tsinlinebudget leaves compile-time string/name bindings and callback lowering alone", () => {

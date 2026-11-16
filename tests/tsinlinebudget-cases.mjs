@@ -19,6 +19,18 @@ export const baseline = [
   { depth: 8, bytes: 605, blocks: 3590, procedures: 1 },
 ];
 
+export function distinctSource(depth, input = "input") {
+  return "let input=3;\n"
+    + Array.from({ length: depth }, (_, i) => `function f${i}(x: number): number { return x+x; }`).join("\n")
+    + `\nonStart(() => { console.log(${Array.from({ length: depth }, (_, i) => `f${i}(`).join("")}${input}${")".repeat(depth)}); });`;
+}
+
+export function warpSource(depth) {
+  return "let total=0; function f0(x: number) { total += x; }\n"
+    + Array.from({ length: depth }, (_, i) => `function f${i + 1}(x: number) { warp(() => { f${i}(x); f${i}(x+1); }); }`).join("\n")
+    + `\nonStart(() => { f${depth}(1); console.log(total); });`;
+}
+
 export const repeated = (value, count = 140) => Array(count).fill(value).join(" + ");
 export const semanticSource = `
 let serial = 0;
@@ -51,6 +63,7 @@ export function prepare(source = semanticSource) {
     compilerOptions: { target: ts.ScriptTarget.ES2020 },
   }).outputText, {
     onStart: callback => callback(),
+    warp: callback => callback(),
     console: { log: (...args) => expected.push(args.map(String).join(" ")) },
   });
   return { expected, report: compileFile("tsinlinebudget.ts", { readFile: () => source }) };
@@ -60,5 +73,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   fs.writeFileSync(process.argv[2], JSON.stringify([
     prepare(),
     prepare(chainSource(12, "x * 2 + 1", "3")),
+    prepare(distinctSource(12)),
+    prepare(warpSource(12)),
+    prepare(distinctSource(12, "next()").replace("let input=3;", "let input=0; function next(): number { input++; console.log(input); return input; }")),
   ]));
 }

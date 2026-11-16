@@ -675,13 +675,14 @@ class WorkspaceCompiler {
     // Numeric RGB is still an editor field, not a runtime socket. Wrappers
     // reaching it must retain compile-time argument substitution too.
     const inlineOnly = new Set();
+    const fieldCall = name => name === "setPenColor" || name === "self.setPenColor";
     const calls = new Map();
     for (const [name, fn] of this.inlineFunctions) {
       const targets = new Set();
       visitFunctionBody(fn.body, node => {
         if (!ts.isCallExpression(node)) return;
         const target = calleeName(node.expression);
-        if (target === "setPenColor" || target === "self.setPenColor") inlineOnly.add(name);
+        if (fieldCall(target)) inlineOnly.add(name);
         if (this.inlineFunctions.has(target)) targets.add(target);
       });
       calls.set(name, targets);
@@ -708,12 +709,13 @@ class WorkspaceCompiler {
         ts.forEachChild(node, preserve);
       };
       const scan = node => {
-        if (ts.isCallExpression(node) && inlineOnly.has(calleeName(node.expression))) {
+        if (ts.isCallExpression(node) && (fieldCall(calleeName(node.expression)) || inlineOnly.has(calleeName(node.expression)))) {
           for (const arg of node.arguments) preserve(arg);
         }
         ts.forEachChild(node, scan);
       };
       for (const file of this.objectSourceFiles) scan(file);
+      for (const fn of this.inlineFunctions.values()) scan(fn.body);
       for (const name of inlineOnly) {
         for (const target of calls.get(name) ?? []) {
           if (!inlineOnly.has(target)) { inlineOnly.add(target); changed = true; }
@@ -747,55 +749,91 @@ class WorkspaceCompiler {
       return result;
     };
     const size = summary => [...summary.uses.values()].reduce((a, b) => cap(a + b), summary.base);
-    const summaries = new Map();
-    const planning = new Set();
-    const summarize = name => {
-      if (summaries.has(name)) return summaries.get(name);
-      if (required.has(name) || planning.has(name)) return null;
-      planning.add(name);
+    const eligible = name => {
       const fn = this.inlineFunctions.get(name);
-      const bindings = new Map(fn.params.map(param => [param, { base: 0, uses: new Map([[param, 1]]) }]));
-      const estimate = node => {
-        if (!node || ts.isTypeNode(node)) return constant(0);
-        if (ts.isIdentifier(node)) return bindings.get(node.text) ?? constant(1);
-        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
-          const value = estimate(node.initializer);
-          bindings.set(node.name.text, value);
-          return value; // also charge unused initializers
-        }
-        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
-          && this.inlineFunctions.has(node.expression.text)) {
-          const target = this.inlineFunctions.get(node.expression.text);
-          const summary = summarize(target.name);
-          let result = constant(summary ? summary.base : 1);
-          const args = Array.from(node.arguments);
-          for (let i = args.length; i < target.params.length; i++) args.push(target.defaults[i]);
-          args.forEach((arg, i) => {
-            // Procedure arguments are evaluated once. For inline arguments,
-            // conservatively charge even an unused slot once as well.
-            result = add(result, estimate(arg), summary ? Math.max(1, summary.uses.get(target.params[i]) ?? 0) : 1);
-          });
-          return result;
-        }
-        // Do not change callback/helper planning. Callbacks are not static
-        // function invocations and may require compile-time DSL bindings.
-        if (ts.isFunctionLike(node)) return constant(0);
-        let result = constant(1);
-        ts.forEachChild(node, child => { result = add(result, estimate(child)); });
-        return result;
-      };
-      let summary = estimate(fn.body);
-      const cost = size(summary);
-      if (fn.budgetEligible && !inlineOnly.has(name) && !functionSourceFile(fn).fileName.startsWith("__nekoc_")
-        && (cost > perCallBudget || cost * Math.max(0, (counts.get(name) ?? 0) - 1) > repeatedBudget)) {
-        required.add(name);
-        summary = null;
-      }
-      planning.delete(name);
-      summaries.set(name, summary);
-      return summary;
+      return fn.budgetEligible && !inlineOnly.has(name) && !functionSourceFile(fn).fileName.startsWith("__nekoc_");
     };
-    for (const name of this.inlineFunctions.keys()) summarize(name);
+    const controlBodies = new Set(["warp", "forever", "repeat", "repeatTimes", "repeatUntil", "forRange",
+      "ifThen", "ifElse", "tell", "tellAndWait", "onStart", "onClick", "onKey", "onMessage", "when", "onBumpActor"]);
+    // New boundaries can invalidate previously memoized callers. Recompute
+    // until no boundary is added; required only grows, so this terminates in
+    // at most the number of eligible functions plus one passes.
+    for (let changed = true; changed;) {
+      changed = false;
+      const share = name => {
+        if (!required.has(name) && eligible(name)) { required.add(name); changed = true; }
+      };
+      const summaries = new Map();
+      const planning = new Set();
+      const estimator = bindings => {
+        const estimate = node => {
+          if (!node || ts.isTypeNode(node)) return constant(0);
+          if (ts.isIdentifier(node)) return bindings.get(node.text) ?? constant(1);
+          if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+            const value = estimate(node.initializer);
+            bindings.set(node.name.text, value);
+            return value; // also charge unused initializers
+          }
+          if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+            && this.inlineFunctions.has(node.expression.text)) {
+            const target = this.inlineFunctions.get(node.expression.text);
+            const summary = summarize(target.name);
+            const args = Array.from(node.arguments);
+            for (let i = args.length; i < target.params.length; i++) args.push(target.defaults[i]);
+            const costs = args.map(estimate);
+            let result = constant(summary ? summary.base : 1);
+            costs.forEach((cost, i) => {
+              result = add(result, cost, summary ? Math.max(1, summary.uses.get(target.params[i]) ?? 0) : 1);
+            });
+            // Include actual argument expansion, even outside function bodies.
+            // A named shared call freezes its arguments once; no CSE is used.
+            if (summary && size(result) > perCallBudget && eligible(target.name)) {
+              share(target.name);
+              return costs.reduce((total, cost) => add(total, cost), constant(1));
+            }
+            return result;
+          }
+          if (ts.isFunctionLike(node)) {
+            const parent = node.parent;
+            const name = parent && ts.isCallExpression(parent) ? calleeName(parent.expression).replace(/^self\./, "") : "";
+            // Control/event bodies really expand inline. Array callbacks retain
+            // their own helper/frame planning and are not counted as controls.
+            return controlBodies.has(name) ? estimate(node.body) : constant(0);
+          }
+          let result = constant(1);
+          ts.forEachChild(node, child => { result = add(result, estimate(child)); });
+          return result;
+        };
+        return estimate;
+      };
+      const summarize = name => {
+        if (summaries.has(name)) return summaries.get(name);
+        if (required.has(name) || planning.has(name)) return null;
+        planning.add(name);
+        const fn = this.inlineFunctions.get(name);
+        const bindings = new Map(fn.params.map(param => [param, { base: 0, uses: new Map([[param, 1]]) }]));
+        const estimate = estimator(bindings);
+        let summary = estimate(fn.body);
+        const cost = size(summary);
+        if (eligible(name)
+          && (cost > perCallBudget || cost * Math.max(0, (counts.get(name) ?? 0) - 1) > repeatedBudget)) {
+          share(name);
+          summary = null;
+        }
+        planning.delete(name);
+        summaries.set(name, summary);
+        return summary;
+      };
+      for (const name of this.inlineFunctions.keys()) summarize(name);
+      // Inspect every static call site, not just fn.body: roots, sprites,
+      // events, initializers and arguments can all contain nested expansion.
+      const inspect = node => {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+          && this.inlineFunctions.has(node.expression.text)) estimator(new Map())(node);
+        ts.forEachChild(node, inspect);
+      };
+      for (const file of this.objectSourceFiles) inspect(file);
+    }
   }
 
   // Recursion and non-inlineable shapes require procedures independently of
