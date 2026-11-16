@@ -56,10 +56,8 @@ test("undefined call arguments remain omitted through transparent wrappers", () 
   assert.throws(() => lowerTsValues(parse("console.log((undefined) + 1);")), /null\/undefined values/);
 });
 
-test("tsfeat variable bitwise and rest arguments remain actionable diagnostics", () => {
+test("tsfeat rest arguments and unsupported values remain actionable diagnostics", () => {
   for (const [source, pattern] of [
-    ["let n=3; console.log(n & 1);", /constant operands|bounded arithmetic/],
-    ["let n=3; console.log(~n);", /constant operands|bounded arithmetic/],
     ["function sum(...args) { return args.length; } console.log(sum(1,2));", /pass an array/],
     ["let a=[1,2]; delete a[0];", /hole.*splice/],
     ["let a=1; let b=(a++,a);", /split the update/],

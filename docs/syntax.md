@@ -156,8 +156,14 @@ onStart(() => {
   literals and JS JSON escaping. Dynamic values produce a compile error because
   the share player has no JSON reporter. Replacer/spacing arguments are rejected.
 - `delete` is rejected: JS array deletion leaves a hole, unlike `splice(i, 1)`.
-  Variable bitwise operations remain rejected; use constant operands or bounded
-  arithmetic rather than expanding a 32-step emulation for each operation.
+- Numeric bitwise `& | ^ ~ << >> >>>` and statement compound assignments
+  `&= |= ^= <<= >>= >>>=` follow JavaScript ToInt32/ToUint32: truncate fractions,
+  map NaN/infinities to zero, wrap modulo 2^32, and mask shift counts to five bits.
+  `>>>` returns uint32; other results are int32. Operands evaluate once in source
+  order. Constants fold; numeric conversions, low-bit masks and shifts use cheap
+  arithmetic paths. General `& | ^` use up to 32 iterations inside a warp custom
+  block, using only share-player blocks. Operands must have numeric types;
+  assignment values remain unsupported (split them into statements).
 
 ### If/Else
 
