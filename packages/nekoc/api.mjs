@@ -25,14 +25,14 @@ export function api(wasm) {
     wasm.assembleBcmkn(JSON.stringify(report), projectName(entry), template === undefined ? undefined : json(template));
   return {
     /** Compiles `entry` (and its relative imports from `files`) to a .bcmkn project. */
-    compile(entry, { files, template } = {}) {
-      const report = compileFile(path.resolve(entry), memoryHost(files));
+    compile(entry, { files, template, target = "kitten-n" } = {}) {
+      const report = compileFile(path.resolve(entry), memoryHost(files), { target });
       return { bcmkn: JSON.parse(assemble(report, entry, template)), report };
     },
     /** Same diagnostics as `nekoc check --json`: types, compat and project checks. */
-    check(entry, { files, template, types = true } = {}) {
+    check(entry, { files, template, types = true, target = "kitten-n" } = {}) {
       const file = path.resolve(entry);
-      const { diagnostics, report } = checkFile(file, { types, host: memoryHost(files) });
+      const { diagnostics, report } = checkFile(file, { types, host: memoryHost(files), target });
       if (report) diagnostics.push(...JSON.parse(wasm.projectDiagnostics(assemble(report, entry, template), file)));
       return { ok: !diagnostics.some(d => d.severity === "error"), diagnostics };
     },

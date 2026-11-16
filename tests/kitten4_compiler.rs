@@ -554,7 +554,7 @@ fn unsupported_kitten_n_features_fail_instead_of_silently_changing_program() {
     for (source, diagnostic) in [
         (
             "onStart(() => { forRange(\"i\", 1, 3, 1, () => { moveSteps(1); }); });",
-            "traverse_number",
+            "Replace forRange",
         ),
         (
             "onStart(() => { scriptVars(\"local\"); setVar(\"copy\", scriptVar(\"local\")); });",

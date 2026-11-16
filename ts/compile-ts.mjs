@@ -12,6 +12,7 @@ import { createExpressionTypes, withParsedParents } from "./tsstr-types.mjs";
 import { evaluateStaticNumericCall } from "./tsstr-numeric.mjs";
 import { boxedValue, evaluatedChoice, evaluatedStatement, evaluatedValue, lazyChoice, nonNullishBinding, returnChoice, updateValue } from "./control-expressions.mjs";
 import * as controlFlow from "./control-flow.mjs";
+import { compileTarget, checkTargetBlock } from "./compile-target.mjs";
 import { lowerTsValues } from "./tsfeat-values.mjs";
 import { lowerTsSequences } from "./tsfeat-sequences.mjs";
 import { lowerTsFeatures } from "./tsfeat-lowering.mjs";
@@ -41,7 +42,7 @@ function fail(message, location = null, code = "NEKOC") {
 const helperOrigins = new WeakMap();
 
 function nodeLocation(node) {
-  const origin = node && helperOrigins.get(node);
+  const origin = node && (helperOrigins.get(node) ?? helperOrigins.get(ts.getOriginalNode(node)));
   if (origin) {
     const { line, character } = origin.file.getLineAndCharacterOfPosition(origin.offset);
     return { file: origin.file.fileName, line: line + 1, column: character + 1 };
@@ -113,6 +114,12 @@ function lowerFrontendFeatures(sourceFile) {
         const origin = origins?.get(statement.name?.text);
         if (origin) mark(statement, origin);
       }
+      // These are the nodes actually consumed by the compiler; later passes
+      // can rebuild declarations/bodies without retaining their node identity.
+      for (const statement of lowered.statements) {
+        const origin = origins?.get(statement.name?.text);
+        if (origin) mark(statement, origin);
+      }
     }
     return lowered;
   } catch (error) {
@@ -141,7 +148,9 @@ const BOOLEAN_OUTPUT_TYPES = new Set(`
 `.trim().split(/\s+/));
 
 class WorkspaceCompiler {
-  constructor(source, sourceFile, host) {
+  constructor(source, sourceFile, host, target) {
+    this.target = target;
+    this.targetBlocks = [];
     this.host = host;
     this.source = source;
     this.sourceFile = sourceFile;
@@ -638,6 +647,7 @@ class WorkspaceCompiler {
     }
     this.inlineFunctions.set(name, {
       name,
+      sourceNode: statement,
       classGenerated: classFunctionNames.get(ts.getOriginalNode(statement.getSourceFile()))?.has(name) ?? false,
       params: params.map((param) => {
         if (!ts.isIdentifier(param.name)) {
@@ -758,6 +768,8 @@ class WorkspaceCompiler {
     const saved = [this.blocks, this.connections, this.expressionBindings, this.inlineCallStack,
       this.rangeBindings, this.loopDepth, this.functionParams, this.tryStack, this.currentProcedureParams,
       this.globalVariables, this.arrayVariables, this.stringVariables];
+    const savedStatementNode = this.currentStatementNode;
+    if (this.target.name === "kitten4") this.currentStatementNode = fn.sourceNode;
     const outerVariables = this.globalVariables;
     this.globalVariables = new Set(outerVariables);
     this.arrayVariables = new Set(this.arrayVariables);
@@ -820,14 +832,14 @@ class WorkspaceCompiler {
           },
           deletable: false,
           editable: false,
-        });
+        }, fn.sourceNode);
         definition.params.forEach((param, index) => {
           if (param.type !== "String") return;
           const paramId = this.addBlockWithId(param.id, {
             type: "procedures_2_stable_parameter",
             parent_id: defId,
             fields: { param_name: param.name },
-          });
+          }, fn.sourceNode);
           this.connectInput(defId, paramId, `PARAMS${index}`, "value");
         });
         return defId;
@@ -902,6 +914,7 @@ class WorkspaceCompiler {
           [this.blocks, this.connections] = current;
         }
       };
+      if (this.target.name === "kitten4") this.currentStatementNode = fn.sourceNode;
       rewrite({ blocks: this.blocks, connections: this.connections }, frameParam.id);
       // Lazy control-expression helpers capture the same mutable frame through
       // functionParams, not a stale copy of each individual local value.
@@ -943,6 +956,7 @@ class WorkspaceCompiler {
       [this.blocks, this.connections, this.expressionBindings, this.inlineCallStack,
         this.rangeBindings, this.loopDepth, this.functionParams, this.tryStack, this.currentProcedureParams,
         this.globalVariables, this.arrayVariables, this.stringVariables] = saved;
+      if (this.target.name === "kitten4") this.currentStatementNode = savedStatementNode;
     }
   }
 
@@ -1166,6 +1180,7 @@ class WorkspaceCompiler {
   }
 
   mapHelperOrigin(statement, { callback, call }) {
+    const inherited = helperOrigins.get(call) ?? helperOrigins.get(ts.getOriginalNode(call));
     const file = call.getSourceFile();
     const copied = callback?.body.getText(file);
     const helperFile = statement.getSourceFile();
@@ -1174,7 +1189,7 @@ class WorkspaceCompiler {
       const position = node.getStart(helperFile);
       const offset = start >= 0 && position >= start && position < start + copied.length
         ? callback.body.getStart(file) + position - start : call.getStart(file);
-      helperOrigins.set(node, { file, offset });
+      helperOrigins.set(node, inherited ?? { file, offset });
       ts.forEachChild(node, visit);
     };
     visit(statement);
@@ -1670,7 +1685,7 @@ class WorkspaceCompiler {
       },
       deletable: false,
       editable: false,
-    });
+    }, call);
     spec.params.forEach((param, index) => {
       if (param.type !== "String") {
         return;
@@ -1679,7 +1694,7 @@ class WorkspaceCompiler {
         type: "procedures_2_stable_parameter",
         parent_id: defId,
         fields: { param_name: param.name },
-      });
+      }, call);
       this.connectInput(defId, paramId, `PARAMS${index}`, "value");
     });
     const firstChild = this.compileStatementList(body, defId);
@@ -5179,7 +5194,10 @@ class WorkspaceCompiler {
       }`);
     });
     const helpers = ts.createSourceFile("__nekoc_object_heap.ts", parts.join("\n"), ts.ScriptTarget.Latest, true);
-    for (const statement of helpers.statements) this.registerInlineFunction(statement);
+    for (const [index, statement] of helpers.statements.entries()) {
+      this.mapHelperOrigin(statement, { call: literals[index] });
+      this.registerInlineFunction(statement);
+    }
     // A list-shaped reporter cannot connect to the editor's scalar procedure
     // socket. Wrap literal lists in an any-shaped return reporter first. The
     // actual runtime value remains a list, including nested object handles.
@@ -5191,6 +5209,7 @@ class WorkspaceCompiler {
       this.objectArrayFactories.set(array, name);
       const params = array.elements.map((_, i) => `__nekocObjectArrayValue${n}_${i}`);
       const file = ts.createSourceFile(`${name}.ts`, `function ${name}(${params.join(",")}) { return [${params.join(",")}]; }`, ts.ScriptTarget.Latest, true);
+      this.mapHelperOrigin(file.statements[0], { call: array });
       this.registerInlineFunction(file.statements[0]);
     });
   }
@@ -6129,6 +6148,7 @@ class WorkspaceCompiler {
   }
 
   addBlock(block, sourceNode) {
+    if (this.target.name === "kitten4") this.targetBlocks.push([block, sourceNode || this.currentStatementNode]);
     const id = `b${this.nextId}`;
     this.nextId += 1;
     this.blocks[id] = { id, ...block };
@@ -6141,7 +6161,8 @@ class WorkspaceCompiler {
     return id;
   }
 
-  addBlockWithId(id, block) {
+  addBlockWithId(id, block, sourceNode) {
+    if (this.target.name === "kitten4") this.targetBlocks.push([block, sourceNode || this.currentStatementNode]);
     this.blocks[id] = { id, ...block };
     return id;
   }
@@ -6839,7 +6860,7 @@ function booleanLiteralValue(node, compiler) {
 }
 
 /** Compiles a TS/JS entry file (and its relative imports) to a workspace report. Throws CompileError. */
-export function compileFile(inputPath, host = defaultHost) {
+export function compileFile(inputPath, host = defaultHost, { target = "kitten-n" } = {}) {
   let compiler;
   try {
     const sourceText = host.readFile(path.resolve(inputPath));
@@ -6855,8 +6876,12 @@ export function compileFile(inputPath, host = defaultHost) {
     );
     rejectParseDiagnostics(sourceFile);
     sourceFile = lowerFrontendFeatures(sourceFile);
-    compiler = new WorkspaceCompiler(inputPath, sourceFile, host);
-    return compiler.compile(sourceFile);
+    compiler = new WorkspaceCompiler(inputPath, sourceFile, host, compileTarget(target));
+    const report = compiler.compile(sourceFile);
+    // Preserve target-independent source errors (including helper validation)
+    // before reporting target availability of the completed graph.
+    for (const [block, node] of compiler.targetBlocks) checkTargetBlock(compiler, block, node);
+    return report;
   } catch (error) {
     if (error instanceof CompileError) {
       // Unknown coordinates stay unknown instead of pointing at 1:1.
@@ -6921,15 +6946,15 @@ export function checkTypes(inputPath, host) {
 }
 
 /**
- * Check mode: type check plus Kitten N compatibility (the full compile), no output file.
+ * Check mode: type check plus target compatibility (the full compile), no output file.
  * Returns { ok, diagnostics, report } where report is the workspace report when compilation succeeded.
  */
-export function checkFile(inputPath, { types = true, host } = {}) {
+export function checkFile(inputPath, { types = true, host, target = "kitten-n" } = {}) {
   const diagnostics = [];
   let report = null;
   try {
     if (types) diagnostics.push(...checkTypes(inputPath, host));
-    report = compileFile(inputPath, host);
+    report = compileFile(inputPath, host, { target });
   } catch (error) {
     if (!(error instanceof CompileError)) {
       diagnostics.push({ severity: "error", source: "compat", code: "NEKOC_INTERNAL",
@@ -7012,13 +7037,14 @@ export function formatDiagnostic(d) {
 function main(argv) {
   const flags = new Set(argv.filter((arg) => arg.startsWith("--") && !arg.includes("=")));
   const reportOut = argv.find((arg) => arg.startsWith("--report-out="))?.slice("--report-out=".length);
+  const target = argv.find(arg => arg.startsWith("--target="))?.slice("--target=".length) ?? "kitten-n";
   const [inputPath, outputPath] = argv.filter((arg) => !arg.startsWith("--"));
   if (flags.has("--check")) {
     if (!inputPath) {
-      console.error("usage: node compile-ts.mjs --check [--json] [--no-types] [--report-out=<file>] <input.ts>");
+      console.error("usage: node compile-ts.mjs --check [--json] [--no-types] [--target=kitten-n|kitten4] [--report-out=<file>] <input.ts>");
       process.exit(2);
     }
-    const result = checkFile(inputPath, { types: !flags.has("--no-types") });
+    const result = checkFile(inputPath, { types: !flags.has("--no-types"), target });
     if (reportOut && result.report) {
       fs.writeFileSync(reportOut, `${JSON.stringify(result.report)}\n`, "utf8");
     }
@@ -7031,12 +7057,12 @@ function main(argv) {
     process.exit(result.ok ? 0 : 1);
   }
   if (!inputPath || !outputPath) {
-    console.error("usage: node compile-ts.mjs <input.ts> <output.json>\n       node compile-ts.mjs --check [--json] <input.ts>");
+    console.error("usage: node compile-ts.mjs [--target=kitten-n|kitten4] <input.ts> <output.json>\n       node compile-ts.mjs --check [--json] [--target=kitten-n|kitten4] <input.ts>");
     process.exit(2);
   }
   let report;
   try {
-    report = compileFile(inputPath);
+    report = compileFile(inputPath, defaultHost, { target });
   } catch (error) {
     if (!(error instanceof CompileError)) throw error;
     compileErrorDiagnostics(error, inputPath).forEach((d) => console.error(formatDiagnostic(d)));
