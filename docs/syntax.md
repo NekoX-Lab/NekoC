@@ -116,7 +116,7 @@ function double(x: number) {
 }
 ```
 
-Simple functions (local declarations plus one final `return`, or statement functions without `return`) are inlined at compile time, except in programs using data objects, where custom procedures preserve argument evaluation and object allocation identity.
+Small simple functions (local declarations plus one final `return`, or statement functions without `return`) are inlined at compile time. Static functions with explicitly numeric parameters become shared custom procedures when their estimated expansion exceeds a deterministic budget. The call-graph estimate includes repeated calls and parameter/local substitution: a per-call syntax cost above 256, or cost × (static call sites − 1) above 512, keeps the function boundary. Costs saturate; they are not timings or exact block counts. String/resource-name bindings, untyped/non-numeric parameters and generated callback/array helpers retain their existing lowering. Programs using data objects already use custom procedures to preserve argument evaluation and object allocation identity. See [ts-inline-budget.md](ts-inline-budget.md).
 
 Expression inlining uses stable reporter parameters for effectful arguments and local initializers: they execute once, in declaration order, before the body uses them (including unused or short-circuited parameters). Statement inlining similarly freezes nonconstant arguments in normal-procedure parameters, including omitted trailing defaults and unused arguments, before running the body. Literal names and constant aliases remain available to compile-time resource/name APIs. Explicit named-variable APIs (`getVar`, `setVar`, `changeVar`, and variable handles) always address project variables, even when a function has a same-named lexical local.
 
@@ -372,7 +372,7 @@ import { helper } from "./lib/helper";
 export function myFunction() { ... }
 ```
 
-Only relative imports are supported. Imported functions are inlined.
+Only relative imports are supported. Imported functions follow the same inline/procedure planning as local functions.
 
 ### Import Statements (Type Stripped)
 

@@ -649,6 +649,11 @@ class WorkspaceCompiler {
         return param.name.text;
       }),
       defaults: params.map((param) => param.initializer ?? null),
+      // String/resource names and function-valued DSL arguments can be
+      // compile-time bindings, not runtime custom-block inputs. Keep their
+      // existing lowering; the first budget applies to numeric static calls.
+      budgetEligible: params.every(param => param.type?.kind === ts.SyntaxKind.NumberKeyword
+        && (!param.initializer || !ts.isStringLiteral(stripParens(param.initializer)))),
       optional: params.map((param) => Boolean(param.questionToken)),
       arrayParams: params.filter(param => param.type && (ts.isArrayTypeNode(param.type)
         || ts.isTupleTypeNode(param.type)
@@ -658,9 +663,143 @@ class WorkspaceCompiler {
     });
   }
 
-  // Decide which functions become custom blocks instead of being inlined:
-  // recursive ones (directly or through other functions), and ones whose
-  // body is not "local declarations, then one final return".
+  // Keep small functions inline, but bound substitution on the static call
+  // graph. These are syntax-cost limits, not block counts or timing heuristics.
+  // Sharing is per named function, never per structurally equal expression.
+  planInlineBudget(required) {
+    const perCallBudget = 256;
+    const repeatedBudget = 512;
+    const limit = repeatedBudget + 1;
+    const cap = value => Math.min(limit, value);
+    const counts = new Map();
+    // Numeric RGB is still an editor field, not a runtime socket. Wrappers
+    // reaching it must retain compile-time argument substitution too.
+    const inlineOnly = new Set();
+    const calls = new Map();
+    for (const [name, fn] of this.inlineFunctions) {
+      const targets = new Set();
+      visitFunctionBody(fn.body, node => {
+        if (!ts.isCallExpression(node)) return;
+        const target = calleeName(node.expression);
+        if (target === "setPenColor" || target === "self.setPenColor") inlineOnly.add(name);
+        if (this.inlineFunctions.has(target)) targets.add(target);
+      });
+      calls.set(name, targets);
+    }
+    for (let changed = true; changed;) {
+      changed = false;
+      for (const [name, targets] of calls) {
+        if (!inlineOnly.has(name) && [...targets].some(target => inlineOnly.has(target))) {
+          inlineOnly.add(name);
+          changed = true;
+        }
+      }
+      // A field wrapper can receive another numeric function's constant
+      // result (e.g. color(rgb(...))). Keep that argument's dependency graph
+      // inline as well; a shared reporter would prevent field folding.
+      const preserve = node => {
+        if (ts.isCallExpression(node)) {
+          const target = calleeName(node.expression);
+          if (this.inlineFunctions.has(target) && !inlineOnly.has(target)) {
+            inlineOnly.add(target);
+            changed = true;
+          }
+        }
+        ts.forEachChild(node, preserve);
+      };
+      const scan = node => {
+        if (ts.isCallExpression(node) && inlineOnly.has(calleeName(node.expression))) {
+          for (const arg of node.arguments) preserve(arg);
+        }
+        ts.forEachChild(node, scan);
+      };
+      for (const file of this.objectSourceFiles) scan(file);
+      for (const name of inlineOnly) {
+        for (const target of calls.get(name) ?? []) {
+          if (!inlineOnly.has(target)) { inlineOnly.add(target); changed = true; }
+        }
+      }
+    }
+    const seen = new Set();
+    const count = node => {
+      if (seen.has(node)) return;
+      seen.add(node);
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+        const name = node.expression.text;
+        if (this.inlineFunctions.has(name)) counts.set(name, cap((counts.get(name) ?? 0) + 1));
+      }
+      ts.forEachChild(node, count);
+    };
+    for (const file of this.objectSourceFiles) count(file);
+    for (const fn of this.inlineFunctions.values()) {
+      count(fn.body);
+      for (const value of fn.defaults) if (value) count(value);
+    }
+
+    // A summary is affine in the costs of its parameters. Counting just AST
+    // nodes misses f(x) = x+x called with another expanded expression, and
+    // counting call edges once misses f(g(x), g(x+1)). Saturation prevents the
+    // estimator itself from building an exponentially large expansion.
+    const constant = base => ({ base: cap(base), uses: new Map() });
+    const add = (a, b, scale = 1) => {
+      const result = { base: cap(a.base + b.base * scale), uses: new Map(a.uses) };
+      for (const [name, uses] of b.uses) result.uses.set(name, cap((result.uses.get(name) ?? 0) + uses * scale));
+      return result;
+    };
+    const size = summary => [...summary.uses.values()].reduce((a, b) => cap(a + b), summary.base);
+    const summaries = new Map();
+    const planning = new Set();
+    const summarize = name => {
+      if (summaries.has(name)) return summaries.get(name);
+      if (required.has(name) || planning.has(name)) return null;
+      planning.add(name);
+      const fn = this.inlineFunctions.get(name);
+      const bindings = new Map(fn.params.map(param => [param, { base: 0, uses: new Map([[param, 1]]) }]));
+      const estimate = node => {
+        if (!node || ts.isTypeNode(node)) return constant(0);
+        if (ts.isIdentifier(node)) return bindings.get(node.text) ?? constant(1);
+        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+          const value = estimate(node.initializer);
+          bindings.set(node.name.text, value);
+          return value; // also charge unused initializers
+        }
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+          && this.inlineFunctions.has(node.expression.text)) {
+          const target = this.inlineFunctions.get(node.expression.text);
+          const summary = summarize(target.name);
+          let result = constant(summary ? summary.base : 1);
+          const args = Array.from(node.arguments);
+          for (let i = args.length; i < target.params.length; i++) args.push(target.defaults[i]);
+          args.forEach((arg, i) => {
+            // Procedure arguments are evaluated once. For inline arguments,
+            // conservatively charge even an unused slot once as well.
+            result = add(result, estimate(arg), summary ? Math.max(1, summary.uses.get(target.params[i]) ?? 0) : 1);
+          });
+          return result;
+        }
+        // Do not change callback/helper planning. Callbacks are not static
+        // function invocations and may require compile-time DSL bindings.
+        if (ts.isFunctionLike(node)) return constant(0);
+        let result = constant(1);
+        ts.forEachChild(node, child => { result = add(result, estimate(child)); });
+        return result;
+      };
+      let summary = estimate(fn.body);
+      const cost = size(summary);
+      if (fn.budgetEligible && !inlineOnly.has(name) && !functionSourceFile(fn).fileName.startsWith("__nekoc_")
+        && (cost > perCallBudget || cost * Math.max(0, (counts.get(name) ?? 0) - 1) > repeatedBudget)) {
+        required.add(name);
+        summary = null;
+      }
+      planning.delete(name);
+      summaries.set(name, summary);
+      return summary;
+    };
+    for (const name of this.inlineFunctions.keys()) summarize(name);
+  }
+
+  // Recursion and non-inlineable shapes require procedures independently of
+  // the budget. Resolve those first, then plan acyclic callees before callers.
   planFunctionProcedures() {
     const calls = new Map();
     for (const [name, fn] of this.inlineFunctions) {
@@ -702,6 +841,8 @@ class WorkspaceCompiler {
         if (mutableObjectState) this.unsupported(fn.body, `Recursive function ${name} with object allocation/mutation or locals is not supported; rewrite it as an iterative loop with explicit state`);
       }
     }
+    const required = new Set();
+    const returnValues = new Map();
     for (const [name, fn] of this.inlineFunctions) {
       let returnsValue = false;
       let hasReturn = false;
@@ -722,10 +863,17 @@ class WorkspaceCompiler {
       // Array helpers and their callbacks must freeze reference arguments and
       // keep mutable loop state in the invocation frame, even for simple bodies.
       const arrayHelper = name.startsWith("__arr") || /^__(cb|map|filter|forEach|reduce|find|findIndex|some|every)\d+$/.test(name);
+      returnValues.set(name, returnsValue);
       if (!this.objectSlots.size && !fn.classGenerated && !arrayHelper
         && !reaches(name, name) && (simpleExpression || simpleStatement)) {
         continue;
       }
+      required.add(name);
+    }
+    this.planInlineBudget(required);
+    for (const [name, fn] of this.inlineFunctions) {
+      if (!required.has(name)) continue;
+      const returnsValue = returnValues.get(name);
       if (this.procedureSpecs.has(name)) {
         this.unsupported(fn.body, `Function ${name} clashes with a procedure of the same name`);
       }
@@ -739,7 +887,8 @@ class WorkspaceCompiler {
           ...fn.params.map((param, index) => ({
             id: `kn-param-fn-${part}-${index + 1}-${sanitizeIdPart(param)}`,
             type: "String",
-            name: param,
+            name: param.replace(/__nekoc_ts_\d+_/g, ""),
+            bindingName: param,
           })),
         ],
       };
@@ -1842,7 +1991,7 @@ class WorkspaceCompiler {
     return this.addBlock({
       type: "procedures_2_parameter",
       parent_id: parentId,
-      fields: { param_name: name },
+      fields: { param_name: this.currentProcedureParams.displayNames?.get(name) ?? name },
       mutation: `<mutation xmlns="http://www.w3.org/1999/xhtml" id="${paramId}"></mutation>`,
       is_output: true,
     });
@@ -6734,7 +6883,10 @@ function optionalBooleanOption(options, name, defaultValue, compiler, node) {
 }
 
 function procedureParamIds(spec) {
-  return new Map(spec.params.filter((param) => param.type === "String").map((param) => [param.name, param.id]));
+  const params = spec.params.filter(param => param.type === "String");
+  const ids = new Map(params.map(param => [param.bindingName ?? param.name, param.id]));
+  ids.displayNames = new Map(params.map(param => [param.bindingName ?? param.name, param.name]));
+  return ids;
 }
 
 // Visits a function body without descending into nested functions.
