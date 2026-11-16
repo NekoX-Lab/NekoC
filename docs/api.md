@@ -61,6 +61,47 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   elements into a new list. Nested/default destructuring is rejected.
 - `a.at(index)` supports negative indices and truncates fractional indices.
   The ES2020 declaration set includes this frontend-supported method.
+- Statement calls to `push`, `unshift` and `splice` evaluate the receiver once,
+  then every argument once from left to right, before changing the list. Saved
+  references and values are invocation-local, including recursive argument calls.
+  `splice` retains the existing nonnegative-start subset; this does not add sparse
+  arrays or general JavaScript boundary/coercion semantics.
+- Array `includes`, `indexOf` and `lastIndexOf` accept a numeric `fromIndex`.
+  Fractions truncate toward zero, negatives count from the end, NaN starts at
+  zero, and out-of-range starts follow each method's direction. Omitted
+  `lastIndexOf` starts at the last item. Explicit `undefined` is rejected with a
+  source location and a suggestion to omit the optional argument. Numeric NaN
+  matches in `includes`, but never in `indexOf`/`lastIndexOf`. Existing Kitten N
+  equality limitations for mixed types remain.
+- Array `concat()` accepts zero or more statically known arrays or scalar values.
+  All arguments evaluate before copying; arrays flatten one level, scalar values
+  append once, and object/list references keep their identity. Array/scalar
+  unions and unknown arguments require narrowing first. Spread and unsupported
+  array-method overloads (including callback `thisArg`) produce diagnostics;
+  extra arguments are never silently discarded.
+- These argument/type rules also apply inside relative imported modules,
+  including annotated array parameters and functions returning arrays. All
+  modules are loaded before helper synthesis and type validation.
+- `map`, `filter`, `forEach`, `reduce`, `some`, `every`, `find` and `findIndex`
+  snapshot their initial length, then fetch each current value. Appending does
+  not extend traversal; changing an unvisited element is visible. `filter`,
+  `forEach`, `reduce`, `some` and `every` skip positions removed by shrinking.
+  Since sparse map results and missing-item `undefined` reads are unavailable,
+  `map`/`find`/`findIndex` conservatively reject callbacks that shrink arrays,
+  including through aliases or called functions, or yield/dispatch events.
+  This includes named-list `deleteListItem` / `self.deleteListItem`,
+  `self.list(...).delete/remove`, and replacement via `copyList` /
+  `self.list(...).copyTo`: `getList` shares the named list's identity. The
+  check conservatively rejects these operations even on unrelated lists.
+  Effects propagate through literal-target `callProc` / `callReporter` (also
+  with a `self` prefix), nested DSL procedures/reporters and ordinary function
+  wrappers. Recursive calls are checked without repeatedly visiting the same
+  body. If the target or body cannot be resolved statically, these three array
+  methods reject the call: use a literal target with a visible definition,
+  move it after traversal, or use an explicit loop. Known nonshrinking,
+  nonyielding DSL procedures remain supported.
+  Move removals after traversal or use an explicit loop. Ordinary `for...of`
+  continues to observe the live length and can visit appended items.
 - `Array.isArray(value)` folds statically known arrays and primitive literals;
   unknown types and arguments whose evaluation would have side effects are
   rejected (store the result in a variable first).
