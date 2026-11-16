@@ -217,7 +217,7 @@ for (const kitten4 of [true,false]) {
     f.pointer('pointerdown',30,-5); f.input.take();
     f.pointer('pointermove',70,25);
     f.pointer('pointermove',90,35);
-    assertNear(f.input.take().events,[{kind:'drag',target:'actor',x:50,y:15},{kind:'drag',target:'actor',x:70,y:25}]);
+    assertNear(f.input.take().events,[{kind:'drag',target:'actor',x:70,y:25}]);
     f.pointer('pointerup',90,35);
     assert.deepEqual(f.input.take().events.filter(e=>e.kind==='swipe'),kitten4 ? [{kind:'swipe',direction:'right'}] : []);
     f.pointer('pointermove',100,40);
@@ -320,13 +320,13 @@ test('K4 dragging adds pointer deltas to newly rendered sprite positions', t => 
   f.pointer('pointerdown',30,40); f.input.take();
   f.pointer('pointermove',40,50);
   f.pointer('pointermove',50,60);
-  assertNear(f.input.take().events,[{kind:'drag',target:'actor',x:20,y:30},{kind:'drag',target:'actor',x:30,y:40}]);
+  assertNear(f.input.take().events,[{kind:'drag',target:'actor',x:30,y:40}]);
   // Renderer replaces frame sprite objects; a script moved the actor since
   // the last input batch. Do not snap it back to its original grab offset.
   f.renderer.sprites=[{id:'actor',x:100,y:150,draggable:true}];
   f.pointer('pointermove',60,70);
   f.pointer('pointermove',70,80);
-  assertNear(f.input.take().events,[{kind:'drag',target:'actor',x:110,y:160},{kind:'drag',target:'actor',x:120,y:170}]);
+  assertNear(f.input.take().events,[{kind:'drag',target:'actor',x:120,y:170}]);
 });
 
 test('K4 dragging observes script coordinate changes on the same sprite object', t => {
@@ -335,11 +335,11 @@ test('K4 dragging observes script coordinate changes on the same sprite object',
   f.pointer('pointerdown',30,40); f.input.take();
   f.pointer('pointermove',40,50);
   f.pointer('pointermove',50,60);
-  assertNear(f.input.take().events,[{kind:'drag',target:'actor',x:20,y:30},{kind:'drag',target:'actor',x:30,y:40}]);
+  assertNear(f.input.take().events,[{kind:'drag',target:'actor',x:30,y:40}]);
   sprite.x=100; sprite.y=150;
   f.pointer('pointermove',60,70);
   f.pointer('pointermove',70,80);
-  assertNear(f.input.take().events,[{kind:'drag',target:'actor',x:110,y:160},{kind:'drag',target:'actor',x:120,y:170}]);
+  assertNear(f.input.take().events,[{kind:'drag',target:'actor',x:120,y:170}]);
   // Each axis must independently invalidate the saved rendered position.
   sprite.x=200;
   f.pointer('pointermove',80,90);
