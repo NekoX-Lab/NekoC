@@ -5657,9 +5657,11 @@ class WorkspaceCompiler {
         case "join": return helper("__arr_join", args[0] ?? literal(","));
         case "concat": this.unsupported(call, "Array.concat requires statically known argument types; annotate arrays and pass each argument explicitly");
         case "slice":
-          // The helper receives saved inputs before it reads length. Infinity
-          // supplies the omitted end without evaluating the receiver again.
-          return helper("__arr_slice", args[0] ?? literal(0), args[1] ?? ts.factory.createIdentifier("Infinity"));
+          // The helper receives saved inputs before it reads length. Numeric
+          // 1 / 0 supplies the omitted end without a second receiver evaluation
+          // or a generated identifier that a user's Infinity binding can capture.
+          return helper("__arr_slice", args[0] ?? literal(0), args[1] ?? ts.factory.createBinaryExpression(
+            literal(1), ts.SyntaxKind.SlashToken, literal(0)));
         case "reverse": return helper("__arr_reverse");
         case "at":
           if (args.length !== 1) this.unsupported(call, "Array.at expects one index");

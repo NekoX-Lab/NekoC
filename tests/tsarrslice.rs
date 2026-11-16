@@ -5,7 +5,14 @@ use std::{fs, process::Command, time::Duration};
 #[test]
 fn slice_matches_node_in_interpreter_and_jit_with_both_optimizations() {
     let dir = tempfile::tempdir().unwrap();
-    for name in ["probe", "receiver", "ranges", "eval", "identity"] {
+    for name in [
+        "probe",
+        "receiver",
+        "ranges",
+        "eval",
+        "identity",
+        "shadow-infinity",
+    ] {
         let input = format!("tests/fixtures/tsarrslice-{name}.ts");
         let oracle = Command::new("node")
             .args(["tests/tsarrayfix-oracle.mjs", &input])

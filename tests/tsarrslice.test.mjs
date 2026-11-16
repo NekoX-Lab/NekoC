@@ -12,10 +12,20 @@ const run = (command, args) => {
   assert.equal(result.status, 0, result.stderr || result.stdout);
   return result.stdout;
 };
-for (const name of ["probe", "receiver", "ranges", "eval", "identity"]) {
+for (const name of ["probe", "receiver", "ranges", "eval", "identity", "shadow-infinity"]) {
   test(`tsarrslice: ${name} matches Node and passes structure/share checks with both optimizations`, async () => {
     const input = `tests/fixtures/tsarrslice-${name}.ts`;
     const expected = JSON.parse(run(process.execPath, ["tests/tsarrayfix-oracle.mjs", input]));
+    if (name === "shadow-infinity") {
+      assert.deepEqual(expected, ["10,20,30", "20,30", "20,30", "0", "20,30,40", "1 1 10,20,30,40"]);
+      // This fixture is also plain JS: independently validate module scope in
+      // native Node ESM instead of relying only on our CommonJS oracle adapter.
+      const native = spawnSync(process.execPath, ["--input-type=module"], {
+        input: readFileSync(input, "utf8"), encoding: "utf8",
+      });
+      assert.equal(native.status, 0, native.stderr);
+      assert.deepEqual(native.stdout.trimEnd().split(/\r?\n/), expected);
+    }
     if (name === "probe") assert.deepEqual(expected, ["20,30", "10,20", "20,30", "10,20,30"]);
     if (name === "receiver") assert.deepEqual(expected, ["20,30", "1"]);
     if (name === "eval") {

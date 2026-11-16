@@ -40,9 +40,12 @@ const load = filename => {
   if (modules.has(filename)) return modules.get(filename).exports;
   const module = { exports: {} };
   modules.set(filename, module);
-  vm.runInNewContext(ts.transpileModule(readFileSync(filename, "utf8"), {
+  const code = ts.transpileModule(readFileSync(filename, "utf8"), {
     compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS },
-  }).outputText, { ...api, module, exports: module.exports,
+  }).outputText;
+  // CommonJS modules have a function scope, not the VM's global lexical scope.
+  // In particular module-local Infinity may legally shadow the global value.
+  vm.runInNewContext(`(function(module, exports, require) {\n${code}\n})(module, exports, require);`, { ...api, module, exports: module.exports,
     require: name => load(path.resolve(path.dirname(filename), `${name}.ts`)),
     console: { log: (...args) => logs.push(args.map(String).join(" ")) } }, { timeout: 5000 });
   return module.exports;

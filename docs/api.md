@@ -65,7 +65,8 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   numeric boundary once from left to right, before reading the saved receiver's
   length. Fractions truncate toward zero, NaN becomes zero, negative bounds
   count from the end, and both bounds clamp to `[0, length]` (including
-  infinities). Omitted start/end mean zero/length; reversed or empty ranges
+  infinities). Omitted start/end mean zero/length, even when a module shadows
+  the global `Infinity` binding; reversed or empty ranges
   produce an empty list. The new dense list is a shallow copy: source structure
   is unchanged, object/instance/nested-list elements retain reference identity.
   Non-numeric or explicit null/undefined bounds are rejected with a location
