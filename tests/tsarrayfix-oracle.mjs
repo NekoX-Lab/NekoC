@@ -16,6 +16,7 @@ const list = name => {
   return lists.get(name);
 };
 const api = {
+  onStart: body => body(),
   defineProc: (name, params, body) => procedures.set(name, body),
   defineReporter: (name, params, body) => procedures.set(name, body),
   callProc: (name, ...args) => invoke(name, args),

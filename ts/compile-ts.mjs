@@ -5507,6 +5507,13 @@ class WorkspaceCompiler {
       && this.expressionType?.(call.arguments[1]) !== "number") {
       this.unsupported(call.arguments[1], `Array.${method} fromIndex must be a number; omit undefined or convert the value before this call`);
     }
+    if (method === "slice") {
+      for (const arg of call.arguments) {
+        if (this.expressionType?.(arg) !== "number") {
+          this.unsupported(arg, "Array.slice boundaries must be numbers; omit optional arguments or convert the value to a number before this call");
+        }
+      }
+    }
   }
 
   checkCallbackShrink(call, method) {
@@ -5636,7 +5643,6 @@ class WorkspaceCompiler {
     const args = call.arguments;
     if (this.isArrayExpression(target)) this.checkArrayMethodArguments(call);
     const literal = (value) => (typeof value === "number" ? ts.factory.createNumericLiteral(value) : ts.factory.createStringLiteral(value));
-    const lengthOf = () => ts.factory.createPropertyAccessExpression(target, "length");
     const helper = (name, ...extra) => this.compileHelperCall(name, target, extra, parentId);
     const synthesized = this.helperCalls.get(call);
     if (synthesized) {
@@ -5651,10 +5657,9 @@ class WorkspaceCompiler {
         case "join": return helper("__arr_join", args[0] ?? literal(","));
         case "concat": this.unsupported(call, "Array.concat requires statically known argument types; annotate arrays and pass each argument explicitly");
         case "slice":
-          if (args.some((arg) => { const v = constantNumber(arg); return v !== null && v < 0; })) {
-            this.unsupported(call, "slice with negative indices is not supported");
-          }
-          return helper("__arr_slice", args[0] ?? literal(0), args[1] ?? lengthOf());
+          // The helper receives saved inputs before it reads length. Infinity
+          // supplies the omitted end without evaluating the receiver again.
+          return helper("__arr_slice", args[0] ?? literal(0), args[1] ?? ts.factory.createIdentifier("Infinity"));
         case "reverse": return helper("__arr_reverse");
         case "at":
           if (args.length !== 1) this.unsupported(call, "Array.at expects one index");
@@ -6269,7 +6274,20 @@ function sortHelper(name, greater, n) {
 
 const SHARED_HELPERS = {
   __arr_join: { source: `function __arr_join(__arrL, __sep) { let __jS = ""; let __jK = 0; for (const __jX of __arrL) { if (__jK > 0) { __jS = join(__jS, __sep); } __jS = join(__jS, __jX); __jK++; } return __jS; }` },
-  __arr_slice: { source: `function __arr_slice(__arrL, __sFrom, __sTo) { const __sO = []; for (let __sK = __sFrom; __sK < __sTo; __sK++) { __sO.push(__arrL[__sK]); } return __sO; }` },
+  __arr_slice: { source: `function __arr_slice(__arrL, __sFrom, __sTo) {
+    const __sSize = __arrL.length;
+    let __sStart = Math.trunc(__sFrom);
+    let __sEnd = Math.trunc(__sTo);
+    if (!(__sStart >= 0) && !(__sStart < 0)) __sStart = 0;
+    if (!(__sEnd >= 0) && !(__sEnd < 0)) __sEnd = 0;
+    if (__sStart < 0) __sStart = Math.max(0, __sSize + __sStart);
+    else __sStart = Math.min(__sStart, __sSize);
+    if (__sEnd < 0) __sEnd = Math.max(0, __sSize + __sEnd);
+    else __sEnd = Math.min(__sEnd, __sSize);
+    const __sO = [];
+    for (let __sK = __sStart; __sK < __sEnd; __sK++) { __sO.push(__arrL[__sK]); }
+    return __sO;
+  }` },
   __arr_reverse: { source: `function __arr_reverse(__arrL) { let __rK = 0; while (__rK < Math.floor(__arrL.length / 2)) { const __rV = __arrL[__rK]; __arrL[__rK] = __arrL[__arrL.length - 1 - __rK]; __arrL[__arrL.length - 1 - __rK] = __rV; __rK++; } return __arrL; }` },
   __arr_at: { source: `function __arr_at(__arrL, __atIndex) { let __atI = Math.trunc(__atIndex); if (!(__atI >= 0) && !(__atI < 0)) { __atI = 0; } if (__atI < 0) { __atI = __arrL.length + __atI; } return __arrL[__atI]; }` },
   __arr_flat: { source: `function __arr_flat(__arrL) { const __flatOut = []; let __flatI = 0; while (__flatI < __arrL.length) { const __arrFlatItem = __arrL[__flatI]; let __flatJ = 0; while (__flatJ < __arrFlatItem.length) { __flatOut.push(__arrFlatItem[__flatJ]); __flatJ++; } __flatI++; } return __flatOut; }` },
