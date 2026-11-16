@@ -11,6 +11,8 @@
 5. Optional, needs Playwright: `node tools/editor-compat.mjs game.bcmkn` loads the work in the official online editor; `ok: true` means it opens cleanly.
 6. Optional: `nekoc test game.nk.ts` runs `test(...)` blocks at compile time.
 
+Kitten 4 target: use `nekoc check game.ts --target kitten4 --json`, then `nekoc compile-ts-kitten4 game.ts --out game.bcm`. Ordinary C-style for loops use generic assignments/live conditions/steps (not KN traverse blocks); continue executes the step, break skips it. Reentrant onMessage/onKey/when for loops are rejected until native per-invocation storage exists. forRange and new custom procedures remain unsupported. No frame-by-frame equivalence to KN traversal is promised. See docs/kitten4.md. Frontend compileFile(entry, host, {target:"kitten4"}) and checkFile(entry, {host, target:"kitten4"}) accept the same target; the browser/Node package compile/check options also expose it, returning canonical bcmkn rather than native bcm.
+
 ## A complete file
 
 ```ts

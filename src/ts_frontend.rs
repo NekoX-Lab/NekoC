@@ -60,19 +60,33 @@ pub fn compile_ts_with_sidecars(
     emit_ir: Option<impl AsRef<Path>>,
     emit_analysis: Option<impl AsRef<Path>>,
 ) -> Result<()> {
+    compile_ts_for_target(input, output, emit_ir, emit_analysis, "kitten-n")
+}
+
+pub fn compile_ts_for_target(
+    input: impl AsRef<Path>,
+    output: impl AsRef<Path>,
+    emit_ir: Option<impl AsRef<Path>>,
+    emit_analysis: Option<impl AsRef<Path>>,
+    target: &str,
+) -> Result<()> {
     let input = input.as_ref();
     let output = output.as_ref();
     let script = frontend_script("compile-ts.mjs")?;
 
-    let status = Command::new("node")
+    let result = Command::new("node")
         .arg(&script)
+        .arg(format!("--target={target}"))
         .arg(input)
         .arg(output)
-        .status()
+        .output()
         .with_context(|| node_error(&script))?;
 
-    if !status.success() {
-        bail!("TypeScript frontend failed with status {status}");
+    if !result.status.success() {
+        bail!(
+            "TypeScript frontend failed: {}",
+            String::from_utf8_lossy(&result.stderr).trim()
+        );
     }
 
     let compiled = std::fs::read_to_string(output)
@@ -120,6 +134,14 @@ pub struct FrontendCheck {
 /// Runs `compile-ts.mjs --check --json`: type check against nekoc.d.ts plus the
 /// Kitten N compile, without producing a project.
 pub fn check_ts(input: impl AsRef<Path>, types: bool) -> Result<FrontendCheck> {
+    check_ts_for_target(input, types, "kitten-n")
+}
+
+pub fn check_ts_for_target(
+    input: impl AsRef<Path>,
+    types: bool,
+    target: &str,
+) -> Result<FrontendCheck> {
     let input = input.as_ref();
     let script = frontend_script("compile-ts.mjs")?;
     let report_file = tempfile::Builder::new()
@@ -128,6 +150,7 @@ pub fn check_ts(input: impl AsRef<Path>, types: bool) -> Result<FrontendCheck> {
         .tempfile()?;
     let mut command = Command::new("node");
     command.arg(&script).arg("--check").arg("--json");
+    command.arg(format!("--target={target}"));
     if !types {
         command.arg("--no-types");
     }
