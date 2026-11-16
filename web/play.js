@@ -234,8 +234,8 @@ new ResizeObserver(()=>{
 
 try{
   renderer=new StageRenderer(canvas);renderer.resolutionScale=settings.resolution;
-  input=new StageInput(canvas,renderer,()=>running&&!busy);
-  overlay=new StageOverlay($('#stage-box'),renderer,event=>{input.push(event);queueMicrotask(()=>{if(running)focusStage();});});
+  input=new StageInput(canvas,renderer,()=>running&&!busy,notice);
+  overlay=new StageOverlay($('#stage-box'),renderer,event=>{const accepted=input.push(event);if(accepted)queueMicrotask(()=>{if(running)focusStage();});return accepted;});
   renderer.onError=message=>{if(!busy)pause('渲染提示');feedback.resourceError(message);};
   // A static wasm page starts empty unless ?src= names a project URL.
   const source=extension||backend.kind==='rust'?'/api/project':params.get('src');
@@ -259,7 +259,7 @@ finally{
 
 // Read-only test/performance snapshot; the standalone page never builds editor DOM.
 window.nekoPlayDiagnostics=()=>({running,busy,playable,settings:{...settings},frame:lastFrame,totalUpdates,drawFps,updateFps,
-  framebuffer:[canvas.width,canvas.height],renderer:{...renderer?.stats},pending:!!inFlight,projectName:project?.projectName,audio:audio.snapshot()});
+  framebuffer:[canvas.width,canvas.height],renderer:{...renderer?.stats},inputQueue:{...input?.queueStats},pending:!!inFlight,projectName:project?.projectName,audio:audio.snapshot()});
 // A detached read, serialized after an outstanding frame. No pause/resume or VM mutation.
 window.nekoPlaySnapshot=async()=>{
   if(!connection?.ready)throw Error('运行时尚未连接');
