@@ -103,6 +103,14 @@ impl Cell {
     pub fn text(&self) -> String {
         self.text_with_js_nonfinite(false)
     }
+    /// Length of the existing text coercion in UTF-16 code units. Only immutable
+    /// Text bypasses conversion; mutable lists and all other tags keep text().
+    pub fn text_length(&self) -> usize {
+        match self {
+            Self::Text(text) => text.utf16_len(),
+            _ => self.text().encode_utf16().count(),
+        }
+    }
     /// Both official products use JS String(number), including exponent notation.
     pub fn text_with_js_nonfinite(&self, _js_nonfinite: bool) -> String {
         self.text_guarded(&mut Vec::new())

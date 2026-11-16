@@ -6372,7 +6372,7 @@ impl Engine {
                 ((now - 946_684_800.0) / 86_400.0).floor()
             }
             ExprOp::Mouse(y) => self.mouse[usize::from(y)],
-            ExprOp::TextLength(i) => self.eval_value(i, actor).text().encode_utf16().count() as f64,
+            ExprOp::TextLength(i) => self.eval_value(i, actor).text_length() as f64,
             ExprOp::Distance(target) => {
                 let (x, y) = self.point(target, actor);
                 let a = &self.sprites[actor];

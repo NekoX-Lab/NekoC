@@ -1,0 +1,10 @@
+[
+  {"text":"", "length":0},
+  {"text":"ASCII", "length":5},
+  {"text":"中文", "length":2},
+  {"text":"😀🚀", "length":4},
+  {"text":"é", "length":2},
+  {"text":"👨‍👩‍👧‍👦", "length":11},
+  {"text":"a中😀é\u0000\r\n", "length":9},
+  {"text":"�", "length":1}
+]
