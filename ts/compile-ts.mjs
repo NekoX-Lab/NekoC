@@ -20,6 +20,7 @@ import { lowerTsClasses } from "./tsfeat-classes.mjs";
 import { lowerTsNullable } from "./tsfeat-nullable.mjs";
 import { compileNilIntrinsic, nilIntrinsic } from "./nil-intrinsics.mjs";
 import { classFunctionNames, classSourceOrigins, markClassHelpers } from "./class-metadata.mjs";
+import { bitwiseAssignments, bitwisePlan, bitwiseTokens } from "./bitwise.mjs";
 
 /** A compile error. `location` is { file, line, column } (1-based) when known. */
 export class CompileError extends Error {
@@ -69,6 +70,15 @@ function rejectParseDiagnostics(sourceFile) {
 
 function lowerFrontendFeatures(sourceFile) {
   try {
+    // Validate raw entry/module identifiers before lexical renaming or helper
+    // registration can hide a collision with the compiler's bitwise procedures.
+    const reserveBitwiseNames = node => {
+      if (ts.isIdentifier(node) && node.text.startsWith("__nekocBit_")) {
+        fail("Names starting with __nekocBit_ are reserved for bitwise lowering; rename this identifier", nodeLocation(node));
+      }
+      ts.forEachChild(node, reserveBitwiseNames);
+    };
+    reserveBitwiseNames(sourceFile);
     const classes = lowerTsClasses(lowerTsNullable(sourceFile));
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
@@ -189,6 +199,15 @@ class WorkspaceCompiler {
     // user additions before copying so an any/union type cannot lose its type
     // information and accidentally fall back to numeric helper lowering.
     const validateAddition = node => {
+      const bitwise = ts.isBinaryExpression(node) && (bitwiseTokens.has(node.operatorToken.kind) || bitwiseAssignments.has(node.operatorToken.kind));
+      const complement = ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.TildeToken;
+      if (bitwise || complement) {
+        for (const operand of bitwise ? [node.left, node.right] : [node.operand]) {
+          if (this.expressionType(operand) !== "number") {
+            this.unsupported(operand, "Bitwise operands must be statically numeric; convert the value to a number explicitly before the operation");
+          }
+        }
+      }
       if (ts.isBinaryExpression(node) && [ts.SyntaxKind.PlusToken, ts.SyntaxKind.PlusEqualsToken].includes(node.operatorToken.kind)) {
         this.additionIsString(node.left, node.right);
       }
@@ -799,7 +818,7 @@ class WorkspaceCompiler {
         firstChild = this.compileReturn(fn.body, defId);
       }
       if (firstChild) {
-        if (fn.name.startsWith("__nekocObjectNew")) {
+        if (fn.name.startsWith("__nekocObjectNew") || fn.name.startsWith("__nekocBit_")) {
           const atomic = this.addBlock({ type: "warp", parent_id: defId });
           this.connectInput(atomic, firstChild, "DO", "statement");
           firstChild = atomic;
@@ -922,7 +941,16 @@ class WorkspaceCompiler {
     const globalNames = { "Math.sign": "__jsSign", "Math.cbrt": "__jsCbrt", "Math.log2": "__jsLog2", "Math.atan2": "__jsAtan2", "Number.isInteger": "__jsIsInteger" };
     this.globalHelpers ??= new Map();
     const used = new Set();
+    const bitwiseSources = new Set();
     const visit = (node) => {
+      if (ts.isBinaryExpression(node)) {
+        const operator = bitwiseAssignments.get(node.operatorToken.kind) ?? node.operatorToken.kind;
+        if (bitwiseTokens.has(operator) && (bitwiseAssignments.has(node.operatorToken.kind) || constantNumber(node) === null)) {
+          for (const source of bitwisePlan(operator, node.left, node.right, constantNumber).sources) bitwiseSources.add(source);
+        }
+      } else if (ts.isPrefixUnaryExpression(node) && node.operator === ts.SyntaxKind.TildeToken && constantNumber(node) === null) {
+        for (const source of bitwisePlan(node.operator, node.operand, null, constantNumber).sources) bitwiseSources.add(source);
+      }
       if (ts.isArrayBindingPattern(node) && node.elements.some(element => element.dotDotDotToken)) used.add("slice");
       if (ts.isCallExpression(node) && calleeName(node.expression) === "Array.from") {
         const [options, callback] = node.arguments;
@@ -1044,6 +1072,10 @@ class WorkspaceCompiler {
       ts.forEachChild(node, visit);
     };
     visit(sourceFile);
+    for (const source of bitwiseSources) {
+      const name = /function (\w+)/.exec(source)[1];
+      if (!this.inlineFunctions.has(name)) parts.push(source);
+    }
     const needed = new Set();
     const need = (name) => {
       if (needed.has(name)) return;
@@ -2492,6 +2524,8 @@ class WorkspaceCompiler {
     } else if (spec.operator === "add" && this.additionIsString(expression.left, expression.right)) {
       // Either operand can make += a string concatenation, including s += 1.
       valueId = this.compileTextJoin([{ expression: expression.left }, { expression: expression.right }], id);
+    } else if (spec.bitwise) {
+      valueId = this.compileBitwise(spec.bitwise, expression.left, expression.right, id);
     } else {
       valueId = this.compileVariableArithmeticExpression(variableName, expression.right, id, spec.operator);
     }
@@ -2739,7 +2773,8 @@ class WorkspaceCompiler {
     this.connectNext(first, second);
     const operators = { add: ts.SyntaxKind.PlusToken, minus: ts.SyntaxKind.MinusToken, multiply: ts.SyntaxKind.AsteriskToken,
       divide: ts.SyntaxKind.SlashToken, mod: ts.SyntaxKind.PercentToken, power: ts.SyntaxKind.AsteriskAsteriskToken };
-    const operator = operators[assignmentOperatorSpec(expression.operatorToken.kind)?.operator];
+    const assignment = assignmentOperatorSpec(expression.operatorToken.kind);
+    const operator = assignment?.bitwise ?? operators[assignment?.operator];
     if (!operator) this.unsupported(expression, "Unsupported array compound assignment operator");
     const element = f.createElementAccessExpression(target, index);
     const read = assign(old, element);
@@ -3857,6 +3892,12 @@ class WorkspaceCompiler {
           fields: { variable: expression.text },
           is_output: true,
         });
+      }
+      if (["NaN", "Infinity"].includes(expression.text)) {
+        // Use arithmetic, not non-finite number fields the editor may rewrite.
+        return this.compileExpression(ts.factory.createBinaryExpression(
+          ts.factory.createNumericLiteral(expression.text === "NaN" ? 0 : 1), ts.SyntaxKind.SlashToken,
+          ts.factory.createNumericLiteral(0)), parentId);
       }
       this.unsupported(expression, `Unknown identifier: ${expression.text}`);
     }
@@ -5187,7 +5228,7 @@ class WorkspaceCompiler {
     const operators = { add: ts.SyntaxKind.PlusToken, minus: ts.SyntaxKind.MinusToken, multiply: ts.SyntaxKind.AsteriskToken,
       divide: ts.SyntaxKind.SlashToken, mod: ts.SyntaxKind.PercentToken, power: ts.SyntaxKind.AsteriskAsteriskToken };
     const read = ts.factory.createElementAccessExpression(ts.factory.createIdentifier(this.objectHeap), this.objectIndex(obj, key));
-    const value = spec.kind === "assign" ? expression.right : ts.factory.createBinaryExpression(read, operators[spec.operator], expression.right);
+    const value = spec.kind === "assign" ? expression.right : ts.factory.createBinaryExpression(read, spec.bitwise ?? operators[spec.operator], expression.right);
     let valueId;
     if (numericUpdate) {
       // ++/-- always perform numeric arithmetic, even when the property is a
@@ -5636,7 +5677,7 @@ class WorkspaceCompiler {
     if (op === ts.SyntaxKind.TildeToken) {
       const value = constantNumber(expression);
       if (value === null) {
-        this.unsupported(expression, "Variable bitwise operators are not supported (32-bit arithmetic emulation requires up to 32 steps per operation); use constant operands or explicit bounded arithmetic");
+        return this.compileBitwise(op, expression.operand, null, parentId);
       }
       return this.addBlock({ type: "math_number", parent_id: parentId, fields: { NUM: String(value) }, is_output: true });
     }
@@ -5715,9 +5756,13 @@ class WorkspaceCompiler {
     return this.isStringExpression(left) || this.isStringExpression(right);
   }
 
+  compileBitwise(operator, left, right, parentId) {
+    return this.compileExpressionCall(bitwisePlan(operator, left, right, constantNumber).expression, parentId);
+  }
+
   compileNativeBinaryExpression(expression, parentId) {
     const operator = expression.operatorToken.kind;
-    if (operator === ts.SyntaxKind.EqualsToken || operator === ts.SyntaxKind.CommaToken) {
+    if (operator === ts.SyntaxKind.EqualsToken || operator === ts.SyntaxKind.CommaToken || bitwiseAssignments.has(operator)) {
       this.unsupported(expression, "Assignment/comma values in this position are not supported; split them into separate statements in the same branch or loop body");
     }
     if (operator === ts.SyntaxKind.AmpersandAmpersandToken || operator === ts.SyntaxKind.BarBarToken) {
@@ -5747,7 +5792,7 @@ class WorkspaceCompiler {
     if (BITWISE_OPERATORS.has(operator)) {
       const value = constantNumber(expression);
       if (value === null) {
-        this.unsupported(expression.operatorToken, "Variable bitwise operators are not supported (32-bit arithmetic emulation requires up to 32 steps per operation); use constant operands or explicit bounded arithmetic");
+        return this.compileBitwise(operator, expression.left, expression.right, parentId);
       }
       return this.addBlock({ type: "math_number", parent_id: parentId, fields: { NUM: String(value) }, is_output: true });
     }
@@ -6350,6 +6395,7 @@ function nativeBinaryExpressionSpec(operator) {
 }
 
 function assignmentOperatorSpec(operator) {
+  if (bitwiseAssignments.has(operator)) return { kind: "compound", bitwise: bitwiseAssignments.get(operator) };
   switch (operator) {
     case ts.SyntaxKind.EqualsToken:
       return { kind: "assign" };
