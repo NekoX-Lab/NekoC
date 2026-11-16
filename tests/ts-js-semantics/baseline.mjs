@@ -18,6 +18,7 @@ const errors = {
   190: "Cannot determine JavaScript + / += semantics for any, union or non-primitive operands",
   197: "Cannot determine JavaScript + / += semantics for any, union or non-primitive operands",
   199: "Namespaces containing runtime values",
+  204: "async / await are not supported",
   205: "Generator functions are not supported: gen",
   207: "Functions cannot be stored or returned as runtime values",
 };

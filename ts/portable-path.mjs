@@ -11,6 +11,7 @@ function resolve(...parts) {
   return `/${output.join("/")}`;
 }
 export const portablePath = {
+  isAbsolute: name => name.startsWith("/"),
   resolve,
   join: (...parts) => resolve(...parts),
   dirname: (name) => resolve(name, ".."),
