@@ -18,6 +18,11 @@ fix/ts-semantics integration. Every original case gets one of:
   the expected Node value/error and VM value/error are recorded in the
   baseline mapping and explained in `known-diff.md`.
 
+`core-204` (an unused async function) now expects an explicit async/await
+compile error: Promise/microtask semantics are not implemented, even when the
+function is never called. See `tests/tsasyncguard*.mjs` for callback/import and
+frontend coverage.
+
 The declaration fixes made after that baseline are represented separately in
 `runtime-extra.mjs` (44 cases: 36 matches and 8 explicit compile errors). They cover omitted/undefined/zero defaults,
 chained defaults referring to earlier parameters, recursive defaults, local

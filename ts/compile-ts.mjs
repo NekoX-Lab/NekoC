@@ -69,8 +69,24 @@ function rejectParseDiagnostics(sourceFile) {
   throw error;
 }
 
+const ASYNC_UNSUPPORTED = "async / await are not supported: Promise and microtask semantics are not implemented; alternative: remove async/await and use ordinary functions for synchronous code, wait(seconds) for cooperative delays, or an explicit event state machine for asynchronous sequencing";
+
+function rejectAsyncSyntax(node) {
+  // Inspect the original AST, including unused functions and callback bodies,
+  // before lowering can inline, rewrite or discard them. AsyncKeyword here is
+  // a modifier, not an identifier named `async` or text inside a string.
+  if (node.kind === ts.SyntaxKind.AsyncKeyword || ts.isAwaitExpression(node)) {
+    fail(ASYNC_UNSUPPORTED, nodeLocation(node));
+  }
+  if (ts.isForOfStatement(node) && node.awaitModifier) {
+    fail(ASYNC_UNSUPPORTED, nodeLocation(node.awaitModifier));
+  }
+  ts.forEachChild(node, rejectAsyncSyntax);
+}
+
 function lowerFrontendFeatures(sourceFile) {
   try {
+    rejectAsyncSyntax(sourceFile);
     // Validate raw entry/module identifiers before lexical renaming or helper
     // registration can hide a collision with the compiler's bitwise procedures.
     const reserveBitwiseNames = node => {
@@ -4011,7 +4027,7 @@ class WorkspaceCompiler {
       });
     }
     if (ts.isAwaitExpression(expression)) {
-      return this.compileExpression(expression.expression, parentId);
+      this.unsupported(expression, ASYNC_UNSUPPORTED);
     }
     if (ts.isSpreadElement(expression)) {
       return this.compileExpression(expression.expression, parentId);
