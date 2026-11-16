@@ -18,6 +18,7 @@ import { lowerTsFeatures } from "./tsfeat-lowering.mjs";
 import { lowerTsMethods } from "./tsfeat-methods.mjs";
 import { lowerTsClasses } from "./tsfeat-classes.mjs";
 import { lowerTsNullable } from "./tsfeat-nullable.mjs";
+import { lowerTsCollections } from "./tsmap.mjs";
 import { compileNilIntrinsic, nilIntrinsic } from "./nil-intrinsics.mjs";
 import { classFunctionNames, classSourceOrigins, markClassHelpers } from "./class-metadata.mjs";
 
@@ -69,7 +70,7 @@ function rejectParseDiagnostics(sourceFile) {
 
 function lowerFrontendFeatures(sourceFile) {
   try {
-    const classes = lowerTsClasses(lowerTsNullable(sourceFile));
+    const classes = lowerTsClasses(lowerTsNullable(lowerTsCollections(sourceFile)));
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
       .map(node => node.name.text));

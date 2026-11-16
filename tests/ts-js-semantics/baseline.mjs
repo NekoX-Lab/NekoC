@@ -11,8 +11,6 @@ const errors = {
   110: "Cannot determine JavaScript + / += semantics for any, union or non-primitive operands",
   136: "Regular expressions are not supported",
   179: "Object destructuring is not supported",
-  181: "new Map() is not supported",
-  182: "new Set() is not supported",
   183: "Reading a null/undefined variable at runtime is not supported",
   185: "Unsupported expression call: Date.now",
   186: "instanceof requires a statically known class identifier",

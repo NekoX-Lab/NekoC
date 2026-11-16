@@ -4,6 +4,10 @@
 
 ## 能用，结果正确
 
+### Map / Set
+
+支持 string/number 键与字面量联合、Map 基本 API、Set 基本 API、插入顺序和 live for-of/forEach、引用别名与字段传递、`get` 的 undefined/`??`。数字键按 SameValueZero。回归覆盖词频、去重和图邻接表，并逐条与 Node 比较。数组值、逃逸迭代器、Array.from/spread 等边界有明确诊断；存储成本与完整限制见 [ts-map-set.md](ts-map-set.md)。
+
 ### 变量
 
 - 顶层 `let` / `const`：常量初始值（数字、字符串、布尔）写入变量表；数组、对象、函数调用等非常量初始值和普通顶层语句按源码顺序放入隐式开始脚本。

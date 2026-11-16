@@ -94,7 +94,7 @@ Kitten N 没有 null 和 undefined，未写入的变量、列表项和对象堆�
   数组越界读取仍是 Kitten N 的空值，不是 undefined。
 - 可空值所用的 interface / type / class 必须在文件顶层声明。
 - `delete obj.x`，以及第 1、2 步已有的全部对象和 class 限制。
-- `Map<string | number, T>` 暂不支持。
+- `Map<string | number, T>` 支持混合键，`get` 返回 `T | undefined` 并可用 `??`；集合值域与迭代限制见 [ts-map-set.md](ts-map-set.md)。
 - 对象引用不能转成文本，可空引用也一样；请打印标量属性。
 
 ## 编译方式
