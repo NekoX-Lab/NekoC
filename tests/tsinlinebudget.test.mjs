@@ -3,7 +3,7 @@ import { test } from "node:test";
 import path from "node:path";
 import { compileFile, checkFile } from "../ts/compile-ts.mjs";
 import { readManifest } from "../tools/compat/kn-share-player-check.mjs";
-import { baseline, chainSource, distinctSource, warpSource, prepare, repeated } from "./tsinlinebudget-cases.mjs";
+import { baseline, chainSource, distinctSource, warpSource, controlColorSource, prepare, repeated } from "./tsinlinebudget-cases.mjs";
 
 const compile = source => compileFile("tsinlinebudget.ts", { readFile: () => source });
 const blocks = report => [report.workspaceData, ...report.procedures.map(p => p.workspaceData)]
@@ -98,6 +98,48 @@ test("tsinlinebudget leaves compile-time string/name bindings and callback lower
   assert.ok(!color.procedures.some(p => ["color", "wrapper"].includes(p.name)));
   assert.ok(!color.procedures.some(p => p.name === "rgb"));
   assert.ok(blocks(color).filter(b => b.type === "self_set_pen_color").every(b => b.fields.color === "#00008c"));
+});
+
+test("tsinlinebudget preserves outer RGB bindings through inline control bodies", () => {
+  for (const control of ["warp", "repeatTimes", "ifThen"]) {
+    for (const indirect of [false, true]) for (const many of [false, true]) for (const sprite of [false, true]) {
+      const source = controlColorSource(control, indirect, many, sprite);
+      const report = compile(source);
+      const label = JSON.stringify({ control, indirect, many, sprite });
+      assert.ok(!report.procedures.some(p => /^(paint|color)( |$)/.test(p.name)), label);
+      const colors = [report.workspaceData, ...report.procedures.map(p => p.workspaceData),
+        ...report.resources.sprites.map(s => s.workspaceData)]
+        .flatMap(w => Object.values(w.blocks)).filter(b => b.type === "self_set_pen_color");
+      assert.equal(colors.length, many ? 100 : 1, label);
+      assert.ok(colors.every(b => b.fields.color === "#00008c"), label);
+      assert.equal(checkFile("tsinlinebudget.ts", { types: false, host: { readFile: () => source } }).ok, true, label);
+    }
+    const args = control === "repeatTimes" ? "1, " : control === "ifThen" ? "true, " : "";
+    const receiver = control === "ifThen" ? "" : "self.";
+    const source = `function rgb(x: number): number { return ${repeated("x")}; }
+      sprite("test", {}, self => { self.onStart(() => {
+        ${receiver}${control}(${args}() => { self.setPenColor(rgb(1)); });
+      }); });`;
+    const report = compile(source);
+    assert.ok(!report.procedures.some(p => p.name === "rgb"), control);
+    const colors = report.resources.sprites.flatMap(s => Object.values(s.workspaceData.blocks))
+      .filter(b => b.type === "self_set_pen_color");
+    assert.equal(colors.length, 1, control);
+    assert.equal(colors[0].fields.color, "#00008c", control);
+  }
+  const nested = compile(controlColorSource("warp", true, false, false)
+    .replace("color(x);", "repeatTimes(1, () => { ifThen(true, () => { color(x); }); });"));
+  assert.ok(!nested.procedures.some(p => /^(paint|color)( |$)/.test(p.name)));
+  assert.equal(blocks(nested).find(b => b.type === "self_set_pen_color").fields.color, "#00008c");
+});
+
+test("tsinlinebudget does not treat array callbacks as outer RGB control bodies", () => {
+  const report = compile(`function wide(x: number): number {
+    const values = [1, 2].map(value => { setPenColor(140); return value + 1; });
+    return ${repeated("x")};
+  } onStart(() => { console.log(wide(2)); });`);
+  assert.ok(report.procedures.some(p => p.name === "wide"));
+  assert.ok(report.procedures.some(p => /^__map/.test(p.name)));
 });
 
 test("tsinlinebudget accounts for repeated parameters and substituted locals", () => {

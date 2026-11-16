@@ -32,6 +32,18 @@ export function warpSource(depth) {
 }
 
 export const repeated = (value, count = 140) => Array(count).fill(value).join(" + ");
+
+export function controlColorSource(control, indirect, many, sprite) {
+  const args = control === "repeatTimes" ? "1, " : control === "ifThen" ? "true, " : "";
+  const field = "setPenColor(x);";
+  const body = `${many ? "" : "moveSteps(1);".repeat(80)}${indirect ? "color(x);" : field}`;
+  const functions = `${indirect ? `function color(x: number) { ${field} }` : ""}
+    function paint(x: number) { ${control}(${args}() => { ${body} }); }`;
+  const calls = "paint(140);".repeat(many ? 100 : 1);
+  return sprite
+    ? `${functions} sprite("test", {}, self => { self.onStart(() => { ${calls} }); });`
+    : `${functions} onStart(() => { ${calls} });`;
+}
 export const semanticSource = `
 let serial = 0;
 function next(): number { serial++; console.log(serial); return serial; }

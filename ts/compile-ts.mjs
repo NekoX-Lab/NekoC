@@ -672,6 +672,22 @@ class WorkspaceCompiler {
     const limit = repeatedBudget + 1;
     const cap = value => Math.min(limit, value);
     const counts = new Map();
+    const controlBodies = new Set(["warp", "forever", "repeat", "repeatTimes", "repeatUntil", "forRange",
+      "ifThen", "ifElse", "tell", "tellAndWait", "onStart", "onClick", "onKey", "onMessage", "when", "onBumpActor"]);
+    const inlineControlBody = node => {
+      const parent = node.parent;
+      const name = parent && ts.isCallExpression(parent) ? calleeName(parent.expression).replace(/^self\./, "") : "";
+      return controlBodies.has(name) ? node.body : undefined;
+    };
+    const visitInlineBody = (node, visit) => {
+      visit(node);
+      if (ts.isFunctionLike(node)) {
+        const body = inlineControlBody(node);
+        if (body) visitInlineBody(body, visit);
+      } else {
+        ts.forEachChild(node, child => visitInlineBody(child, visit));
+      }
+    };
     // Numeric RGB is still an editor field, not a runtime socket. Wrappers
     // reaching it must retain compile-time argument substitution too.
     const inlineOnly = new Set();
@@ -679,7 +695,7 @@ class WorkspaceCompiler {
     const calls = new Map();
     for (const [name, fn] of this.inlineFunctions) {
       const targets = new Set();
-      visitFunctionBody(fn.body, node => {
+      visitInlineBody(fn.body, node => {
         if (!ts.isCallExpression(node)) return;
         const target = calleeName(node.expression);
         if (fieldCall(target)) inlineOnly.add(name);
@@ -753,8 +769,6 @@ class WorkspaceCompiler {
       const fn = this.inlineFunctions.get(name);
       return fn.budgetEligible && !inlineOnly.has(name) && !functionSourceFile(fn).fileName.startsWith("__nekoc_");
     };
-    const controlBodies = new Set(["warp", "forever", "repeat", "repeatTimes", "repeatUntil", "forRange",
-      "ifThen", "ifElse", "tell", "tellAndWait", "onStart", "onClick", "onKey", "onMessage", "when", "onBumpActor"]);
     // New boundaries can invalidate previously memoized callers. Recompute
     // until no boundary is added; required only grows, so this terminates in
     // at most the number of eligible functions plus one passes.
@@ -794,11 +808,10 @@ class WorkspaceCompiler {
             return result;
           }
           if (ts.isFunctionLike(node)) {
-            const parent = node.parent;
-            const name = parent && ts.isCallExpression(parent) ? calleeName(parent.expression).replace(/^self\./, "") : "";
             // Control/event bodies really expand inline. Array callbacks retain
-            // their own helper/frame planning and are not counted as controls.
-            return controlBodies.has(name) ? estimate(node.body) : constant(0);
+            // their own helper/frame planning. Field dependency traversal must
+            // use the same boundary, or it can lose outer constant bindings.
+            return estimate(inlineControlBody(node));
           }
           let result = constant(1);
           ts.forEachChild(node, child => { result = add(result, estimate(child)); });
