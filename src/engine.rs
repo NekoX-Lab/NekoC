@@ -210,6 +210,8 @@ fn is_prime(v: f64) -> bool {
     true
 }
 /// Point targets beside actor indices (actor_target uses usize::MAX for self).
+/// Live task cap that only stops runaway broadcast recursion.
+const MAX_TASKS: usize = 1 << 16;
 const TARGET_MOUSE: usize = usize::MAX - 1;
 const TARGET_RANDOM: usize = usize::MAX - 2;
 const TARGET_EDGE: usize = usize::MAX - 3;
@@ -6190,7 +6192,13 @@ impl Engine {
                 continue;
             }
             for target in self.instances(actor) {
-                ensure!(self.tasks.len() < 4096, "broadcast task limit exceeded");
+                // Runaway guard only; the official runtimes have no task cap. KN
+                // allows 300 clones per actor, so ordinary per-frame broadcasts to
+                // cloned listeners fan out to thousands of tasks in one frame.
+                ensure!(
+                    self.tasks.len() < MAX_TASKS,
+                    "broadcast task limit exceeded"
+                );
                 let mut task =
                     Task::new(self.next_task_id, &self.program.scripts[i], &self.program);
                 task.actor = target;
