@@ -2,6 +2,13 @@ use anyhow::{Result, bail};
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
+/// Confirmed physical socket shapes in the official Kitten N editor 0.27.4.
+/// Do not infer this from control flow: `stop` has a next socket, and deleting
+/// an original actor can still resume an enclosing branch/loop/procedure.
+pub(crate) fn has_no_next_socket(block_type: &str) -> bool {
+    matches!(block_type, "dispose_clone" | "restart")
+}
+
 pub fn build_report(value: &Value) -> Result<Value> {
     if !value.is_object() {
         bail!("project root must be a JSON object");
@@ -31,6 +38,7 @@ pub fn build_report(value: &Value) -> Result<Value> {
     validate_scenes(value, &mut issues);
     validate_screen_references(value, &mut issues);
     validate_procedure_parameters(value, &mut issues);
+    issues.extend(crate::kn_actor_target::validate(value));
 
     Ok(json!({
         "ok": issues.is_empty(),
@@ -251,6 +259,10 @@ fn collect_owner_issues(value: &Value, path: &[&str], kind: &str, issues: &mut V
         let block_ids = collect_block_ids(owner);
         validate_comments(kind, owner_id, owner_name, owner, &block_ids, issues);
         validate_block_parent_ids(kind, owner_id, owner_name, owner, &block_ids, issues);
+        // Native Kitten 4 uses different shapes even in its canonical form.
+        if value.get("_nekocKitten4").is_none() {
+            validate_next_sockets(kind, owner_id, owner, issues);
+        }
     }
 }
 
@@ -382,6 +394,35 @@ fn validate_block_parent_ids_in_value(
                 for child in items.values() {
                     pending.push((child, Some(block_id)));
                 }
+            }
+        }
+    }
+}
+
+fn validate_next_sockets(kind: &str, owner_id: &str, owner: &Value, issues: &mut Vec<Value>) {
+    let mut pending: Vec<_> = owner["nekoBlockJsonList"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .collect();
+    while let Some(block) = pending.pop() {
+        if let Some(next) = block.get("next").filter(|next| !next.is_null()) {
+            if has_no_next_socket(block["type"].as_str().unwrap_or_default()) {
+                issues.push(json!({
+                    "kind": "terminal_block_has_next",
+                    "owner_kind": kind,
+                    "owner_id": owner_id,
+                    "block_id": block["id"],
+                    "block_type": block["type"],
+                    "next_block_id": next["id"],
+                    "message": format!("Kitten N block {} ({}) has no next socket; remove its next connection", block["type"], block["id"]),
+                }));
+            }
+            pending.push(next);
+        }
+        for container in ["inputs", "statements"] {
+            if let Some(items) = block.get(container).and_then(Value::as_object) {
+                pending.extend(items.values());
             }
         }
     }

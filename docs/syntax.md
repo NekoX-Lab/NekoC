@@ -116,9 +116,11 @@ function double(x: number) {
 }
 ```
 
-Simple functions (local declarations plus one final `return`, or statement functions without `return`) are inlined at compile time, except in programs using data objects, where custom procedures preserve argument evaluation and object allocation identity.
+Small simple functions (local declarations plus one final `return`, or statement functions without `return`) are inlined at compile time. Static functions with explicitly numeric parameters become shared custom procedures when their estimated expansion exceeds a deterministic budget. The call-graph estimate includes repeated calls and parameter/local substitution: a per-call syntax cost above 256, or cost × (static call sites − 1) above 512, keeps the function boundary. Costs saturate; they are not timings or exact block counts. String/resource-name bindings, untyped/non-numeric parameters and generated callback/array helpers retain their existing lowering. Programs using data objects already use custom procedures to preserve argument evaluation and object allocation identity. See [ts-inline-budget.md](ts-inline-budget.md).
 
 Expression inlining uses stable reporter parameters for effectful arguments and local initializers: they execute once, in declaration order, before the body uses them (including unused or short-circuited parameters). Statement inlining similarly freezes nonconstant arguments in normal-procedure parameters, including omitted trailing defaults and unused arguments, before running the body. Literal names and constant aliases remain available to compile-time resource/name APIs. Explicit named-variable APIs (`getVar`, `setVar`, `changeVar`, and variable handles) always address project variables, even when a function has a same-named lexical local.
+
+Known default-argument ordering limitation: in `f(undefined, next())`, an earlier effectful default can run before the later explicit argument, unlike JS. The inline budget does not fix this pre-existing lowering limitation; evaluate explicit arguments and defaults into locals in JS order, then pass them explicitly. See [ts-inline-budget.md](ts-inline-budget.md).
 
 Recursive functions (including mutual recursion) and functions with early or multiple `return`s compile to Kitten N custom procedures. Parameters and mutable `let`/`const` locals are per call: a wrapper allocates a fresh list frame for the implementation. Generated temporaries and lazy expression helpers share that invocation's frame. The native reporter evaluator still has a 200-call safety guard (not the official KN stack limit); wrappers and expression helpers count toward it.
 
@@ -372,7 +374,7 @@ import { helper } from "./lib/helper";
 export function myFunction() { ... }
 ```
 
-Only relative imports are supported. Imported functions are inlined.
+Only relative imports are supported. Imported functions follow the same inline/procedure planning as local functions.
 
 ### Import Statements (Type Stripped)
 
@@ -457,6 +459,23 @@ Trigonometric calls convert radians to/from the share player's degree-based
 ### Array and String Methods
 
 Methods without a Kitten N block compile to helper custom blocks built from loops (added only when used): arrays support `map`, `filter`, `forEach`, `reduce`, `find`, `findIndex`, `some`, `every`, `sort`, `indexOf`, `lastIndexOf`, `join`, `concat`, `slice`, `reverse`, `pop`, `shift`, `unshift` and `splice`; strings support `indexOf`, `lastIndexOf`, `startsWith`, `endsWith`, `replace`, `replaceAll`, `trim*`, `repeat`, `padStart`, `padEnd`, `toUpperCase`, `toLowerCase` and `concat`.
+
+String `charAt`/`substring` preserve single evaluation and JS normalized half-open
+ranges; `substring` swaps reversed bounds, unlike `slice`. String search methods
+accept their numeric position/endPosition arguments and `split` accepts a uint32
+limit, preserving all argument effects. `padStart`/`padEnd` use only the required
+fill prefix; `repeat` truncates counts. Dynamic variables, expressions and fill
+strings are supported. Runtime growth is capped at 65536 units; NaN means zero,
+dynamic invalid repeat counts return empty, and padding never truncates its source.
+See [API](api.md#typescript-strings) for explicit resource/Unicode differences.
+
+Runtime code-unit selection/search uses a BMP proof as an optimization; unknown
+container/parameter paths compile with a runtime guard and work for ASCII/Chinese.
+Non-BMP receivers on guarded paths become empty text to avoid isolated surrogates.
+For complete emoji in runtime strings, `includes(search)` without position and
+`split(nonemptySeparator, limit?)` use safe native blocks. Empty/unknown split
+separators use the same runtime guard. Ordinary identifiers named `self` are not DSL
+exemptions and cannot bypass bounded repeat/padding checks.
 
 ### Default Parameters and try/catch
 

@@ -222,11 +222,37 @@ pub fn assemble_workspace_bcmkn(
     inject_sprite_resources(&mut project, sprites)?;
     inject_procedures(&mut project, procedures);
     rewrite_tell_actor_names(&mut project);
+    let issues = crate::kn_actor_target::resolve(&mut project);
+    if !issues.is_empty() {
+        return Err(ActorTargetErrors(issues).into());
+    }
     project["projectName"] = Value::String(name.to_owned());
 
     crate::key_buttons::annotate(&mut project, workspace_report.get("keyButtons"));
     Ok(project)
 }
+
+#[derive(Debug)]
+pub(crate) struct ActorTargetErrors(pub Vec<Value>);
+
+impl std::fmt::Display for ActorTargetErrors {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for issue in &self.0 {
+            let source = &issue["source"];
+            if let Some(file) = source["file"].as_str() {
+                write!(f, "{}:{}:{}: ", file, source["line"], source["column"])?;
+            }
+            writeln!(
+                f,
+                "invalid_actor_menu_target: {}",
+                issue["message"].as_str().unwrap_or("")
+            )?;
+        }
+        Ok(())
+    }
+}
+
+impl std::error::Error for ActorTargetErrors {}
 
 fn compiled_procedures_from_report(report: &Value) -> Result<Vec<CompiledProcedure>> {
     let Some(procedures) = report.get("procedures").and_then(Value::as_array) else {
@@ -397,6 +423,13 @@ fn build_nested_block(
                 continue;
             };
             if connection_type == "next" {
+                ensure!(
+                    !crate::validate::has_no_next_socket(
+                        block["type"].as_str().unwrap_or_default()
+                    ),
+                    "Kitten N block {} ({id}) has no next socket; cannot connect {child_id}",
+                    block["type"]
+                );
                 next_id = Some(child_id.to_owned());
                 continue;
             }

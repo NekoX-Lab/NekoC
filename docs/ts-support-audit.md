@@ -19,7 +19,7 @@
 
 ### 函数
 
-- 简单函数（若干局部声明加一个 `return`，或者没有 `return` 的语句函数）调用时内联展开。
+- 小型简单函数（若干局部声明加一个 `return`，或者没有 `return` 的语句函数）调用时内联展开。显式数字参数的静态函数按调用图估计展开成本：单次成本超过 256，或成本 ×（静态调用点数 − 1）超过 512 时改为共享自制积木；重复调用、参数和局部变量替换都计入饱和估计。字符串/资源名称、非数字或未标注参数、生成的数组辅助函数和回调保持原有策略。阈值不依赖耗时，不是运行速度保证；详见 [ts-inline-budget.md](ts-inline-budget.md)。
 - 递归函数（包括互相递归）、带多个 `return` 或提前 `return` 的函数，会自动编译成自制积木：
   - 返回值的编译成有返回值的积木，不返回值的编译成普通积木。
   - 参数和函数里的 `let` / `const` 局部变量每次调用独立：包装积木为每次调用分配一个列表帧，递归调用之后局部变量的值不会被覆盖。报告器递归深度上限是 200 层。
@@ -28,7 +28,7 @@
 - 箭头函数常量，如 `const f = (x) => x + 1`，规则同上。
 - 局部变量和参数会先改成全局唯一名，词法块、循环、调用方和被调用方的同名变量互不遮蔽。支持嵌套函数、函数表达式和静态可知的函数实参；可变捕获、逃逸函数值、递归捕获和递归函数参数特化明确报错。
 - 内联调用的实参只计算一次，按顺序在函数体之前计算（没用到的参数也会计算）；数组实参按引用传递，函数里 `a.push(x)` 会改到调用方的数组。
-- 默认参数 `function f(x, y = 10)`：常量默认值在调用处展开；`y = next()`、`y = settings.size` 这类默认值在调用处按参数顺序计算一次，前提是不读任何参数、用到的名字在定义处和调用处指同一个文件级变量或函数，否则编译报错。
+- 默认参数 `function f(x, y = 10)`：常量默认值在调用处展开；`y = next()`、`y = settings.size` 这类默认值在调用处按参数顺序计算一次，前提是不读任何参数、用到的名字在定义处和调用处指同一个文件级变量或函数，否则编译报错。已有顺序限制：`f(undefined, next())` 中前面的副作用默认值可能先于后面的显式实参求值，不等于 JS 的“全部显式实参先求值”；请先按 JS 顺序保存实参及默认值再显式传入。内联预算不修复这项已有 lowering 问题，见 [ts-inline-budget.md](ts-inline-budget.md)。
 - 有返回值的函数也可以单独作为一条语句调用，返回值会被丢弃。
 - 可以给标量参数重新赋值（`n = n - 1`）：前端生成局部副本，递归时副本和其他标量局部变量都放在每次调用独立的帧中。函数值参数不允许重新赋值。
 - `defineProc`、`param()`、`callProc`、`defineReporter`、`returnValue`、`callReporter`。
@@ -77,12 +77,16 @@
 
 - `+` / `+=`：按 TS 类型检查器给出的操作数类型决定。有一边是字符串（字面量、模板字符串、`string` 标注、函数返回值、元组位、`string[]` 元素、对象属性等）就编译成"连接"积木；`any`、混合联合类型（如 `string | number`）和非原始值编译报错，拼接请写 `String(x)`，相加请给出准确的数字类型（如 `getVar<number>("x")`）。
 - 模板字符串 `` `n=${x}` ``。
-- `.length`、`s[i]`、`s.charAt(i)`、`s.slice(a, b)`、`s.substring(a, b)`（不支持负数下标）、`s.includes(x)`、`s.split(sep)`。
+- `.length`、`s[i]`、`s.charAt(i)`、`s.slice(a, b)`、`s.substring(a, b)`、`s.includes(x, position?)`、`s.split(sep?, limit?)`。
+- `charAt/substring` 按接收者、实参顺序各求值一次；数字下标向零截断，substring 钳位到 `[0,length]` 后交换反序边界，相等返回空串。charAt 越界返回空串。NaN 按 0，Infinity 按边界处理；不修改原生 selectText 的反向截取规则。slice 保持原有常量下标（含负数）和半开空区间语义，不交换边界。
+- `startsWith/includes/indexOf` 的 position 默认 0；`endsWith` 的 endPosition、`lastIndexOf` 的 position 默认文本长度。支持负数/小数/超界/空 needle；lastIndexOf 的 NaN 按末端，其余按 0。split limit 按 uint32 截断/模 2^32（非有限值按 0），省略为 2^32−1；每次返回新数组，接收者不变。额外实参、spread、显式 undefined 和正则/强制转换重载定位拒绝，提示省略可选参数或使用字符串。
+- padding 精确补至截断后的长度，空 fill 或无需补齐直接返回；repeat 次数向零截断。支持动态变量/表达式/函数/循环次数、目标长度和 fill。NaN 按 0；动态 repeat 负整数/正负 Infinity 返回空串，非法常量计数可编译报错；repeat 运行时只保留总长不超过 65536 UTF-16 单元的完整副本，padding target 运行时钳位到 [0,65536] 且不截原串。非 BMP fill 若需不完整副本则保守返回原串，常量可精确折叠时仍检查孤立代理项。以上是已知差异，不是完整 JS RangeError/资源语义，详见 docs/api.md。
 - `indexOf`、`lastIndexOf`、`startsWith`、`endsWith`、`replace`、`replaceAll`、`trim`、`trimStart`、`trimEnd`、`repeat`、`padStart`、`padEnd`、`toUpperCase`、`toLowerCase`（只转换英文字母）、`concat`。
   - `replace/replaceAll` 仅接受两个 string 实参，接收者与实参从左到右各求值一次。修正首尾、整串、未命中与空片段；支持动态替换串的 `$$`、`$&`、前缀 `` $` `` 和后缀 `$'`，无捕获组时 `$1/$01/$<name>` 保留字面文本，与 Node 一致。replaceAll 非重叠扫描原串，插入内容不重新搜索。完整 Unicode 字符（含 emoji）匹配、数字文本 `007` 不失真。
   - 空 search 的 replace 在开头插入一次；replaceAll 在每个 UTF-16 单元边界插入并保证推进。VM 无法保存孤立代理项，因此 replaceAll 必须能证明 search 是非空常量（含不可变 const 别名），或接收者是 BMP-only 常量；其他可能为空的模式定位报错，并提示使用非空常量 search 或 BMP-only 常量接收者。正则、函数替换、隐式转换、spread、多余/缺失参数定位拒绝。ES2020 类型声明补齐同一 replaceAll string 重载，CLI/npm/browser 一致。详见 [API](api.md#typescript-string-replacement)。
   - 这些方法没有对应积木，编译器会生成用循环实现的辅助自制积木，用到哪个才加哪个。
   - 除 replace/replaceAll 使用精确字符串分割查找外，其他辅助方法比较字符时用的是积木的"等于"，和积木本身的规则一致（例如数字形式的文本 `"1.0"` 和 `"1"` 视为相等）。
+- UTF-16 安全：BMP 证明只作为快速路径优化。未知形参/容器/字段/被循环与声明重写的绑定不再编译拒绝，而在代码单元选择/搜索前运行时检查；ASCII/中文保持正常结果，非 BMP 保守替换为空接收者，避免孤立代理项 VM 异常（文档化差异）。无 position includes/startsWith 和确定非空 separator split 仍使用安全原生路径保留 emoji；空/未知 separator 走 guard。写入事实继续覆盖赋值、更新、循环、解构和全部合并声明，使不可靠静态证明转为 guard。普通 self/any/as 不豁免运行时安全限制。
 - `join()`、`selectText()`、`length(x)`。
 
 ### 数组（列表值）

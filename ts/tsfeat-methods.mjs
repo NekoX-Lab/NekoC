@@ -38,6 +38,75 @@ export function lowerTsMethods(sourceFile) {
   };
   collect(sourceFile);
   const helpers = [];
+  const unwrap = node => {
+    while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)
+      || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)
+      || ts.isSatisfiesExpression(node))) node = node.expression;
+    return node;
+  };
+  // One source of write facts for all safety proofs. Unbound names also matter
+  // in no-types mode (notably the implicit DSL self); do not collapse them to an
+  // undefined symbol shared by unrelated identifiers.
+  const bindingKey = node => (ts.isShorthandPropertyAssignment(node.parent)
+    ? checker.getShorthandAssignmentValueSymbol(node.parent)
+    : (ts.isVariableDeclaration(node.parent) || ts.isBindingElement(node.parent))
+      ? checker.resolveName(node.text, node, ts.SymbolFlags.Value, false) ?? checker.getSymbolAtLocation(node)
+      : checker.getSymbolAtLocation(node)) ?? node.text;
+  const writes = new Map();
+  const writeTarget = (target, fact) => {
+    target = unwrap(target);
+    if (ts.isIdentifier(target)) {
+      const key = bindingKey(target);
+      const facts = writes.get(key) ?? [];
+      facts.push(fact);
+      writes.set(key, facts);
+    } else if (ts.isArrayLiteralExpression(target) || ts.isArrayBindingPattern(target)) {
+      for (const element of target.elements) writeTarget(element, null);
+    } else if (ts.isObjectLiteralExpression(target) || ts.isObjectBindingPattern(target)) {
+      for (const property of target.properties ?? target.elements) writeTarget(property, null);
+    } else if (ts.isPropertyAssignment(target)) {
+      writeTarget(target.initializer, null);
+    } else if (ts.isShorthandPropertyAssignment(target)) {
+      writeTarget(target.name, null);
+    } else if (ts.isSpreadElement(target) || ts.isSpreadAssignment(target)) {
+      writeTarget(target.expression, null);
+    } else if (ts.isBindingElement(target)) {
+      writeTarget(target.name, null);
+    } else if (ts.isBinaryExpression(target) && target.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+      writeTarget(target.left, null); // destructuring default, not a known source
+    }
+    // Property/element writes mutate a container, not its base binding. Such
+    // reads are already excluded from the primitive BMP proof.
+  };
+  const findWrites = node => {
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
+      writeTarget(node.left, { operator: node.operatorToken.kind, value: node.right });
+    } else if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+      && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator)) {
+      writeTarget(node.operand, null);
+    } else if ((ts.isForOfStatement(node) || ts.isForInStatement(node))
+      && !ts.isVariableDeclarationList(node.initializer)) {
+      writeTarget(node.initializer, null); // loop/destructured sources stay unknown
+    } else if (ts.isVariableDeclaration(node)) {
+      const list = node.parent;
+      const loop = ts.isVariableDeclarationList(list) && list.parent;
+      const loopTarget = loop && (ts.isForOfStatement(loop) || ts.isForInStatement(loop))
+        && loop.initializer === list;
+      const symbol = ts.isIdentifier(node.name) && checker.getSymbolAtLocation(node.name);
+      // A first, simple initializer is the binding's producer, not a later
+      // write. All declarations must be considered: var redeclarations can
+      // share a symbol with each other, a parameter or a function declaration.
+      // Conservatively invalidate merged declarations even without an explicit
+      // initializer; a declaration-style loop target is an implicit write too.
+      if (loopTarget || !ts.isIdentifier(node.name) || symbol?.declarations?.length > 1
+        || bindingKey(node.name) !== symbol) {
+        writeTarget(node.name, null);
+      }
+    }
+    ts.forEachChild(node, findWrites);
+  };
+  findWrites(sourceFile);
   const edits = [];
   const printer = ts.createPrinter();
   const replace = (node, replacement) => {
@@ -62,12 +131,6 @@ export function lowerTsMethods(sourceFile) {
     error.location = { file: sourceFile.fileName, line: line + 1, column: character + 1 };
     throw error;
   };
-  const unwrap = node => {
-    while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)
-      || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)
-      || ts.isSatisfiesExpression(node))) node = node.expression;
-    return node;
-  };
   const unshadowed = (node, name) => ts.isIdentifier(node) && node.text === name
     && !checker.getSymbolAtLocation(node)?.declarations?.length;
   const globalMember = (node, owner, member) => ts.isPropertyAccessExpression(node)
@@ -86,7 +149,8 @@ export function lowerTsMethods(sourceFile) {
       if (unshadowed(node, "undefined")) return undefined;
       const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration;
       if (!declaration || !ts.isVariableDeclaration(declaration) || seen.has(declaration)
-        || !(declaration.parent.flags & ts.NodeFlags.Const) || declaration.end > node.pos) return UNKNOWN;
+        || !(declaration.parent.flags & ts.NodeFlags.Const) || declaration.end > node.pos
+        || writes.has(bindingKey(node))) return UNKNOWN;
       const next = new Set(seen).add(declaration);
       const value = constant(declaration.initializer, next);
       // A const array is still mutable (including through aliases).
@@ -156,6 +220,11 @@ export function lowerTsMethods(sourceFile) {
   const kind = (node, seen = new Set()) => {
     node = unwrap(node);
     if (ts.isArrayLiteralExpression(node)) return "array";
+    if (ts.isCallExpression(node)) {
+      const declaration = checker.getSymbolAtLocation(node.expression)?.valueDeclaration;
+      if (declaration?.type && (ts.isArrayTypeNode(declaration.type) || ts.isTupleTypeNode(declaration.type)
+        || ts.isTypeReferenceNode(declaration.type) && ["Array", "ReadonlyArray"].includes(declaration.type.typeName.getText(sourceFile)))) return "array";
+    }
     if (ts.isIdentifier(node)) {
       const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration;
       if (declaration && !seen.has(declaration)) {
@@ -186,6 +255,203 @@ export function lowerTsMethods(sourceFile) {
       fail(call, `${error.name}: ${error.message}`, "use arguments in the JavaScript method's valid range");
     }
   };
+  // A deliberately conservative bound, not JavaScript's maximum string size.
+  // Inspect return expressions without evaluating calls (and without erasing
+  // their effects). Mutable bindings, parameters and recursive calls are unknown.
+  const possible = (node, seen = new Set()) => {
+    node = unwrap(node);
+    const value = constant(node);
+    if (value !== UNKNOWN) return [value];
+    if (!node || seen.has(node)) return null;
+    const next = new Set(seen).add(node);
+    if (ts.isConditionalExpression(node)) {
+      const a = possible(node.whenTrue, next), b = possible(node.whenFalse, next);
+      return a && b ? [...a, ...b] : null;
+    }
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      if (writes.has(bindingKey(node.expression))) return null;
+      const declaration = checker.getSymbolAtLocation(node.expression)?.valueDeclaration;
+      if (ts.isVariableDeclaration(declaration ?? {}) && !(declaration.parent.flags & ts.NodeFlags.Const)) return null;
+      const fn = ts.isVariableDeclaration(declaration ?? {}) ? unwrap(declaration.initializer) : declaration;
+      if (!fn || next.has(fn) || !ts.isFunctionLike(fn) || !fn.body) return null;
+      next.add(fn);
+      if (!ts.isBlock(fn.body)) return possible(fn.body, next);
+      // Require a final unconditional return; branch returns alone do not prove
+      // that every path returns a bounded value.
+      if (!ts.isReturnStatement(fn.body.statements.at(-1) ?? {})) return null;
+      const values = [];
+      let unknown = false;
+      const visit = part => {
+        if (ts.isFunctionLike(part)) return;
+        if (ts.isReturnStatement(part)) {
+          const result = possible(part.expression, next);
+          if (result) values.push(...result); else unknown = true;
+        } else ts.forEachChild(part, visit);
+      };
+      visit(fn.body);
+      return unknown ? null : values;
+    }
+    return null;
+  };
+  const stringLimits = { charAt: [0, 1], substring: [0, 2], includes: [1, 2],
+    indexOf: [1, 2], lastIndexOf: [1, 2], startsWith: [1, 2], endsWith: [1, 2],
+    split: [0, 2], repeat: [1, 1], padStart: [1, 2], padEnd: [1, 2],
+    concat: [0, Infinity], replace: [2, 2], replaceAll: [2, 2], trim: [0, 0],
+    trimStart: [0, 0], trimEnd: [0, 0], toUpperCase: [0, 0], toLowerCase: [0, 0] };
+  // This proof follows lexical symbols, not variable spelling or a string type
+  // annotation. A string may contain astral characters unless every producer
+  // and write is known. Unknown/external/aliased containers stay conservative.
+  const references = new Map();
+  const indexReferences = node => {
+    if (ts.isIdentifier(node)) {
+      const symbol = checker.getSymbolAtLocation(node);
+      if (symbol) {
+        const refs = references.get(symbol) ?? [];
+        refs.push(node);
+        references.set(symbol, refs);
+      }
+    }
+    ts.forEachChild(node, indexReferences);
+  };
+  indexReferences(sourceFile);
+  const bmp = (node, seen = new Set()) => {
+    node = unwrap(node);
+    if (!node) return false;
+    if (seen.has(node)) {
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) return bmp(node.expression.expression, seen);
+      return ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+        && seen.has(checker.getSymbolAtLocation(node.expression)?.valueDeclaration);
+    }
+    const value = constant(node);
+    if (typeof value === "string") return !/[\uD800-\uDFFF]/.test(value);
+    const next = new Set(seen).add(node);
+    if (ts.isConditionalExpression(node)) return bmp(node.whenTrue, next) && bmp(node.whenFalse, next);
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+      return bmp(node.left, next) && bmp(node.right, next);
+    }
+    if (ts.isIdentifier(node)) {
+      const symbol = checker.getSymbolAtLocation(node);
+      const declaration = symbol?.valueDeclaration;
+      if (!declaration || next.has(declaration)) return false;
+      next.add(declaration);
+      if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
+        if (!bmp(declaration.initializer, next)) return false;
+        return (writes.get(symbol) ?? []).every(fact => fact
+          && [ts.SyntaxKind.EqualsToken, ts.SyntaxKind.PlusEqualsToken].includes(fact.operator)
+          && bmp(fact.value, next));
+      }
+      if (ts.isParameter(declaration) && ts.isFunctionDeclaration(declaration.parent) && declaration.parent.name) {
+        const fn = declaration.parent;
+        if (fn.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.ExportKeyword)) return false;
+        const fnSymbol = checker.getSymbolAtLocation(fn.name);
+        const index = fn.parameters.indexOf(declaration);
+        const calls = (references.get(fnSymbol) ?? []).filter(ref => ref !== fn.name);
+        return calls.length > 0 && !writes.has(symbol) && calls.every(ref => {
+          const call = ref.parent;
+          return ts.isCallExpression(call) && call.expression === ref && call.arguments[index] && bmp(call.arguments[index], next);
+        });
+      }
+      return false;
+    }
+    if (ts.isCallExpression(node)) {
+      if (ts.isPropertyAccessExpression(node.expression)) {
+        return ["substring", "charAt", "slice", "trim", "trimStart", "trimEnd", "toUpperCase", "toLowerCase"].includes(node.expression.name.text)
+          && bmp(node.expression.expression, next);
+      }
+      if (ts.isIdentifier(node.expression)) {
+        const symbol = checker.getSymbolAtLocation(node.expression);
+        const fn = symbol?.valueDeclaration;
+        if (!fn || !ts.isFunctionDeclaration(fn) || !fn.body || writes.has(symbol)) return false;
+        if (next.has(fn)) return true; // recursive edges cannot introduce text by themselves
+        next.add(fn);
+        let found = false, safe = true;
+        const visit = part => {
+          if (ts.isFunctionLike(part)) return;
+          if (ts.isReturnStatement(part)) { found = true; safe &&= bmp(part.expression, next); }
+          else ts.forEachChild(part, visit);
+        };
+        visit(fn.body);
+        return found && safe;
+      }
+    }
+    return false;
+  };
+  const dslReceiver = receiver => {
+    receiver = unwrap(receiver);
+    if (!ts.isIdentifier(receiver) || writes.has(bindingKey(receiver))) return false;
+    if (unshadowed(receiver, "self")) return true; // unwritten implicit DSL global
+    const symbol = checker.getSymbolAtLocation(receiver);
+    const declaration = symbol?.valueDeclaration;
+    if (!declaration || !ts.isParameter(declaration)) return false;
+    const callback = declaration.parent;
+    const call = callback.parent;
+    return (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback))
+      && ts.isCallExpression(call) && unshadowed(call.expression, "sprite")
+      && call.arguments[2] === callback && callback.parameters[0] === declaration;
+  };
+  const checkGrowth = (node, receiver, method, args) => {
+    const count = constant(args[0]);
+    if (method === "repeat" && typeof count === "number"
+      && (Math.trunc(count) < 0 || Math.abs(count) === Infinity)) {
+      fail(args[0], "repeat has an invalid negative or infinite constant count", "use a nonnegative finite count; dynamic invalid counts return an empty string");
+    }
+  };
+  let bmpGuard;
+  const runtimeBmpGuard = () => {
+    if (bmpGuard) return bmpGuard;
+    bmpGuard = fresh();
+    const text = fresh(), parts = fresh(), item = fresh(), rebuilt = fresh();
+    // splitText never selects a surrogate with text_select. The official player
+    // keeps code units; the VM replaces isolated units. Check both representations
+    // before any unit-selecting block, without relying on a mutable-source proof.
+    helpers.push(`function ${bmpGuard}(${text}: string): boolean {
+      const ${parts} = splitText(${text}, ""); let ${rebuilt} = "";
+      for (const ${item} of ${parts}) {
+        if (String(${item}) > "\uD7FF" && String(${item}) < "\uE000") return false;
+        ${rebuilt} = join(${rebuilt}, ${item});
+      }
+      return ${rebuilt} === ${text};
+    }`);
+    return bmpGuard;
+  };
+  const growthHelper = (node, receiver, method, args, visit) => {
+    for (const builtin of ["Math", "String", "join", "length", "selectText", "splitText"]) {
+      if (checker.resolveName(builtin, node, ts.SymbolFlags.Value, false)?.declarations?.length) {
+        fail(node, `Cannot lower ${method} while ${builtin} is shadowed`, `rename the local ${builtin} binding`);
+      }
+    }
+    const name = fresh(), text = fresh(), count = fresh(), fill = fresh();
+    const out = fresh(), index = fresh(), needed = fresh();
+    helpers.push(method === "repeat" ? `function ${name}(${text}: string, ${count}: number): string {
+      if (String(${count}) === "NaN") ${count} = 0;
+      if (Math.trunc(${count}) < 0 || String(${count}) === "Infinity" || String(${count}) === "-Infinity") return "";
+      if (length(${text}) === 0) return "";
+      ${count} = Math.min(Math.max(0, Math.trunc(${count})), Math.floor(65536 / length(${text})));
+      let ${out} = "";
+      while (${count} > 0) {
+        if (${count} % 2 === 1) ${out} = join(${out}, ${text});
+        ${count} = Math.floor(${count} / 2);
+        if (${count} > 0) ${text} = join(${text}, ${text});
+      }
+      return ${out};
+    }` : `function ${name}(${text}: string, ${count}: number, ${fill}: string): string {
+      if (String(${count}) === "NaN") ${count} = 0;
+      ${count} = Math.min(65536, Math.max(0, Math.trunc(${count})));
+      const ${needed}: number = Math.max(0, Math.trunc(${count}) - length(${text}));
+      if (${needed} === 0 || length(${fill}) === 0) return ${text};
+      if (${needed} % length(${fill}) !== 0 && !${runtimeBmpGuard()}(${fill})) return ${text};
+      let ${out} = "";
+      while (length(${out}) + length(${fill}) <= ${needed}) {
+        ${out} = join(${out}, ${fill});
+        if (length(${out}) + length(${fill}) * 2 <= ${needed}) ${fill} = join(${fill}, ${fill});
+      }
+      if (length(${out}) < ${needed}) ${out} = join(${out}, selectText(${fill}, 1, ${needed} - length(${out})));
+      return ${method === "padStart" ? `join(${out}, ${text})` : `join(${text}, ${out})`};
+    }`);
+    const actual = [receiver, ...args];
+    if (method !== "repeat" && args.length < 2) actual.push(f.createStringLiteral(" "));
+    return f.createCallExpression(f.createIdentifier(name), undefined, actual.map(arg => ts.visitNode(arg, visit)));
+  };
   // Emit a procedure rather than duplicating the receiver expression. Its
   // explicit empty-range guard avoids text_select's reverse-selection behavior.
   const sliceHelper = (call, receiver, start, end, context) => {
@@ -201,9 +467,9 @@ export function lowerTsMethods(sourceFile) {
       return value < 0 ? `Math.max(${len} + (${value}), 0)` : `Math.min(${value}, ${len})`;
     };
     const code = `function ${name}(${text}: string): string {
-      const ${len} = length(${text});
-      const ${lo} = ${bound(start)};
-      const ${hi} = ${end === undefined ? len : bound(end)};
+      const ${len}: number = length(${text});
+      const ${lo}: number = ${bound(start)};
+      const ${hi}: number = ${end === undefined ? len : bound(end)};
       if (${lo} >= ${hi}) return "";
       return selectText(${text}, ${lo} + 1, ${hi});
     }`;
@@ -246,6 +512,55 @@ export function lowerTsMethods(sourceFile) {
       }
       if (!ts.isPropertyAccessExpression(callee)) return ts.visitEachChild(node, visit, context);
       const receiver = callee.expression, method = callee.name.text;
+      const listHandle = ts.isCallExpression(receiver) && ts.isPropertyAccessExpression(receiver.expression)
+        && receiver.expression.name.text === "list" && dslReceiver(receiver.expression.expression);
+      if (Object.hasOwn(stringLimits, method) && kind(receiver) !== "array" && !dslReceiver(receiver) && !listHandle) {
+        // Known array/user methods belong to their own lowering. Unknown
+        // receivers of code-unit/growth methods must not skip safety checks.
+        const isString = kind(receiver) === "string" || possible(receiver)?.every(v => typeof v === "string");
+        const userMethod = checker.getSymbolAtLocation(callee.name)?.declarations?.some(ts.isMethodDeclaration);
+        if (isString || !userMethod && ["charAt", "substring", "split", "includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "repeat", "padStart", "padEnd"].includes(method)) {
+          optional();
+          arity(node, ...stringLimits[method], `String.${method}`);
+          if (!["replace", "replaceAll"].includes(method) && args.some(arg => arg.kind === ts.SyntaxKind.RegularExpressionLiteral)) {
+            fail(node, `String.${method} regular-expression overload is not supported`, "use a string search/separator instead");
+          }
+          // replace/replaceAll arguments are validated with the TS checker in
+          // compile-ts (narrowed nullable reads, String(...) conversions).
+          if (["includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "split"].includes(method)
+            && args[0] && kind(args[0]) !== "string" && !possible(args[0])?.every(v => typeof v === "string")) {
+            fail(args[0], `String.${method} requires a string search/separator`, "use an explicit string instead of a regular expression or coercing overload");
+          }
+          const values = args.map(arg => constant(arg));
+          const text = constant(receiver);
+          if (["repeat", "padStart", "padEnd"].includes(method)) checkGrowth(node, receiver, method, args);
+          if (["charAt", "substring", "includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "split", "repeat", "padStart", "padEnd"].includes(method)
+            && typeof text === "string" && values.every(v => v !== UNKNOWN && (typeof v === "string" || typeof v === "number"))
+            && (!["repeat", "padStart", "padEnd"].includes(method)
+              || Number.isFinite(values[0]) && values[0] <= 65536
+                && (method !== "repeat" || text.length * Math.max(0, Math.trunc(values[0])) <= 65536))) {
+            const output = fold(node, () => text[method](...values));
+            return replace(node, Array.isArray(output) ? f.createArrayLiteralExpression(output.map(v => literal(v, node))) : literal(output, node));
+          }
+          const selectsUnits = ["charAt", "substring", "indexOf", "lastIndexOf", "endsWith"].includes(method)
+            || method === "startsWith" && args.length > 1
+            || method === "includes" && args.length > 1
+            || method === "split" && args.length > 0 && !(possible(args[0])?.every(v => typeof v === "string" && v.length > 0));
+          if (selectsUnits && !bmp(receiver)) {
+            for (const builtin of ["String", "join", "splitText"]) {
+              if (checker.resolveName(builtin, node, ts.SymbolFlags.Value, false)?.declarations?.length) {
+                fail(node, `Cannot guard ${method} while ${builtin} is shadowed`, `rename the local ${builtin} binding`);
+              }
+            }
+            const name = fresh(), textArg = fresh();
+            helpers.push(`function ${name}(${textArg}: string): string { if (!${runtimeBmpGuard()}(${textArg})) return ""; return ${textArg}; }`);
+            return replace(node, f.updateCallExpression(node,
+              f.updatePropertyAccessExpression(callee, f.createCallExpression(f.createIdentifier(name), undefined, [ts.visitNode(receiver, visit)]), callee.name),
+              node.typeArguments, args.map(arg => ts.visitNode(arg, visit))));
+          }
+          if (["repeat", "padStart", "padEnd"].includes(method)) return replace(node, growthHelper(node, receiver, method, args, visit));
+        }
+      }
       if (!["toFixed", "toString", "charCodeAt", "at", "slice"].includes(method)) return ts.visitEachChild(node, visit, context);
       const receiverKind = kind(receiver);
       // Array and object methods are handled by other lowering passes.

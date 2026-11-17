@@ -41,6 +41,7 @@ function fail(message, location = null, code = "NEKOC") {
 
 const helperOrigins = new WeakMap();
 const frontendOriginals = new WeakMap();
+const blockSourceNodes = new WeakMap();
 
 function nodeLocation(node) {
   const origin = node && (helperOrigins.get(node) ?? helperOrigins.get(ts.getOriginalNode(node)));
@@ -716,6 +717,11 @@ class WorkspaceCompiler {
         return param.name.text;
       }),
       defaults: params.map((param) => param.initializer ?? null),
+      // String/resource names and function-valued DSL arguments can be
+      // compile-time bindings, not runtime custom-block inputs. Keep their
+      // existing lowering; the first budget applies to numeric static calls.
+      budgetEligible: params.every(param => param.type?.kind === ts.SyntaxKind.NumberKeyword
+        && (!param.initializer || !ts.isStringLiteral(stripParens(param.initializer)))),
       optional: params.map((param) => Boolean(param.questionToken)),
       arrayParams: params.filter(param => param.type && (ts.isArrayTypeNode(param.type)
         || ts.isTupleTypeNode(param.type)
@@ -725,9 +731,194 @@ class WorkspaceCompiler {
     });
   }
 
-  // Decide which functions become custom blocks instead of being inlined:
-  // recursive ones (directly or through other functions), and ones whose
-  // body is not "local declarations, then one final return".
+  // Keep small functions inline, but bound substitution on the static call
+  // graph. These are syntax-cost limits, not block counts or timing heuristics.
+  // Sharing is per named function, never per structurally equal expression.
+  planInlineBudget(required) {
+    const perCallBudget = 256;
+    const repeatedBudget = 512;
+    const limit = repeatedBudget + 1;
+    const cap = value => Math.min(limit, value);
+    const counts = new Map();
+    const controlBodies = new Set(["warp", "forever", "repeat", "repeatTimes", "repeatUntil", "forRange",
+      "ifThen", "ifElse", "tell", "tellAndWait", "onStart", "onClick", "onKey", "onMessage", "when", "onBumpActor"]);
+    const inlineControlBody = node => {
+      const parent = node.parent;
+      const name = parent && ts.isCallExpression(parent) ? calleeName(parent.expression).replace(/^self\./, "") : "";
+      return controlBodies.has(name) ? node.body : undefined;
+    };
+    const visitInlineBody = (node, visit) => {
+      visit(node);
+      if (ts.isFunctionLike(node)) {
+        const body = inlineControlBody(node);
+        if (body) visitInlineBody(body, visit);
+      } else {
+        ts.forEachChild(node, child => visitInlineBody(child, visit));
+      }
+    };
+    // Numeric RGB is still an editor field, not a runtime socket. Wrappers
+    // reaching it must retain compile-time argument substitution too.
+    const inlineOnly = new Set();
+    const fieldCall = name => name === "setPenColor" || name === "self.setPenColor";
+    const calls = new Map();
+    for (const [name, fn] of this.inlineFunctions) {
+      const targets = new Set();
+      visitInlineBody(fn.body, node => {
+        if (!ts.isCallExpression(node)) return;
+        const target = calleeName(node.expression);
+        if (fieldCall(target)) inlineOnly.add(name);
+        if (this.inlineFunctions.has(target)) targets.add(target);
+      });
+      calls.set(name, targets);
+    }
+    for (let changed = true; changed;) {
+      changed = false;
+      for (const [name, targets] of calls) {
+        if (!inlineOnly.has(name) && [...targets].some(target => inlineOnly.has(target))) {
+          inlineOnly.add(name);
+          changed = true;
+        }
+      }
+      // A field wrapper can receive another numeric function's constant
+      // result (e.g. color(rgb(...))). Keep that argument's dependency graph
+      // inline as well; a shared reporter would prevent field folding.
+      const preserve = node => {
+        if (ts.isCallExpression(node)) {
+          const target = calleeName(node.expression);
+          if (this.inlineFunctions.has(target) && !inlineOnly.has(target)) {
+            inlineOnly.add(target);
+            changed = true;
+          }
+        }
+        ts.forEachChild(node, preserve);
+      };
+      const scan = node => {
+        if (ts.isCallExpression(node) && (fieldCall(calleeName(node.expression)) || inlineOnly.has(calleeName(node.expression)))) {
+          for (const arg of node.arguments) preserve(arg);
+        }
+        ts.forEachChild(node, scan);
+      };
+      for (const file of this.objectSourceFiles) scan(file);
+      for (const fn of this.inlineFunctions.values()) scan(fn.body);
+      for (const name of inlineOnly) {
+        for (const target of calls.get(name) ?? []) {
+          if (!inlineOnly.has(target)) { inlineOnly.add(target); changed = true; }
+        }
+      }
+    }
+    const seen = new Set();
+    const count = node => {
+      if (seen.has(node)) return;
+      seen.add(node);
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+        const name = node.expression.text;
+        if (this.inlineFunctions.has(name)) counts.set(name, cap((counts.get(name) ?? 0) + 1));
+      }
+      ts.forEachChild(node, count);
+    };
+    for (const file of this.objectSourceFiles) count(file);
+    for (const fn of this.inlineFunctions.values()) {
+      count(fn.body);
+      for (const value of fn.defaults) if (value) count(value);
+    }
+
+    // A summary is affine in the costs of its parameters. Counting just AST
+    // nodes misses f(x) = x+x called with another expanded expression, and
+    // counting call edges once misses f(g(x), g(x+1)). Saturation prevents the
+    // estimator itself from building an exponentially large expansion.
+    const constant = base => ({ base: cap(base), uses: new Map() });
+    const add = (a, b, scale = 1) => {
+      const result = { base: cap(a.base + b.base * scale), uses: new Map(a.uses) };
+      for (const [name, uses] of b.uses) result.uses.set(name, cap((result.uses.get(name) ?? 0) + uses * scale));
+      return result;
+    };
+    const size = summary => [...summary.uses.values()].reduce((a, b) => cap(a + b), summary.base);
+    const eligible = name => {
+      const fn = this.inlineFunctions.get(name);
+      return fn.budgetEligible && !inlineOnly.has(name) && !functionSourceFile(fn).fileName.startsWith("__nekoc_");
+    };
+    // New boundaries can invalidate previously memoized callers. Recompute
+    // until no boundary is added; required only grows, so this terminates in
+    // at most the number of eligible functions plus one passes.
+    for (let changed = true; changed;) {
+      changed = false;
+      const share = name => {
+        if (!required.has(name) && eligible(name)) { required.add(name); changed = true; }
+      };
+      const summaries = new Map();
+      const planning = new Set();
+      const estimator = bindings => {
+        const estimate = node => {
+          if (!node || ts.isTypeNode(node)) return constant(0);
+          if (ts.isIdentifier(node)) return bindings.get(node.text) ?? constant(1);
+          if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+            const value = estimate(node.initializer);
+            bindings.set(node.name.text, value);
+            return value; // also charge unused initializers
+          }
+          if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+            && this.inlineFunctions.has(node.expression.text)) {
+            const target = this.inlineFunctions.get(node.expression.text);
+            const summary = summarize(target.name);
+            const args = Array.from(node.arguments);
+            for (let i = args.length; i < target.params.length; i++) args.push(target.defaults[i]);
+            const costs = args.map(estimate);
+            let result = constant(summary ? summary.base : 1);
+            costs.forEach((cost, i) => {
+              result = add(result, cost, summary ? Math.max(1, summary.uses.get(target.params[i]) ?? 0) : 1);
+            });
+            // Include actual argument expansion, even outside function bodies.
+            // A named shared call freezes its arguments once; no CSE is used.
+            if (summary && size(result) > perCallBudget && eligible(target.name)) {
+              share(target.name);
+              return costs.reduce((total, cost) => add(total, cost), constant(1));
+            }
+            return result;
+          }
+          if (ts.isFunctionLike(node)) {
+            // Control/event bodies really expand inline. Array callbacks retain
+            // their own helper/frame planning. Field dependency traversal must
+            // use the same boundary, or it can lose outer constant bindings.
+            return estimate(inlineControlBody(node));
+          }
+          let result = constant(1);
+          ts.forEachChild(node, child => { result = add(result, estimate(child)); });
+          return result;
+        };
+        return estimate;
+      };
+      const summarize = name => {
+        if (summaries.has(name)) return summaries.get(name);
+        if (required.has(name) || planning.has(name)) return null;
+        planning.add(name);
+        const fn = this.inlineFunctions.get(name);
+        const bindings = new Map(fn.params.map(param => [param, { base: 0, uses: new Map([[param, 1]]) }]));
+        const estimate = estimator(bindings);
+        let summary = estimate(fn.body);
+        const cost = size(summary);
+        if (eligible(name)
+          && (cost > perCallBudget || cost * Math.max(0, (counts.get(name) ?? 0) - 1) > repeatedBudget)) {
+          share(name);
+          summary = null;
+        }
+        planning.delete(name);
+        summaries.set(name, summary);
+        return summary;
+      };
+      for (const name of this.inlineFunctions.keys()) summarize(name);
+      // Inspect every static call site, not just fn.body: roots, sprites,
+      // events, initializers and arguments can all contain nested expansion.
+      const inspect = node => {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+          && this.inlineFunctions.has(node.expression.text)) estimator(new Map())(node);
+        ts.forEachChild(node, inspect);
+      };
+      for (const file of this.objectSourceFiles) inspect(file);
+    }
+  }
+
+  // Recursion and non-inlineable shapes require procedures independently of
+  // the budget. Resolve those first, then plan acyclic callees before callers.
   planFunctionProcedures() {
     const calls = new Map();
     for (const [name, fn] of this.inlineFunctions) {
@@ -769,6 +960,8 @@ class WorkspaceCompiler {
         if (mutableObjectState) this.unsupported(fn.body, `Recursive function ${name} with object allocation/mutation or locals is not supported; rewrite it as an iterative loop with explicit state`);
       }
     }
+    const required = new Set();
+    const returnValues = new Map();
     for (const [name, fn] of this.inlineFunctions) {
       let returnsValue = false;
       let hasReturn = false;
@@ -786,13 +979,20 @@ class WorkspaceCompiler {
         && statements.slice(0, -1).every((statement) => ts.isVariableStatement(statement))
       );
       const simpleStatement = ts.isBlock(fn.body) && !hasReturn;
-      // Array/callback and replacement helpers freeze arguments and keep loop
-      // state in the invocation frame, even for simple bodies.
-      const framedHelper = name.startsWith("__arr") || name.startsWith("__str_replace") || /^__(cb|map|filter|forEach|reduce|find|findIndex|some|every)\d+$/.test(name);
-      if (!this.objectSlots.size && !fn.classGenerated && !framedHelper
+      // Array/callback and string helpers (including replacement) freeze arguments
+      // and keep loop state in the invocation frame, even for simple bodies.
+      const arrayHelper = name.startsWith("__arr") || name.startsWith("__str_") || /^__(cb|map|filter|forEach|reduce|find|findIndex|some|every)\d+$/.test(name);
+      returnValues.set(name, returnsValue);
+      if (!this.objectSlots.size && !fn.classGenerated && !arrayHelper
         && !reaches(name, name) && (simpleExpression || simpleStatement)) {
         continue;
       }
+      required.add(name);
+    }
+    this.planInlineBudget(required);
+    for (const [name, fn] of this.inlineFunctions) {
+      if (!required.has(name)) continue;
+      const returnsValue = returnValues.get(name);
       if (this.procedureSpecs.has(name)) {
         this.unsupported(fn.body, `Function ${name} clashes with a procedure of the same name`);
       }
@@ -806,7 +1006,8 @@ class WorkspaceCompiler {
           ...fn.params.map((param, index) => ({
             id: `kn-param-fn-${part}-${index + 1}-${sanitizeIdPart(param)}`,
             type: "String",
-            name: param,
+            name: param.replace(/__nekoc_ts_\d+_/g, ""),
+            bindingName: param,
           })),
         ],
       };
@@ -1877,6 +2078,7 @@ class WorkspaceCompiler {
     const entryId = this.addBlock({
       type: "on_bump_actor",
       parent_id: null,
+      _nekocTargetSource: nodeLocation(call),
       fields: {
         type: stringLiteralValue(call.arguments[0], this),
         sprite: stringLiteralValue(call.arguments[1], this),
@@ -1914,7 +2116,7 @@ class WorkspaceCompiler {
     return this.addBlock({
       type: "procedures_2_parameter",
       parent_id: parentId,
-      fields: { param_name: name },
+      fields: { param_name: this.currentProcedureParams.displayNames?.get(name) ?? name },
       mutation: `<mutation xmlns="http://www.w3.org/1999/xhtml" id="${paramId}"></mutation>`,
       is_output: true,
     });
@@ -3902,6 +4104,7 @@ class WorkspaceCompiler {
     const id = this.addBlock({
       type: "self_rotate_around",
       parent_id: parentId,
+      _nekocTargetSource: nodeLocation(call),
       fields: { sprite: stringLiteralValue(call.arguments[0], this) },
     });
     const degreesId = this.compileExpression(call.arguments[1], id);
@@ -5598,6 +5801,38 @@ class WorkspaceCompiler {
     }
   }
 
+  checkStringMethodArguments(call) {
+    const method = call.expression.name.text;
+    const limits = { charAt: [0, 1], substring: [0, 2], slice: [0, 2],
+      includes: [1, 2], indexOf: [1, 2], lastIndexOf: [1, 2], startsWith: [1, 2], endsWith: [1, 2],
+      split: [0, 2], repeat: [1, 1], padStart: [1, 2], padEnd: [1, 2], concat: [0, Infinity],
+      replace: [2, 2], replaceAll: [2, 2], trim: [0, 0], trimStart: [0, 0], trimEnd: [0, 0],
+      toUpperCase: [0, 0], toLowerCase: [0, 0] };
+    if (!Object.hasOwn(limits, method)) return;
+    const [min, max] = limits[method];
+    if (call.arguments.length < min || call.arguments.length > max) {
+      this.unsupported(call, `String.${method} supports ${min}..${max} arguments; remove extra arguments or split the operation into separate calls`);
+    }
+    for (const arg of call.arguments) {
+      if (ts.isSpreadElement(arg)) this.unsupported(arg, `String.${method} spread is not supported; pass each argument explicitly`);
+      if (ts.isIdentifier(stripParens(arg)) && stripParens(arg).text === "undefined") {
+        this.unsupported(arg, `String.${method} explicit undefined is not supported; omit the optional argument instead`);
+      }
+    }
+    const numeric = ["charAt", "substring", "slice", "repeat", "padStart", "padEnd"].includes(method)
+      ? (method === "padStart" || method === "padEnd" || method === "repeat" ? [0] : [0, 1])
+      : ["includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "split"].includes(method) ? [1] : [];
+    for (const index of numeric) {
+      if (call.arguments[index] && this.expressionType?.(call.arguments[index]) !== "number") {
+        this.unsupported(call.arguments[index], `String.${method} numeric argument required; convert to a number before the call or omit the optional argument`);
+      }
+    }
+    if (["includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "split", "replace", "replaceAll"].includes(method)
+      && call.arguments[0] && this.expressionType?.(call.arguments[0]) !== "string") {
+      this.unsupported(call.arguments[0], `String.${method} supports string search/separator only; use a string instead of a regular expression or coercing overload`);
+    }
+  }
+
   checkCallbackShrink(call, method) {
     const functions = new Map();
     const procedures = new Map();
@@ -5724,6 +5959,7 @@ class WorkspaceCompiler {
     const method = call.expression.name.text;
     const args = call.arguments;
     if (this.isArrayExpression(target)) this.checkArrayMethodArguments(call);
+    else this.checkStringMethodArguments(call);
     const literal = (value) => (typeof value === "number" ? ts.factory.createNumericLiteral(value) : ts.factory.createStringLiteral(value));
     const helper = (name, ...extra) => this.compileHelperCall(name, target, extra, parentId);
     const synthesized = this.helperCalls.get(call);
@@ -5766,16 +6002,11 @@ class WorkspaceCompiler {
       return null;
     }
     switch (method) {
-      case "includes": {
-        const id = this.addBlock({ type: "text_contain", parent_id: parentId, is_output: true });
-        this.connectInput(id, this.compileExpression(target, id), "A", "value");
-        this.connectInput(id, this.compileExpression(args[0], id), "B", "value");
-        return id;
-      }
-      case "charAt":
-      case "slice":
-      case "substring": {
-        if (method !== "charAt" && args.some((arg) => { const v = constantNumber(arg); return v !== null && v < 0; })) {
+      case "includes": return helper(args.length > 1 ? "__str_includes" : "__str_contains", args[0], ...(args.length > 1 ? [args[1]] : []));
+      case "charAt": return helper("__str_charAt", args[0] ?? literal(0));
+      case "substring": return helper("__str_substring", args[0] ?? literal(0), args[1] ?? literal(0), literal(args.length > 1 ? 1 : 0));
+      case "slice": {
+        if (args.some((arg) => { const v = constantNumber(arg); return v !== null && v < 0; })) {
           this.unsupported(call, `${method} with negative indices is not supported`);
         }
         const id = this.addBlock({
@@ -5786,30 +6017,22 @@ class WorkspaceCompiler {
         });
         this.connectInput(id, this.compileExpression(target, id), "text", "value");
         this.connectInput(id, this.compilePlusOne(args[0] ?? ts.factory.createNumericLiteral(0), id), "start_index", "value");
-        let endId;
-        if (method === "charAt") endId = this.compilePlusOne(args[0], id);
-        else if (args[1]) endId = this.compileExpression(args[1], id);
-        else endId = this.compileLength(target, id);
+        const endId = args[1] ? this.compileExpression(args[1], id) : this.compileLength(target, id);
         this.connectInput(id, endId, "end_index", "value");
         return id;
       }
       case "indexOf": return helper("__str_indexOf", args[0], args[1] ?? literal(0));
-      case "lastIndexOf": return helper("__str_lastIndexOf", args[0]);
-      case "startsWith": return helper("__str_startsWith", args[0]);
-      case "endsWith": return helper("__str_endsWith", args[0]);
+      case "lastIndexOf": return helper("__str_lastIndexOf", args[0], args[1] ?? literal(0), literal(args.length > 1 ? 1 : 0));
+      case "startsWith": return args.length > 1 ? helper("__str_startsWith", args[0], args[1]) : helper("__str_starts", args[0]);
+      case "endsWith": return helper("__str_endsWith", args[0], args[1] ?? literal(0), literal(args.length > 1 ? 1 : 0));
       case "replace": return helper("__str_replace", args[0], args[1]);
       case "replaceAll": return helper("__str_replaceAll", args[0], args[1]);
       case "trim": case "trimStart": case "trimEnd": case "toUpperCase": case "toLowerCase":
         return helper(`__str_${method}`);
-      case "repeat": return helper("__str_repeat", args[0]);
-      case "padStart": case "padEnd": return helper(`__str_${method}`, args[0], args[1] ?? literal(" "));
+      case "repeat": case "padStart": case "padEnd":
+        this.unsupported(call, `String.${method} requires runtime-bounded method lowering; use a direct string method call with a string receiver`);
       case "concat": return this.compileTextJoin([{ expression: target }, ...Array.from(args, (arg) => ({ expression: arg }))], parentId);
-      case "split": {
-        const id = this.addBlock({ type: "text_split", parent_id: parentId, is_output: true });
-        this.connectInput(id, this.compileExpression(target, id), "TEXT_TO_SPLIT", "value");
-        this.connectInput(id, this.compileExpression(args[0], id), "SPLIT_TEXT", "value");
-        return id;
-      }
+      case "split": return helper("__str_split", args[0] ?? literal(""), args[1] ?? literal(4294967295), literal(args.length > 0 ? 1 : 0));
       default:
         return null;
     }
@@ -6223,6 +6446,7 @@ class WorkspaceCompiler {
     this.nextId += 1;
     this.blocks[id] = { id, ...block };
     const node = sourceNode || this.currentStatementNode;
+    if (node) blockSourceNodes.set(this.blocks[id], node);
     if (node && this.sourceFile && node.pos >= 0 && node.getSourceFile?.() === this.sourceFile) {
       const start = node.getStart(this.sourceFile);
       const { line, character } = this.sourceFile.getLineAndCharacterOfPosition(start);
@@ -6238,6 +6462,17 @@ class WorkspaceCompiler {
   }
 
   connectNext(parentId, childId) {
+    // These two KN blocks have no physical next socket (editor 0.27.4).
+    // This is not a control-flow proof: dispose_clone on an original actor can
+    // return to an enclosing branch/loop/procedure, and stop has a next socket.
+    const type = this.blocks[parentId]?.type;
+    if (this.target.name === "kitten-n" && ["dispose_clone", "restart"].includes(type)) {
+      fail(`${type} has no next socket in Kitten N; cannot connect following code. `
+        + "Make deleteClone()/restart() the last statement in its block stack, or put it at the end of an explicit if/loop/procedure body. "
+        + "Continuation outside that body is preserved; deleting an original actor may continue there.",
+        nodeLocation(blockSourceNodes.get(this.blocks[parentId]))
+          ?? nodeLocation(this.currentStatementNode), "NEKOC_TERMINAL_NEXT");
+    }
     this.addConnection(parentId, childId, { type: "next" });
   }
 
@@ -6385,10 +6620,19 @@ const SHARED_HELPERS = {
   // Official convert_type(type=string) calls String(value); logic_compare
   // GT uses JS > (crc_libs.8196dbd1.js, module 70542, offset 820058).
   __arr_sort: { source: sortHelper("__arr_sort", 'String(__arrL[__bD]) > String(__vD)', "D") },
-  __str_indexOf: { source: `function __str_indexOf(__s, __t, __from) { for (let __iK = __from; __iK <= length(__s) - length(__t); __iK++) { if (selectText(__s, __iK + 1, __iK + length(__t)) === __t) { return __iK; } } return -1; }` },
-  __str_lastIndexOf: { source: `function __str_lastIndexOf(__s, __t) { for (let __lK = length(__s) - length(__t); __lK >= 0; __lK--) { if (selectText(__s, __lK + 1, __lK + length(__t)) === __t) { return __lK; } } return -1; }` },
-  __str_startsWith: { source: `function __str_startsWith(__s, __t) { return selectText(__s, 1, length(__t)) === __t; }` },
-  __str_endsWith: { source: `function __str_endsWith(__s, __t) { return selectText(__s, length(__s) - length(__t) + 1, length(__s)) === __t; }` },
+  __str_position: { source: `function __str_position(__position, __size) { if (String(__position) === "NaN") return 0; return Math.trunc(Math.max(0, Math.min(__position, __size))); }` },
+  __str_range: { source: `function __str_range(__s, __lo, __hi) { if (__lo >= __hi) return ""; return selectText(__s, __lo + 1, __hi); }` },
+  __str_charAt: { source: `function __str_charAt(__s, __input) { let __index = __input; if (String(__index) === "NaN") __index = 0; if (__index <= -1 || __index >= length(__s)) return ""; const __charIndex = Math.trunc(__index) + 1; return selectText(__s, __charIndex, __charIndex); }` },
+  __str_substring: { needs: ["__str_position", "__str_range"], source: `function __str_substring(__s, __start, __end, __given) { const __size = length(__s); const __lo = __str_position(__start, __size); let __hi = __size; if (__given) __hi = __str_position(__end, __size); return __str_range(__s, Math.min(__lo, __hi), Math.max(__lo, __hi)); }` },
+  __str_indexOf: { needs: ["__str_position", "__str_range"], source: `function __str_indexOf(__s, __t, __from) { const __start = __str_position(__from, length(__s)); if (length(__t) === 0) return __start; for (let __iK = __start; __iK <= length(__s) - length(__t); __iK++) { if (__str_range(__s, __iK, __iK + length(__t)) === __t) return __iK; } return -1; }` },
+  __str_includes: { needs: ["__str_indexOf"], source: `function __str_includes(__s, __t, __from) { return __str_indexOf(__s, __t, __from) >= 0; }` },
+  __str_contains: { source: `function __str_contains(__s, __t) { return contains(__s, __t); }` },
+  __str_firstIndex: { source: `function __str_firstIndex(__s, __t) { if (length(__t) === 0) return 0; const __parts = splitText(__s, __t); if (__parts.length < 2) return -1; return length(__parts[0]); }` },
+  __str_starts: { needs: ["__str_firstIndex"], source: `function __str_starts(__s, __t) { return __str_firstIndex(__s, __t) === 0; }` },
+  __str_lastIndexOf: { needs: ["__str_position", "__str_range"], source: `function __str_lastIndexOf(__s, __t, __from, __given) { let __start = length(__s); if (__given && String(__from) !== "NaN") __start = __str_position(__from, length(__s)); if (length(__t) === 0) return __start; for (let __lK = Math.min(__start, length(__s) - length(__t)); __lK >= 0; __lK--) { if (__str_range(__s, __lK, __lK + length(__t)) === __t) return __lK; } return -1; }` },
+  __str_startsWith: { needs: ["__str_position", "__str_range"], source: `function __str_startsWith(__s, __t, __from) { const __start = __str_position(__from, length(__s)); if (length(__t) === 0) return true; if (__start + length(__t) > length(__s)) return false; return __str_range(__s, __start, __start + length(__t)) === __t; }` },
+  __str_endsWith: { needs: ["__str_position", "__str_range"], source: `function __str_endsWith(__s, __t, __from, __given) { let __end = length(__s); if (__given) __end = __str_position(__from, length(__s)); if (length(__t) === 0) return true; if (length(__t) > __end) return false; return __str_range(__s, __end - length(__t), __end) === __t; }` },
+  __str_split: { source: `function __str_split(__s, __separator, __inputLimit, __given) { const __out = []; let __limit = __inputLimit; if (String(__limit) === "NaN" || String(__limit) === "Infinity" || String(__limit) === "-Infinity") __limit = 0; __limit = Math.trunc(__limit) % 4294967296; if (__limit < 0) __limit += 4294967296; if (__limit === 0) return __out; if (!__given) { __out.push(__s); return __out; } const __parts = splitText(__s, __separator); let __cursor = 0; while (__cursor < __parts.length && __out.length < __limit) { __out.push(__parts[__cursor]); __cursor++; } return __out; }` },
   // KN selection reverses an empty interval. Guard it before using zero-based,
   // half-open JS ranges. Keep all replacement helpers invocation-local.
   __str_replaceSlice: { source: `function __str_replaceSlice(__s, __start, __end) { if (__start >= __end) return ""; return selectText(__s, __start + 1, __end); }` },
@@ -6398,9 +6642,9 @@ const SHARED_HELPERS = {
   // across the guard/input boundary (including searches containing both guards).
   __str_replaceIndex: { source: `function __str_replaceIndex(__s, __a) {
     if (length(__a) === 0) return 0;
-    const __guardParts = __a.split("~"); let __guard = "~";
+    const __guardParts = splitText(__a, "~"); let __guard = "~";
     if (String(__guardParts[0]) === "") __guard = "!";
-    const __parts = join(__guard, __s).split(__a);
+    const __parts = splitText(join(__guard, __s), __a);
     if (__parts.length < 2) return -1;
     return length(String(__parts[0])) - 1;
   }` },
@@ -6445,9 +6689,6 @@ const SHARED_HELPERS = {
   __str_trimStart: { source: `function __str_trimStart(__s) { let __tA = 1; while (__tA <= length(__s) && contains(" \\t\\n\\r", selectText(__s, __tA, __tA))) { __tA = __tA + 1; } return selectText(__s, __tA, length(__s)); }` },
   __str_trimEnd: { source: `function __str_trimEnd(__s) { let __tB = length(__s); while (__tB >= 1 && contains(" \\t\\n\\r", selectText(__s, __tB, __tB))) { __tB = __tB - 1; } return selectText(__s, 1, __tB); }` },
   __str_trim: { needs: ["__str_trimStart", "__str_trimEnd"], source: `function __str_trim(__s) { return __str_trimEnd(__str_trimStart(__s)); }` },
-  __str_repeat: { source: `function __str_repeat(__s, __n) { let __pO = ""; for (let __pK = 0; __pK < __n; __pK++) { __pO = join(__pO, __s); } return __pO; }` },
-  __str_padStart: { source: `function __str_padStart(__s, __n, __f) { let __qO = __s; while (length(__qO) < __n && length(__f) > 0) { __qO = join(__f, __qO); } return __qO; }` },
-  __str_padEnd: { source: `function __str_padEnd(__s, __n, __f) { let __qE = __s; while (length(__qE) < __n && length(__f) > 0) { __qE = join(__qE, __f); } return __qE; }` },
   __str_toUpperCase: { needs: ["__str_indexOf"], source: `function __str_toUpperCase(__s) { let __uO = ""; for (let __uK = 1; __uK <= length(__s); __uK++) { const __uC = selectText(__s, __uK, __uK); const __uI = __str_indexOf("abcdefghijklmnopqrstuvwxyz", __uC, 0); if (__uI >= 0) { __uO = join(__uO, selectText("ABCDEFGHIJKLMNOPQRSTUVWXYZ", __uI + 1, __uI + 1)); } else { __uO = join(__uO, __uC); } } return __uO; }` },
   __str_toLowerCase: { needs: ["__str_indexOf"], source: `function __str_toLowerCase(__s) { let __wO = ""; for (let __wK = 1; __wK <= length(__s); __wK++) { const __wC = selectText(__s, __wK, __wK); const __wI = __str_indexOf("ABCDEFGHIJKLMNOPQRSTUVWXYZ", __wC, 0); if (__wI >= 0) { __wO = join(__wO, selectText("abcdefghijklmnopqrstuvwxyz", __wI + 1, __wI + 1)); } else { __wO = join(__wO, __wC); } } return __wO; }` },
 };
@@ -6457,9 +6698,10 @@ const METHOD_HELPERS = {
   join: ["__arr_join"], slice: ["__arr_slice"], reverse: ["__arr_reverse"],
   at: ["__arr_at"], flat: ["__arr_flat"],
   lastIndexOf: ["__arr_lastIndexOf", "__str_lastIndexOf"], pop: ["__arr_pop"], shift: ["__arr_shift"],
-  sort: ["__arr_sort"], includes: ["__arr_includes"], indexOf: ["__arr_indexOf", "__str_indexOf"], startsWith: ["__str_startsWith"], endsWith: ["__str_endsWith"],
+  sort: ["__arr_sort"], includes: ["__arr_includes", "__str_includes", "__str_contains"], indexOf: ["__arr_indexOf", "__str_indexOf"], startsWith: ["__str_startsWith", "__str_starts"], endsWith: ["__str_endsWith"],
+  charAt: ["__str_charAt"], substring: ["__str_substring"], split: ["__str_split"],
   replace: ["__str_replace"], replaceAll: ["__str_replaceAll"], trim: ["__str_trim"], trimStart: ["__str_trimStart"],
-  trimEnd: ["__str_trimEnd"], repeat: ["__str_repeat"], padStart: ["__str_padStart"], padEnd: ["__str_padEnd"],
+  trimEnd: ["__str_trimEnd"],
   toUpperCase: ["__str_toUpperCase"], toLowerCase: ["__str_toLowerCase"],
 };
 
@@ -6889,7 +7131,10 @@ function optionalBooleanOption(options, name, defaultValue, compiler, node) {
 }
 
 function procedureParamIds(spec) {
-  return new Map(spec.params.filter((param) => param.type === "String").map((param) => [param.name, param.id]));
+  const params = spec.params.filter(param => param.type === "String");
+  const ids = new Map(params.map(param => [param.bindingName ?? param.name, param.id]));
+  ids.displayNames = new Map(params.map(param => [param.bindingName ?? param.name, param.name]));
+  return ids;
 }
 
 // Visits a function body without descending into nested functions.
