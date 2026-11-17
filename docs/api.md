@@ -2,6 +2,34 @@
 
 Complete reference for all functions and APIs available in NekoC TypeScript projects.
 
+## TypeScript vector length
+
+`Math.hypot(...components)` supports any fixed number of finite numeric arguments,
+including variables, function results and loop values. It saves each argument
+once, left to right, in invocation-local procedure parameters. It finds the
+maximum absolute component, sums squares of normalized components, then rescales
+the square root. Empty and all-zero vectors return 0 without division by zero.
+This avoids premature overflow/underflow for large/small finite components and
+works with nested and recursive calls using share-player-supported blocks.
+Actual result overflow can still produce Infinity. Infinity/NaN input combinations
+and bit-identical V8 compensated summation remain outside the documented guarantee.
+
+## Numeric helpers
+
+`Math.max` / `Math.min` accept one or more numeric arguments, save each once in
+left-to-right order, and propagate numeric NaN in any position. Arguments after
+NaN still run, including side effects. Single arguments, ±Infinity, numeric
+function parameters/results and nested/recursive calls are supported.
+`Math.trunc` preserves NaN and ±Infinity and truncates finite fractions toward zero.
+`Number.isInteger` additionally guarantees false for numeric NaN and ±Infinity;
+finite integers return true and fractions return false. Statically string/boolean
+arguments return false while preserving their evaluation. Dynamic mixed types,
+arbitrary any/text coercion, and signed-zero behavior are outside these guarantees.
+
+NaN detection uses the saved numeric value's verified `String(number)` spelling
+([official conversion evidence](kn-conversion-evidence.json)), then returns that
+original number. It does not rely on Kitten N NaN equality or produce text `"NaN"`.
+
 ## TypeScript classes
 
 Class declarations, fields, constructors (including parameter properties), `new`,
@@ -194,7 +222,13 @@ The ES2020 declarations include the implemented
   comparators remain supported. Sparse arrays and undefined sort keys have not
   been verified.
 - `const [head, ...tail] = value` evaluates `value` once and copies the remaining
-  elements into a new list. Nested/default destructuring is rejected.
+  elements into a new list (shallow: array/object/instance elements keep their
+  reference identity). Top-level array bindings are registered globally, then
+  initialized at their source position in the implicit startup script, before
+  explicit root `onStart` handlers. Omitted bindings (`[head, , third]`) and other
+  declarations in the same statement are supported. Nested/default patterns and
+  object destructuring are rejected; sparse/missing-element semantics and normal
+  array out-of-bounds access are unchanged.
 - `a.at(index)` supports negative indices and truncates fractional indices.
   The ES2020 declaration set includes this frontend-supported method.
 - Array `slice(start?, end?)` evaluates its receiver once, then each explicit
