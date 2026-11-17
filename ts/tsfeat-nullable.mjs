@@ -529,7 +529,12 @@ export function lowerTsNullable(input) {
     return true;
   }
   function contextRule(node, specific) {
-    if (!mayHoldNil(node) || legacyOptionalParameter(node)) return specific;
+    // Explicit String conversion must decode declared nullable sentinels even
+    // when TS retained a stale non-null flow type across an earlier call.
+    const converted = climb(node);
+    const explicitString = ts.isCallExpression(converted.parent)
+      && calleeText(converted.parent) === "String" && converted.parent.arguments.includes(converted);
+    if (!(mayHoldNil(node) || explicitString && nilDeclared(node)) || legacyOptionalParameter(node)) return specific;
     const ctx = context(node);
     if (untrusted(node)) {
       const target = ctx === "flow" ? literalTarget(node) ?? (ts.isVariableDeclaration(climb(node).parent) ? declaredType(climb(node).parent.name) : null) : null;

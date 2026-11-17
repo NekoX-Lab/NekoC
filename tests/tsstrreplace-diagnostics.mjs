@@ -22,4 +22,20 @@ export const diagnosticCases = [
     ['optional-parameter', 'function f(a?: string): string {\n  return "abc".replace("a", a);\n}\nconsole.log(f());', 2, 10],
   ].map(([name, source, line, column]) => ({ name: `nullable-${name}`, source, line, column,
     message: /without implicit conversion.*narrow null\/undefined.*String\(value\)/ })),
+  ...["replace", "replaceAll"].flatMap(method => ["null", "undefined"].flatMap(nil => ["search-call", "receiver-search", "receiver-replacement"].map(mode => {
+    const source = mode === "search-call"
+      ? `let value: string | ${nil} = "X";\nfunction search(): string { value = ${nil}; return "a"; }\nconsole.log("aaba".${method}(search(), value));`
+      : `let value: string | ${nil} = "a";\nfunction receiver(): string { value = ${nil}; return "aaba"; }\nconsole.log(receiver().${method}(${mode === "receiver-search" ? 'value, "X"' : '"a", value'}));`;
+    return { name: `stale-${method}-${nil}-${mode}`, source, line: 3, column: 13,
+      message: /nullable argument after intervening side effects.*stable string.*\?\?.*String\(value\)/ };
+  }))),
+  ...[
+    ["alias", 'const obj: { value: string | null } = { value: "X" };\nconst alias = obj;\nfunction search(): string { alias.value = null; return "a"; }\nif (obj.value !== null) console.log("abc".replace(search(), obj.value));', 4, 37],
+    ["between-guard-and-call", 'let value: string | null = "X";\nfunction change(): void { value = null; }\nif (value !== null) {\n  change();\n  console.log("abc".replace("a", value));\n}', 5, 15],
+    ["closure", 'function outer(): string {\n  const obj: { value: string | null } = { value: "X" };\n  function search(): string { obj.value = null; return "a"; }\n  if (obj.value !== null) return "abc".replace(search(), obj.value);\n  return "skipped";\n}\nconsole.log(outer());', 4, 34],
+    ["array-alias", 'let values: (string | undefined)[] = ["X"];\nconst alias = values;\nfunction search(): string { alias[0] = undefined; return "a"; }\nif (values[0] !== undefined) console.log("abc".replace(search(), values[0]));', 4, 42],
+    ["late-capture", 'let value: string | null = "X";\nfunction change(): void { value = null; }\nchange();\nconst captured = value;\nconsole.log("abc".replace("a", captured));', 5, 13],
+    ["loop-back-edge", 'let value: string | null = "X";\nfunction change(): void { value = null; }\nfor (let i = 0; i < 2; i++) {\n  console.log("abc".replace("a", value));\n  change();\n}', 4, 15],
+  ].map(([name, source, line, column]) => ({ name: `stale-${name}`, source, line, column,
+    message: /nullable argument after intervening side effects.*stable string.*\?\?.*String\(value\)/ })),
 ];

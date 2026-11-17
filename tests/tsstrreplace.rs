@@ -35,7 +35,13 @@ fn assert_replacements_match_node(input: &str) {
                 "Xbc",
                 "NULL",
                 "NULL",
-                "0"
+                "0",
+                "Xbc",
+                "fallbackbc",
+                "nullbc",
+                "fallbackfallbackbfallback",
+                "nullnullbnull",
+                "undefinedbc"
             ]
         );
     }
@@ -214,13 +220,13 @@ fn nullable_arguments_fail_cli_check_and_build_before_emitting_a_work() {
         .args([
             "--input-type=module",
             "-e",
-            "import { diagnosticCases } from './tests/tsstrreplace-diagnostics.mjs'; console.log(JSON.stringify(diagnosticCases.filter(c => c.name.startsWith('nullable-'))));",
+            "import { diagnosticCases } from './tests/tsstrreplace-diagnostics.mjs'; console.log(JSON.stringify(diagnosticCases.filter(c => c.name.startsWith('nullable-') || c.name.startsWith('stale-'))));",
         ])
         .output()
         .unwrap();
     assert!(cases.status.success(), "{cases:?}");
     let cases: Vec<Value> = serde_json::from_slice(&cases.stdout).unwrap();
-    assert_eq!(cases.len(), 12);
+    assert_eq!(cases.len(), 30);
     let dir = tempfile::tempdir().unwrap();
     for case in cases {
         let input = dir
@@ -244,11 +250,11 @@ fn nullable_arguments_fail_cli_check_and_build_before_emitting_a_work() {
                 .unwrap();
             assert_eq!(diagnostic["line"], case["line"]);
             assert_eq!(diagnostic["column"], case["column"]);
+            let message = diagnostic["message"].as_str().unwrap();
             assert!(
-                diagnostic["message"]
-                    .as_str()
-                    .unwrap()
-                    .contains("without implicit conversion")
+                message.contains("without implicit conversion")
+                    || message.contains("intervening side effects"),
+                "{message}"
             );
         }
         for optimize in [false, true] {
@@ -264,7 +270,11 @@ fn nullable_arguments_fail_cli_check_and_build_before_emitting_a_work() {
             let result = build.output().unwrap();
             assert!(!result.status.success(), "{result:?}");
             let stderr = String::from_utf8_lossy(&result.stderr);
-            assert!(stderr.contains("without implicit conversion"), "{stderr}");
+            assert!(
+                stderr.contains("without implicit conversion")
+                    || stderr.contains("intervening side effects"),
+                "{stderr}"
+            );
             assert!(
                 stderr.contains(&format!(":{}:{}:", case["line"], case["column"])),
                 "{stderr}"

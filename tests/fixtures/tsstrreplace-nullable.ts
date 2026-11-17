@@ -29,3 +29,19 @@ function replacement(): string { calls++; return "X"; }
 console.log(absent?.replace("a", replacement()) ?? "NULL");
 console.log(absent?.replaceAll("a", replacement()) ?? "NULL");
 console.log(calls);
+let changing: string | null = "X";
+function mutateSearch(): string { changing = null; return "a"; }
+const captured = changing;
+console.log("abc".replace(mutateSearch(), captured));
+changing = "X";
+console.log("abc".replace(mutateSearch(), changing ?? "fallback"));
+changing = "X";
+console.log("abc".replace(mutateSearch(), String(changing)));
+function mutateReceiver(): string { changing = null; return "aaba"; }
+changing = "X";
+console.log(mutateReceiver().replaceAll("a", changing ?? "fallback"));
+changing = "X";
+console.log(mutateReceiver().replaceAll("a", String(changing)));
+let changingUndefined: string | undefined = "X";
+function mutateUndefined(): string { changingUndefined = undefined; return "a"; }
+console.log("abc".replace(mutateUndefined(), String(changingUndefined)));

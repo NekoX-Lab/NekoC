@@ -173,6 +173,7 @@ export function createExpressionTypes(files, declarations = "", path = portableP
   const stringConstants = new WeakMap();
   const nonNullableKinds = new WeakMap();
   const flowKinds = new WeakMap();
+  const unstableNullableReads = new WeakSet();
   // Assertions do not convert nullish sentinels. Inspect the operand's actual
   // flow type, while retaining real narrowing and value-producing ??/String().
   const flowKind = node => {
@@ -180,6 +181,90 @@ export function createExpressionTypes(files, declarations = "", path = portableP
       || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)
       || ts.isSatisfiesExpression(node)) return flowKind(node.expression);
     return classify(checker.getTypeAtLocation(node));
+  };
+  const unwrap = node => {
+    while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)
+      || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)
+      || ts.isSatisfiesExpression(node)) node = node.expression;
+    return node;
+  };
+  const nilType = type => !!type && (type.isUnion() ? type.types : [type])
+    .some(part => part.flags & (ts.TypeFlags.Null | ts.TypeFlags.Undefined | ts.TypeFlags.Void));
+  // TS does not invalidate flow narrowing after calls or alias writes. For a
+  // nullable read, use the most recent enclosing explicit guard (or its own
+  // initializer) as a checkpoint, and conservatively reject intervening effects.
+  // No cross-procedure alias/purity assumptions are needed for this rule.
+  const unstableNullableRead = (expression, seen = new Set()) => {
+    const node = unwrap(expression);
+    if (seen.has(node)) return false;
+    seen.add(node);
+    if (ts.isConditionalExpression(node)) return unstableNullableRead(node.whenTrue, seen) || unstableNullableRead(node.whenFalse, seen);
+    if (ts.isBinaryExpression(node)) {
+      const op = node.operatorToken.kind;
+      if ([ts.SyntaxKind.CommaToken, ts.SyntaxKind.QuestionQuestionToken].includes(op)) return unstableNullableRead(node.right, seen);
+      if ([ts.SyntaxKind.AmpersandAmpersandToken, ts.SyntaxKind.BarBarToken].includes(op)) {
+        return unstableNullableRead(node.left, seen) || unstableNullableRead(node.right, seen);
+      }
+    }
+    if (ts.isIdentifier(node)) {
+      const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration;
+      if (declaration && ts.isVariableDeclaration(declaration) && declaration.initializer
+        && unstableNullableRead(declaration.initializer, seen)) return true;
+    }
+    if (!nilType(declaredReadType(node))) return false;
+    let scope = node;
+    while (scope.parent && !ts.isFunctionLike(scope) && !ts.isSourceFile(scope)) scope = scope.parent;
+    const readStart = node.end;
+    let checkpoint = scope.getStart();
+    if (ts.isIdentifier(node)) {
+      const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration;
+      if (declaration && ts.isVariableDeclaration(declaration) && declaration.initializer
+        && declaration.end <= readStart && declaration.getStart() >= checkpoint
+        && flowKind(declaration.initializer) === "string") checkpoint = declaration.end;
+    }
+    const sameRead = value => {
+      value = unwrap(value);
+      if (ts.isIdentifier(node) && ts.isIdentifier(value)) {
+        return checker.getSymbolAtLocation(node) === checker.getSymbolAtLocation(value);
+      }
+      return value.getText() === node.getText();
+    };
+    const guardsRead = condition => {
+      condition = unwrap(condition);
+      if (!ts.isBinaryExpression(condition)) return false;
+      const op = condition.operatorToken.kind;
+      if (op === ts.SyntaxKind.AmpersandAmpersandToken) return guardsRead(condition.left) || guardsRead(condition.right);
+      if (![ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(op)) return false;
+      return sameRead(condition.left) && nilType(checker.getTypeAtLocation(condition.right))
+        || sameRead(condition.right) && nilType(checker.getTypeAtLocation(condition.left));
+    };
+    for (let child = node, parent = child.parent; parent && parent !== scope; child = parent, parent = parent.parent) {
+      if (ts.isIfStatement(parent) && child === parent.thenStatement && guardsRead(parent.expression)
+        || ts.isConditionalExpression(parent) && child === parent.whenTrue && guardsRead(parent.condition)) {
+        const condition = ts.isIfStatement(parent) ? parent.expression : parent.condition;
+        checkpoint = Math.max(checkpoint, condition.getStart());
+      }
+    }
+    // A later effect in a loop can precede this read on the next iteration.
+    // Require a fresh initializer/guard inside each enclosing loop instead of
+    // treating source order as execution order across the loop back edge.
+    for (let parent = node.parent; parent && parent !== scope; parent = parent.parent) {
+      if ((ts.isForStatement(parent) || ts.isForInStatement(parent) || ts.isForOfStatement(parent)
+        || ts.isWhileStatement(parent) || ts.isDoStatement(parent)) && checkpoint <= parent.getStart()) return true;
+    }
+    const effectBeforeRead = value => {
+      if (value.end <= checkpoint || value.getStart() >= readStart) return false;
+      if (value !== scope && ts.isFunctionLike(value)) return false;
+      if (value.end <= readStart && (ts.isCallExpression(value) || ts.isNewExpression(value)
+        || ts.isTaggedTemplateExpression(value) || ts.isAwaitExpression(value) || ts.isYieldExpression(value)
+        || ts.isDeleteExpression(value)
+        || ts.isBinaryExpression(value) && value.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+          && value.operatorToken.kind <= ts.SyntaxKind.LastAssignment
+        || (ts.isPrefixUnaryExpression(value) || ts.isPostfixUnaryExpression(value))
+          && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(value.operator))) return true;
+      return !!ts.forEachChild(value, effectBeforeRead);
+    };
+    return effectBeforeRead(scope);
   };
   const stringConstant = (node, seen = new Set()) => {
     if (!node || seen.has(node)) return null;
@@ -214,6 +299,12 @@ export function createExpressionTypes(files, declarations = "", path = portableP
         stringConstants.set(node, stringConstant(node));
         nonNullableKinds.set(node, classify(checker.getNonNullableType(declaredReadType(node) ?? type)));
         flowKinds.set(node, flowKind(node));
+        if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+          && ["replace", "replaceAll"].includes(node.expression.name.text)) {
+          for (const argument of node.arguments) {
+            if (unstableNullableRead(argument)) unstableNullableReads.add(argument);
+          }
+        }
       }
       ts.forEachChild(node, visit);
     };
@@ -229,6 +320,7 @@ export function createExpressionTypes(files, declarations = "", path = portableP
   result.stringConstant = node => stringConstants.get(node && ts.getOriginalNode(node)) ?? null;
   result.nonNullableKind = node => nonNullableKinds.get(node && ts.getOriginalNode(node));
   result.flowKind = node => flowKinds.get(node && ts.getOriginalNode(node));
+  result.unstableNullableRead = node => unstableNullableReads.has(node && ts.getOriginalNode(node));
   return result;
 }
 

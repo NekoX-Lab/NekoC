@@ -119,8 +119,8 @@ test("tsstrreplace diagnostics retain original class/nullable/literal coordinate
       }
       // Imports retain their own untouched file, not just the entry's text.
       const main = path.join(dir, "main.ts");
-      fs.appendFileSync(file, '\nexport function value() { return 1; }');
-      fs.writeFileSync(main, `import { value } from "./${item.name}"; console.log(value());`);
+      fs.appendFileSync(file, '\nexport function diagnosticEntry() { return 1; }');
+      fs.writeFileSync(main, `import { diagnosticEntry } from "./${item.name}"; console.log(diagnosticEntry());`);
       assert.throws(() => compileFile(main), assertLocation);
     }
   } finally { fs.rmSync(dir, { recursive: true, force: true }); }

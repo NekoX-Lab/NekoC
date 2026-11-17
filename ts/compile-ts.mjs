@@ -258,6 +258,9 @@ class WorkspaceCompiler {
           this.unsupported(node, `String.${method} supports exactly two string arguments; use a string search and string replacement instead of RegExp, a replacer function, coercion or spread`);
         }
         for (const value of node.arguments) {
+          if (replacementTypes.unstableNullableRead(value)) {
+            this.unsupported(node, `String.${method} cannot trust a nullable argument after intervening side effects; first capture a stable string value after narrowing, use ?? with a string fallback, or explicitly use String(value)`);
+          }
           if (replacementTypes.nonNullableKind(value) !== "string"
             || replacementTypes.flowKind(value) !== "string") {
             this.unsupported(node, `String.${method} supports exactly two string arguments; search and replacement must be strings at the call site, without implicit conversion; narrow null/undefined first, use ?? with a string fallback, or explicitly use String(value)`);

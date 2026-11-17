@@ -70,6 +70,7 @@
 
 - replace/replaceAll 的兼容性检查在保留的原始 AST 上进行，class 方法和 nullable 可选调用也指向原始调用的行列。孤立 UTF-16 代理项字面量（含 let 初值、模板、导入模块）在降低和 JSON 序列化前定位拒绝，提示改用完整 Unicode 字符；不等到 Rust JSON 解码失败。
 - replace/replaceAll 的 search/replacement 必须在调用点确定为 string；不能先去除 null/undefined 再认定参数合法。nullable 实参定位拒绝并提示先判空、使用 `??` 提供 string 回退或显式 `String(value)`；合法缩窄、class/数组字段缩窄和接收者 `?.` 短路保留。
+- TS flow 不追踪任意调用/别名写入导致的缩窄失效。替换参数的 nullable 读取若在初始化或显式判空后经过调用/赋值等副作用（包括接收者及较早 search 实参），保守拒绝；不推断调用纯度。请在副作用前保存稳定 string，或在读取位置使用 `??` / `String(value)`。
 
 - `+` / `+=`：按 TS 类型检查器给出的操作数类型决定。有一边是字符串（字面量、模板字符串、`string` 标注、函数返回值、元组位、`string[]` 元素、对象属性等）就编译成"连接"积木；`any`、混合联合类型（如 `string | number`）和非原始值编译报错，拼接请写 `String(x)`，相加请给出准确的数字类型（如 `getVar<number>("x")`）。
 - 模板字符串 `` `n=${x}` ``。

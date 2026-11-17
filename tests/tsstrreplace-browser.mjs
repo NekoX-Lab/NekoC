@@ -38,7 +38,7 @@ for (const expression of ['"abc".replace(/b/, "X")', '"abc".replaceAll("b", () =
 for (const item of diagnosticCases) {
   for (const imported of [false, true]) {
     const file = imported ? "/lib.ts" : "/main.ts";
-    const files = imported ? { "/main.ts": 'import { value } from "./lib"; console.log(value());', [file]: item.source + '\nexport function value() { return 1; }' } : { [file]: item.source };
+    const files = imported ? { "/main.ts": 'import { diagnosticEntry } from "./lib"; console.log(diagnosticEntry());', [file]: item.source + '\nexport function diagnosticEntry() { return 1; }' } : { [file]: item.source };
     for (const types of [false, true]) {
       const checked = api.check("/main.ts", { files, types });
       assert.equal(checked.ok, false);

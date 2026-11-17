@@ -62,6 +62,10 @@ string arguments instead. Nullable search/replacement arguments must be strings
 at the call site: narrow them first (for example `if (a !== null)`), use `a ?? ""`,
 or explicitly convert with `String(a)`. The compiler does not implicitly convert
 null/undefined arguments; optional receiver short-circuiting remains supported.
+Calls or writes between narrowing and a nullable argument read are conservatively
+rejected, including earlier receiver/search evaluation and writes through aliases.
+Capture a string in a local before those effects, or coalesce/convert the value
+at its argument evaluation point. This check does not infer that a call is pure.
 Isolated surrogate literals anywhere in source (also
 in `let` initializers, templates and imported modules) are rejected before
 lowering/JSON serialization with their original coordinates and a hint to use

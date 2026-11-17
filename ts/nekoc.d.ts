@@ -44,6 +44,8 @@ interface String {
    * RegExp, callback replacers and implicit coercion are rejected by the compiler.
    * Nullable arguments must be narrowed first, use ?? with a string fallback,
    * or explicitly convert with String(value). Applies to replaceAll as well.
+   * Calls/writes after narrowing may invalidate nullable reads; capture a stable
+   * string first, or convert/coalesce at the argument's evaluation point.
    */
   replace(searchValue: string, replaceValue: string): string;
   /** Nonoverlapping replacement, including empty search on constant BMP strings.
