@@ -1,5 +1,6 @@
 import ts from "typescript";
 import { portablePath } from "./portable-path.mjs";
+import { createNullableReadAnalysis } from "./nullable-reads.mjs";
 
 // Reuse the exact ASTs compiled by the frontend, including imported functions.
 // A small ambient library keeps this usable in the browser and memory hosts;
@@ -106,10 +107,20 @@ export function createExpressionTypes(files, declarations = "", path = portableP
   const checker = program.getTypeChecker();
   for (const [file, name] of originalNames) file.fileName = name;
   const classify = type => {
+    if (type.flags & ts.TypeFlags.TypeParameter) {
+      // A numeric constraint guarantees the runtime domain even when the
+      // parameter itself is not NumberLike (including T extends U extends number).
+      const constraint = checker.getBaseConstraintOfType(type);
+      return constraint && constraint !== type && classify(constraint) === "number" ? "number" : "unknown";
+    }
     if (type.isUnion()) {
       const kinds = new Set(type.types.map(classify));
       return kinds.size === 1 ? [...kinds][0] : "unknown";
     }
+    // Every inhabitant of an intersection satisfies each constituent. A
+    // numeric constituent therefore proves the numeric domain even when other
+    // constituents only add type-level brands. Do not broaden text/bool paths.
+    if (type.isIntersection() && type.types.some(part => classify(part) === "number")) return "number";
     if (type.flags & ts.TypeFlags.StringLike) return "string";
     if (type.flags & (ts.TypeFlags.NumberLike | ts.TypeFlags.EnumLike)) return "number";
     if (type.flags & ts.TypeFlags.BooleanLike) return "boolean";
@@ -168,7 +179,34 @@ export function createExpressionTypes(files, declarations = "", path = portableP
   // Classify every parsed expression once, under its parsed parents.
   const kinds = new WeakMap();
   const arrays = new WeakSet();
+  const objects = new WeakSet();
   const concatKinds = new WeakMap();
+  const stringConstants = new WeakMap();
+  const nonNullableKinds = new WeakMap();
+  const flowKinds = new WeakMap();
+  const unstableNullableReads = new WeakSet();
+  // Assertions do not convert nullish sentinels. Inspect the operand's actual
+  // flow type, while retaining real narrowing and value-producing ??/String().
+  const flowKind = node => {
+    if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)
+      || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)
+      || ts.isSatisfiesExpression(node)) return flowKind(node.expression);
+    return classify(checker.getTypeAtLocation(node));
+  };
+  const { unstableRead: unstableNullableRead } = createNullableReadAnalysis(checker, declaredReadType, flowKind);
+  const stringConstant = (node, seen = new Set()) => {
+    if (!node || seen.has(node)) return null;
+    seen.add(node);
+    if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)
+      || ts.isNonNullExpression(node) || ts.isSatisfiesExpression(node)) return stringConstant(node.expression, seen);
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+    if (ts.isIdentifier(node)) {
+      const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration;
+      if (declaration && ts.isVariableDeclaration(declaration)
+        && declaration.parent.flags & ts.NodeFlags.Const) return stringConstant(declaration.initializer, seen);
+    }
+    return null;
+  };
   const concatKind = type => {
     if (type.isUnion()) {
       const values = new Set(type.types.map(concatKind));
@@ -184,7 +222,17 @@ export function createExpressionTypes(files, declarations = "", path = portableP
         kinds.set(node, expressionKind(node));
         const type = checker.getTypeAtLocation(node);
         if (checker.isArrayType(type) || checker.isTupleType(type)) arrays.add(node);
+        if (checker.getNonNullableType(type).flags & ts.TypeFlags.Object) objects.add(node);
         concatKinds.set(node, concatKind(declaredReadType(node) ?? type));
+        stringConstants.set(node, stringConstant(node));
+        nonNullableKinds.set(node, classify(checker.getNonNullableType(declaredReadType(node) ?? type)));
+        flowKinds.set(node, flowKind(node));
+        if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+          && ["replace", "replaceAll"].includes(node.expression.name.text)) {
+          for (const argument of node.arguments) {
+            if (unstableNullableRead(argument)) unstableNullableReads.add(argument);
+          }
+        }
       }
       ts.forEachChild(node, visit);
     };
@@ -195,7 +243,12 @@ export function createExpressionTypes(files, declarations = "", path = portableP
     return kinds.has(original) ? kinds.get(original) : null;
   };
   result.array = node => arrays.has(node && ts.getOriginalNode(node));
+  result.object = node => objects.has(node && ts.getOriginalNode(node));
   result.concatKind = node => concatKinds.get(node && ts.getOriginalNode(node));
+  result.stringConstant = node => stringConstants.get(node && ts.getOriginalNode(node)) ?? null;
+  result.nonNullableKind = node => nonNullableKinds.get(node && ts.getOriginalNode(node));
+  result.flowKind = node => flowKinds.get(node && ts.getOriginalNode(node));
+  result.unstableNullableRead = node => unstableNullableReads.has(node && ts.getOriginalNode(node));
   return result;
 }
 

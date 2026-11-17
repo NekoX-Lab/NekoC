@@ -874,6 +874,69 @@ fn failed_assignment_inputs_preserve_numeric_and_typed_targets_in_both_tiers() {
 }
 
 #[test]
+fn kitten4_private_change_keeps_typed_rules_errors_and_numeric_native_path() {
+    for decrease in [false, true] {
+        for initial in [
+            Cell::Number(0.3),
+            Cell::Text("0.3".into()),
+            Cell::List(Default::default()),
+            Cell::Null,
+        ] {
+            for failing in [false, true] {
+                let mut states = vec![];
+                for native in [false, true] {
+                    let mut e = engine(vec![Op::Kitten4ChangeActor(0, 0, decrease), Op::Halt]);
+                    e.set_random_seed(1);
+                    e.program.semantics = RuntimeSemantics::Kitten4;
+                    e.program.actor_variable_names = vec!["private".into()];
+                    e.sprites[1].variables.insert(0, initial.clone());
+                    e.program.constants[0] = Cell::Number(0.1);
+                    if failing {
+                        e.program.expressions = vec![
+                            ExprOp::Constant(f64::NAN),
+                            ExprOp::ListItem(ListRef::Global(0), false),
+                        ];
+                        e.program.expression_starts = vec![0, 0];
+                        e.program.values[0] = ValueExpr::Number(Expr { end: 2 });
+                        e.lists = vec![Default::default()];
+                    }
+                    let error = if native {
+                        e.jit_compile(0);
+                        assert_eq!(e.jit_run(0, 0, 1, 1), Some(1));
+                        if !failing && matches!(initial, Cell::Number(_)) {
+                            assert_eq!(e.jit_profile()["delegated_ops"], 0);
+                            assert!(e.jit_profile()["native_ops"].as_u64().unwrap() > 0);
+                        }
+                        e.jit_error.take()
+                    } else {
+                        e.tasks[0].pc = 1;
+                        e.exec(0, 0, e.program.ops[0], 1).err()
+                    };
+                    assert_eq!(error.is_some(), failing);
+                    let actual = e.read_actor_variable(1, 0);
+                    let expected = if failing {
+                        initial.clone()
+                    } else {
+                        match &initial {
+                            Cell::Number(_) => Cell::Number(if decrease { 0.2 } else { 0.4 }),
+                            Cell::Text(_) if decrease => Cell::Number(0.2),
+                            Cell::Text(_) => Cell::Text("0.30.1".into()),
+                            _ => initial.clone(),
+                        }
+                    };
+                    assert_eq!(format!("{actual:?}"), format!("{expected:?}"));
+                    states.push(serde_json::json!([
+                        error.map(|e| e.to_string()),
+                        e.jit_debug_snapshot()
+                    ]));
+                }
+                assert_eq!(states[0], states[1]);
+            }
+        }
+    }
+}
+
+#[test]
 fn terminal_only_entry_stops_paying_native_trampoline_after_real_sample() {
     let mut e = engine(vec![
         Op::AppendList(ListRef::Global(0), 2),

@@ -29,6 +29,7 @@ mod k4_effects;
 mod k4_lifecycle;
 mod k4_monitors;
 mod k4_properties;
+mod k4decimal;
 mod kn_ai;
 mod kn_appearance;
 mod kn_async;
@@ -77,6 +78,9 @@ enum Binary {
     Sub,
     Mul,
     Div,
+    K4Sub,
+    K4Mul,
+    K4Div,
     Mod,
     Pow,
     Eq,
@@ -97,6 +101,9 @@ impl Binary {
             Self::Mul => a * b,
             // Official K4 Tn6a/h and KN operators propagate IEEE nonfinite values.
             Self::Div => a / b,
+            Self::K4Sub => k4decimal::apply(k4decimal::Operation::Sub, a, b),
+            Self::K4Mul => k4decimal::apply(k4decimal::Operation::Mul, a, b),
+            Self::K4Div => k4decimal::apply(k4decimal::Operation::Div, a, b),
             Self::Mod => a % b,
             Self::Pow => a.powf(b),
             Self::Eq => (a == b) as u8 as f64,
@@ -322,6 +329,7 @@ enum Op {
     ChangeLocal(usize, Expr, f64),
     Change(usize, Expr, f64),
     Kitten4Change(Target, usize, bool),
+    Kitten4ChangeActor(usize, usize, bool),
     /// Code-view compound assignment; always interpreted (including hot loops).
     AssignLocal(usize, Option<usize>, Binary),
     Move(Expr),
@@ -1984,6 +1992,24 @@ impl Compiler {
             {
                 ValueExpr::Kitten4Add(self.value(input(b, "A")?)?, self.value(input(b, "B")?)?)
             }
+            "math_arithmetic"
+                if self.program.semantics == RuntimeSemantics::Kitten4
+                    && matches!(
+                        field(b, "type"),
+                        "minus" | "subtract" | "multiply" | "divide"
+                    ) =>
+            {
+                let op = match field(b, "type") {
+                    "minus" | "subtract" => Binary::K4Sub,
+                    "multiply" => Binary::K4Mul,
+                    _ => Binary::K4Div,
+                };
+                ValueExpr::Kitten4Arithmetic(
+                    self.value(input(b, "A")?)?,
+                    self.value(input(b, "B")?)?,
+                    op,
+                )
+            }
             "ai_text_result_check" if self.program.semantics == RuntimeSemantics::KnCurrent => {
                 ensure!(
                     matches!(field(b, "options"), "include" | "exclude"),
@@ -2670,11 +2696,14 @@ impl Compiler {
     }
     fn expression_inputs(&self, node: &Value) -> &'static [&'static str] {
         match node["type"].as_str().unwrap_or("") {
-            // K4 ADD consumes typed values. As with whole below, value() owns
+            // K4 ordinary arithmetic consumes typed values. As with whole below, value() owns
             // its children; numeric traversal must not compile/evaluate them twice.
             "math_arithmetic"
                 if self.program.semantics == RuntimeSemantics::Kitten4
-                    && field(node, "type") == "add" =>
+                    && matches!(
+                        field(node, "type"),
+                        "add" | "minus" | "subtract" | "multiply" | "divide"
+                    ) =>
             {
                 &[]
             }
@@ -3134,7 +3163,10 @@ impl Compiler {
             "math_arithmetic" | "math_modulo" => {
                 if kind == "math_arithmetic"
                     && self.program.semantics == RuntimeSemantics::Kitten4
-                    && field(b, "type") == "add"
+                    && matches!(
+                        field(b, "type"),
+                        "add" | "minus" | "subtract" | "multiply" | "divide"
+                    )
                 {
                     return self.expression_value(b);
                 }
@@ -3145,7 +3177,7 @@ impl Compiler {
                 } else {
                     field(b, "type")
                 };
-                ExprOp::Binary(match name {
+                let op = match name {
                     "add" => Binary::Add,
                     "minus" | "subtract" => Binary::Sub,
                     "multiply" => Binary::Mul,
@@ -3161,6 +3193,16 @@ impl Compiler {
                     "and" => Binary::And,
                     "or" => Binary::Or,
                     _ => bail!("unsupported numeric operator {name}"),
+                };
+                ExprOp::Binary(if self.program.semantics == RuntimeSemantics::Kitten4 {
+                    match op {
+                        Binary::Sub => Binary::K4Sub,
+                        Binary::Mul => Binary::K4Mul,
+                        Binary::Div => Binary::K4Div,
+                        _ => op,
+                    }
+                } else {
+                    op
                 })
             }
             "math_arithmetic_power" => ExprOp::Binary(Binary::Pow),
@@ -3759,6 +3801,19 @@ impl Compiler {
                     }
                     "change_variables" | "change_script_variables" => {
                         if let Some(&slot) = self.actor_variables.get(field(b, "variable")) {
+                            if self.program.semantics == RuntimeSemantics::Kitten4 {
+                                let value = self.value(input(b, "value")?)?;
+                                self.emit(
+                                    Op::Kitten4ChangeActor(
+                                        slot,
+                                        value,
+                                        field(b, "method") == "decrease",
+                                    ),
+                                    b,
+                                );
+                                block = b.get("next");
+                                continue;
+                            }
                             let expr = self.arg(b, "value")?;
                             let sign = if field(b, "method") == "decrease" {
                                 -1.0
@@ -8073,6 +8128,7 @@ impl Engine {
             ValueExpr::Contains(a, b)
             | ValueExpr::TextIndex(a, b, _)
             | ValueExpr::Kitten4Add(a, b)
+            | ValueExpr::Kitten4Arithmetic(a, b, _)
             | ValueExpr::Split(a, b)
             | ValueExpr::ParseInt(a, b)
             | ValueExpr::Compare(a, b, _)
@@ -8129,6 +8185,11 @@ impl Engine {
         }
         // Only strings/list references are cloned; numeric expressions stay unboxed.
         match self.program.values[i] {
+            ValueExpr::Kitten4Arithmetic(a, b, op) => {
+                let a = self.eval_value(a, actor);
+                let b = self.eval_value(b, actor);
+                Cell::Number(k4decimal::cells(op, &a, &b))
+            }
             ValueExpr::Kitten4Add(a, b) => {
                 // Offline player's math_arithmetic uses JS + whenever
                 // either operand is not a number (see docs/kitten4-run-errors.md).
@@ -8147,7 +8208,11 @@ impl Engine {
                 } else {
                     #[cfg(feature = "interp-profile")]
                     let _profile = interp_profile::span("add_scalar", &());
-                    Cell::Number(a.number() + b.number())
+                    Cell::Number(if let (Cell::Number(a), Cell::Number(b)) = (&a, &b) {
+                        k4decimal::apply(k4decimal::Operation::Add, *a, *b)
+                    } else {
+                        a.number() + b.number()
+                    })
                 }
             }
             ValueExpr::Whole(input) => {
@@ -8892,26 +8957,21 @@ impl Engine {
                         .clone()
                         .unwrap_or(Cell::Number(self.tasks[index].locals[i])),
                 };
-                if !matches!(
-                    previous,
-                    Cell::List(_) | Cell::Costume(_) | Cell::Midi(_) | Cell::Null
-                ) && self.value_error.is_none()
+                if self.value_error.is_none()
+                    && let Some(result) = k4decimal::change(&previous, &value, decrease)
                 {
-                    let result = if !decrease
-                        && (matches!(previous, Cell::Text(_))
-                            || matches!(
-                                value,
-                                Cell::Text(_) | Cell::List(_) | Cell::Costume(_) | Cell::Midi(_)
-                            )) {
-                        Cell::concat(&previous, &value)
-                    } else {
-                        Cell::Number(if decrease {
-                            previous.number() - value.number()
-                        } else {
-                            previous.number() + value.number()
-                        })
-                    };
                     self.assign(target, result);
+                }
+            }
+            Op::Kitten4ChangeActor(slot, value, decrease) => {
+                let value = self.eval_value(value, actor);
+                if self.value_error.is_none() {
+                    let previous = self.read_actor_variable(actor, slot);
+                    if self.value_error.is_none()
+                        && let Some(result) = k4decimal::change(&previous, &value, decrease)
+                    {
+                        self.write_actor_variable(actor, slot, result);
+                    }
                 }
             }
             Op::WarpIteration => {
