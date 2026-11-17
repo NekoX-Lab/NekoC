@@ -14,6 +14,22 @@ works with nested and recursive calls using share-player-supported blocks.
 Actual result overflow can still produce Infinity. Infinity/NaN input combinations
 and bit-identical V8 compensated summation remain outside the documented guarantee.
 
+## Numeric helpers
+
+`Math.max` / `Math.min` accept one or more numeric arguments, save each once in
+left-to-right order, and propagate numeric NaN in any position. Arguments after
+NaN still run, including side effects. Single arguments, ±Infinity, numeric
+function parameters/results and nested/recursive calls are supported.
+`Math.trunc` preserves NaN and ±Infinity and truncates finite fractions toward zero.
+`Number.isInteger` additionally guarantees false for numeric NaN and ±Infinity;
+finite integers return true and fractions return false. Statically string/boolean
+arguments return false while preserving their evaluation. Dynamic mixed types,
+arbitrary any/text coercion, and signed-zero behavior are outside these guarantees.
+
+NaN detection uses the saved numeric value's verified `String(number)` spelling
+([official conversion evidence](kn-conversion-evidence.json)), then returns that
+original number. It does not rely on Kitten N NaN equality or produce text `"NaN"`.
+
 ## TypeScript classes
 
 Class declarations, fields, constructors (including parameter properties), `new`,
