@@ -876,16 +876,29 @@ class WorkspaceCompiler {
     if (this.target.name === "kitten4") return;
     const indices = new Map([["onStart", 0], ["onClick", 0], ["onKey", -1],
       ["onMessage", -1], ["when", 1], ["onBumpActor", 3]]);
+    const collectLocals = (body, owner) => visitInvocationBody(body, node => {
+      if (!ts.isVariableDeclaration(node)) return;
+      const collectName = name => {
+        if (ts.isIdentifier(name)) this.eventLocalOwners.set(name.text, owner);
+        else if (ts.isArrayBindingPattern(name)) for (const element of name.elements) {
+          if (ts.isBindingElement(element)) collectName(element.name);
+        }
+      };
+      collectName(node.name);
+    });
     const visit = node => {
       if (ts.isCallExpression(node)) {
         const index = indices.get(calleeName(node.expression).split(".").at(-1));
         const callback = index === -1 ? node.arguments.at(-1) : node.arguments[index];
         if (index !== undefined && callback && isCallbackBody(callback)) {
           // Root start hats cannot re-enter during a run (restart cancels old
-          // tasks); sprite start hats also run for clones. Hats without lexical
-          // or inline locals need no mutable invocation storage.
+          // tasks); sprite start hats also run for clones. Lexical locals and
+          // lowering-generated control state both need invocation storage.
           const needsFrame = (body, seen = new Set()) => {
-            if (ts.isVariableDeclaration(body)) return true;
+            // Lowering allocates invocation state even without source locals.
+            if (ts.isVariableDeclaration(body) || ts.isSwitchStatement(body) || ts.isTryStatement(body)
+              || ts.isBreakStatement(body) || ts.isContinueStatement(body) || ts.isLabeledStatement(body)
+              || ts.isForOfStatement(body) || ts.isForInStatement(body)) return true;
             if (ts.isCallExpression(body)) {
               const name = calleeName(body.expression);
               // A synchronous warp finishes all of its lexical locals before
@@ -931,22 +944,7 @@ class WorkspaceCompiler {
             optional: [], arrayParams: [], budgetEligible: false };
           this.eventFunctions.set(callback, fn);
           this.inlineFunctions.set(name, fn);
-          // Inline loop/warp bodies belong to the event too.
-          const collectInline = child => {
-            if (ts.isFunctionLike(child)) {
-              const call = child.parent;
-              if (!call || !ts.isCallExpression(call) || !["warp", "forever", "repeatTimes", "repeatUntil", "forRange", "ifThen", "ifElse"].includes(calleeName(call.expression))) return;
-            }
-            if (ts.isVariableDeclaration(child)) {
-              const names = name => {
-                if (ts.isIdentifier(name)) this.eventLocalOwners.set(name.text, fn.name);
-                else if (ts.isArrayBindingPattern(name)) for (const e of name.elements) if (ts.isBindingElement(e)) names(e.name);
-              };
-              names(child.name);
-            }
-            ts.forEachChild(child, collectInline);
-          };
-          collectInline(body);
+          collectLocals(body, fn.name);
         }
       }
       ts.forEachChild(node, visit);
@@ -959,19 +957,13 @@ class WorkspaceCompiler {
       if (!this.helperSourceOrigins.get(fn.name)?.callback) continue;
       fn.event = true;
       fn.statementEvent = fn.name.startsWith("__timerCallback");
-      visitFunctionBody(fn.body, node => {
-        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) this.eventLocalOwners.set(node.name.text, fn.name);
-      });
+      collectLocals(fn.body, fn.name);
     }
     const calls = new Map();
     for (const fn of this.inlineFunctions.values()) {
       fn.capturedEvents = new Set();
       const edges = new Set();
       const scan = (node, parent) => {
-        if (ts.isFunctionLike(node)) {
-          const call = node.parent;
-          if (!call || !ts.isCallExpression(call) || !["warp", "forever", "repeatTimes", "repeatUntil", "forRange", "ifThen", "ifElse"].includes(calleeName(call.expression))) return;
-        }
         if (ts.isIdentifier(node) && isRuntimeReference(node, parent)) {
           const owner = this.eventLocalOwners.get(node.text);
           if (owner && owner !== fn.name) fn.capturedEvents.add(owner);
@@ -981,9 +973,8 @@ class WorkspaceCompiler {
           const name = helper?.name ?? calleeName(node.expression);
           if (this.inlineFunctions.has(name)) edges.add(name);
         }
-        ts.forEachChild(node, child => scan(child, node));
       };
-      scan(fn.body);
+      visitInvocationBody(fn.body, node => scan(node, node.parent));
       calls.set(fn.name, edges);
     }
     for (let changed = true; changed;) {
@@ -1261,6 +1252,11 @@ class WorkspaceCompiler {
             activeName = frameName;
             let slot = slots.get(block.fields?.variable);
             const owner = this.eventLocalOwners.get(block.fields?.variable);
+            if (owner && owner !== fn.name && !slots.has(block.fields.variable)
+              && ["variables_get", "variables_set", "change_variables"].includes(block.type)
+              && !fn.capturedEvents?.has(owner)) {
+              this.unsupported(fn.body, "Invocation-local access is missing its captured frame; pass explicit values instead");
+            }
             if (!slot && fn.capturedEvents?.has(owner)) {
               slot = this.eventSlots.get(owner)?.get(block.fields.variable);
               activeParameter = procedureParamIds({ params }).get(`__eventFrame_${owner}`);
@@ -7261,6 +7257,22 @@ function visitFunctionBody(body, visit) {
   };
   if (ts.isBlock(body)) ts.forEachChild(body, walk);
   else walk(body);
+}
+
+// These callbacks lower into the current invocation; array/timer callbacks and
+// real functions own separate invocations. Use one boundary rule for owners and
+// capture dependencies so nested synchronous captures cannot fall back to globals.
+function visitInvocationBody(body, visit) {
+  const walk = node => {
+    if (ts.isFunctionLike(node)) {
+      const call = node.parent;
+      if (!call || !ts.isCallExpression(call)
+        || !["warp", "forever", "repeatTimes", "repeatUntil", "forRange", "ifThen", "ifElse"].includes(calleeName(call.expression))) return;
+    }
+    visit(node);
+    ts.forEachChild(node, walk);
+  };
+  walk(body);
 }
 
 function sanitizeIdPart(value) {

@@ -772,6 +772,8 @@ does nothing and that enclosing continuation still runs; on a clone deletion
 cancels that clone's tasks. This physical socket rule does not make deletion
 equivalent to a function return. `nekoc check` reports
 `terminal_block_has_next` for existing works with either known illegal edge.
+The `NORMAL` form of `procedures_2_return_value` also has no next socket;
+event returns end the current path before loop increment/condition handling.
 
 ### `cloneCount(sprite)`
 

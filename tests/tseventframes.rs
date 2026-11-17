@@ -107,6 +107,42 @@ fn overlapping_event_locals_survive_wait_in_interpreter_and_jit() {
             ],
         ),
         ("stop", vec!["2"]),
+        (
+            "flow",
+            vec![
+                "switch two",
+                "switch one",
+                "try two",
+                "try one",
+                "loop done 2",
+                "loop one",
+                "loop done 1",
+                "continue done 2",
+                "continue done 1",
+            ],
+        ),
+        (
+            "nested",
+            vec![
+                "warp 9",
+                "repeat hello 2",
+                "if 9",
+                "array 10",
+                "destructure 12",
+                "event-array 10",
+            ],
+        ),
+        (
+            "return-loops",
+            vec![
+                "for 7",
+                "do 8",
+                "conditional 1",
+                "do-continue 2",
+                "fallthrough 1",
+                "fallthrough done",
+            ],
+        ),
     ] {
         if !["inline", "clones"].contains(&name) {
             let oracle = Command::new("node")

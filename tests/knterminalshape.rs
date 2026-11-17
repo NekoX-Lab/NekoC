@@ -22,9 +22,9 @@ fn advance(engine: &mut Engine, frames: usize) -> Vec<String> {
 
 #[test]
 fn knterminalshape_checks_and_assembles_only_legal_next_sockets() {
-    for terminal in ["dispose_clone", "restart"] {
+    for terminal in ["dispose_clone", "restart", "procedures_2_return_value"] {
         let workspace = json!({"blocks": {
-            "end":{"id":"end", "type":terminal},
+            "end":{"id":"end", "type":terminal, "mutation":"<mutation type=\"NORMAL\" items=\"0\"></mutation>"},
             "after":{"id":"after", "type":"console_log", "parent_id":"end"}
         }, "connections":{"end":{"after":{"type":"next"}}}});
         let error = workspace_data_to_neko_blocks(&workspace).unwrap_err();
@@ -35,7 +35,7 @@ fn knterminalshape_checks_and_assembles_only_legal_next_sockets() {
             ("procedures", "proceduresDict", "procedure"),
         ] {
             for container in ["next", "inputs", "statements"] {
-                let end = json!({"id":"end", "type":terminal, "parent_id":"outer", "next":{
+                let end = json!({"id":"end", "type":terminal, "mutation":"<mutation type=\"NORMAL\" items=\"0\"></mutation>", "parent_id":"outer", "next":{
                     "id":"after", "type":"console_log", "parent_id":"end"}});
                 let mut outer = json!({"id":"outer", "type":"controls_if"});
                 if container == "next" {

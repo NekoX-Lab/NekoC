@@ -34,14 +34,21 @@ export function eventOracle(name) {
   }).outputText;
   transform.dispose();
   const logs = [], handlers = new Map(), starts = [], pending = [], variables = new Map();
-  let now = 0, order = 0;
-  const enqueue = (iterator, delay = 0) => pending.push({ iterator, at: now + Math.max(delay, 1 / 60), order: order++ });
+  let now = 0, order = 0, received = new Map();
+  const enqueue = (iterator, delay = 0, values = received) => pending.push({ iterator, values, at: now + Math.max(delay, 1 / 60), order: order++ });
   const stopped = {};
   vm.runInNewContext(javascript, {
     console: { log: (...args) => logs.push(args.map(String).join(" ")) },
     onStart: callback => starts.push(callback),
-    onMessage: (name, callback) => handlers.set(name, callback),
-    broadcast: name => enqueue(handlers.get(name)()),
+    onMessage: (name, param, callback) => handlers.set(name, { param, callback: callback ?? param }),
+    broadcast: (name, value) => {
+      const handler = handlers.get(name);
+      enqueue(handler.callback(), 0, new Map([[handler.param, value]]));
+    },
+    messageValue: name => received.get(name),
+    warp: callback => callback(),
+    repeatTimes: (count, callback) => { for (let i = 0; i < count; i++) callback(); },
+    ifThen: (condition, callback) => { if (condition) callback(); },
     setTimeout: (callback, ms) => enqueue(callback(), ms / 1000),
     setInterval: (callback, ms) => enqueue(callback(), ms / 1000),
     setVar: (key, value) => variables.set(key, value),
@@ -54,6 +61,7 @@ export function eventOracle(name) {
     pending.sort((a, b) => a.at - b.at || a.order - b.order);
     const next = pending.shift();
     now = next.at;
+    received = next.values;
     try {
       const result = next.iterator.next();
       if (!result.done) enqueue(next.iterator, result.value);

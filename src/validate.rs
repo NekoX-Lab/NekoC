@@ -9,6 +9,13 @@ pub(crate) fn has_no_next_socket(block_type: &str) -> bool {
     matches!(block_type, "dispose_clone" | "restart")
 }
 
+pub(crate) fn block_has_no_next_socket(block: &Value) -> bool {
+    has_no_next_socket(block["type"].as_str().unwrap_or_default())
+        || block["type"] == "procedures_2_return_value"
+            && crate::runtime::helpers::attr_value(block["mutation"].as_str().unwrap_or(""), "type")
+                == Some("NORMAL")
+}
+
 pub fn build_report(value: &Value) -> Result<Value> {
     if !value.is_object() {
         bail!("project root must be a JSON object");
@@ -406,7 +413,7 @@ fn validate_next_sockets(kind: &str, owner_id: &str, owner: &Value, issues: &mut
         .collect();
     while let Some(block) = pending.pop() {
         if let Some(next) = block.get("next").filter(|next| !next.is_null()) {
-            if has_no_next_socket(block["type"].as_str().unwrap_or_default()) {
+            if block_has_no_next_socket(block) {
                 issues.push(json!({
                     "kind": "terminal_block_has_next",
                     "owner_kind": kind,

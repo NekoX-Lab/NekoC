@@ -50,7 +50,7 @@ test("tseventframes: generated broadcast/timer/clone paths pass structure, param
   const dir = path.resolve("dist/tseventframes");
   mkdirSync(dir, { recursive: true });
   const bin = path.resolve("target/debug", process.platform === "win32" ? "nekoc.exe" : "nekoc");
-  for (const name of ["broadcast", "complex", "timers", "intervals", "inline", "clones", "stop"]) {
+  for (const name of ["broadcast", "complex", "timers", "intervals", "inline", "clones", "stop", "flow", "nested", "return-loops"]) {
     for (const optimize of [false, true]) {
       const input = `tests/fixtures/tseventframes-${name}.ts`;
       const output = path.join(dir, `${name}-${optimize}.bcmkn`);
@@ -66,6 +66,7 @@ test("tseventframes: generated broadcast/timer/clone paths pass structure, param
           if (!node || typeof node !== "object") return;
           if (node.type === "procedures_2_parameter") assert.ok(params.has(/id="([^"]+)"/.exec(node.mutation)?.[1]));
           if (node.type === "procedures_2_stable_parameter") assert.ok(params.has(node.id));
+          if (node.type === "procedures_2_return_value") assert.ok(!node.next, `return has next: ${node.id}`);
           Object.values(node).forEach(walk);
         };
         walk(procedure.nekoBlockJsonList);
