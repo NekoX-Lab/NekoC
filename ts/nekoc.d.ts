@@ -169,6 +169,7 @@ interface NekoSpriteSelf {
   glideChangeY(delta: NekoValue): void;
   turn(degrees: NekoValue): void;
   pointTowards(degrees: NekoValue): void;
+  /** Current-scene unique actor name/ID; --self turns the executing instance, including clones. */
   rotateAround(target: string, degrees: NekoValue): void;
   faceTo(target: string): void;
   setFaceTo(target: string): void;
@@ -316,6 +317,7 @@ declare function onMessage(message: string, body: NekoStatementBody): void;
 declare function onMessage(message: string, parameter: string, body: NekoStatementBody): void;
 declare function when(condition: NekoValue, body: NekoStatementBody): void;
 declare function onBumpActor(target: string, body: NekoStatementBody): void;
+/** phase: start/move/end; target: current-scene unique actor name/ID, or definite --self. */
 declare function onBumpActor(target: string, self: string, actor: string, body: NekoStatementBody): void;
 
 declare function test(name: string, body: NekoTestBody): void;
@@ -491,6 +493,7 @@ declare function move(steps: NekoValue): void;
 declare function glideTo(x: NekoValue, y: NekoValue, seconds?: NekoValue): void;
 declare function glideChangeX(delta: NekoValue, seconds?: NekoValue): void;
 declare function glideChangeY(delta: NekoValue, seconds?: NekoValue): void;
+/** Current-scene unique actor name/ID; --self turns the executing instance, including clones. */
 declare function rotateAround(target: string, degrees: NekoValue): void;
 declare function contains(text: NekoValue, part: NekoValue): boolean;
 declare function length(text: NekoValue): number;
