@@ -2762,6 +2762,8 @@ dependencies = [
  "image",
  "notify",
  "notify-debouncer-mini",
+ "num-bigint",
+ "num-traits",
  "percent-encoding",
  "predicates",
  "rapier2d-f64",
