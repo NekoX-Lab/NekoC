@@ -153,8 +153,19 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
 - Statement calls to `push`, `unshift` and `splice` evaluate the receiver once,
   then every argument once from left to right, before changing the list. Saved
   references and values are invocation-local, including recursive argument calls.
-  `splice` retains the existing nonnegative-start subset; this does not add sparse
-  arrays or general JavaScript boundary/coercion semantics.
+  Statement `splice` reads length after all arguments and fixes the insertion
+  position before mutation. Numeric start/deleteCount truncate toward zero and
+  clamp to the original remaining range; negative starts count from the end,
+  NaN means zero, infinities use the respective boundary, and negative deleteCount
+  means zero. Omitted deleteCount deletes to the end; no arguments is a no-op.
+  Multiple inserted references retain their order and identity. Non-numeric or
+  explicit undefined bounds are diagnosed with conversion/omission hints.
+  Numeric type parameter constraints (including constraint chains such as
+  `T extends number, U extends T`) and numeric intersections such as
+  `number & { readonly brand?: "index" }` are accepted for start and deleteCount,
+  both directly and through generic constraints;
+  unconstrained or mixed number/string parameters still require narrowing.
+  This does not add the deleted-items return value, sparse arrays or coercion.
 - Array `includes`, `indexOf` and `lastIndexOf` accept a numeric `fromIndex`.
   Fractions truncate toward zero, negatives count from the end, NaN starts at
   zero, and out-of-range starts follow each method's direction. Omitted
