@@ -2228,6 +2228,7 @@ class WorkspaceCompiler {
     const entryId = this.addBlock({
       type: "on_bump_actor",
       parent_id: null,
+      _nekocTargetSource: nodeLocation(call),
       fields: {
         type: stringLiteralValue(call.arguments[0], this),
         sprite: stringLiteralValue(call.arguments[1], this),
@@ -4266,6 +4267,7 @@ class WorkspaceCompiler {
     const id = this.addBlock({
       type: "self_rotate_around",
       parent_id: parentId,
+      _nekocTargetSource: nodeLocation(call),
       fields: { sprite: stringLiteralValue(call.arguments[0], this) },
     });
     const degreesId = this.compileExpression(call.arguments[1], id);

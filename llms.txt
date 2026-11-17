@@ -86,7 +86,18 @@ onStart(() => {
 
 ## Events
 
-`onStart(body)`, `onClick(body)` (sprite clicked), `onKey(key, state?, body)` (`"space"`, `"up"`, `"a"`…; state `"down"`/`"up"`), `onMessage(message, body)`, `when(condition, body)`, `onBumpActor(target, body)`.
+`onStart(body)`, `onClick(body)` (sprite clicked), `onKey(key, state?, body)` (`"space"`, `"up"`, `"a"`…; state `"down"`/`"up"`), `onMessage(message, body)`, `when(condition, body)`, `onBumpActor(phase, target, actor, body)` (phase `"start"`/`"move"`/`"end"`; actor names the contact reporter).
+
+Kitten N `rotateAround(target, degrees)` (also `self.rotateAround`) and
+`onBumpActor` targets are current-scene actor IDs or unique names, resolved after
+allocation. For rotateAround, `"--self"` lowers to a current-instance turn
+(position unchanged, angle evaluated once), including clones and shared procedures.
+For onBumpActor, self resolves to the definite actor prototype ID. Global procedure
+dropdowns must be selectable in every editor scene as well as all runtime callers;
+move nonpersistent target actions into sprite events or inline functions. Unknown/ambiguous or
+cross-scene targets, scene IDs, mouse/random/edge are diagnosed with source
+locations. Other sprite-field APIs have different menus; do not generalize this
+rule to sensing or tell. `check` on an existing work requires persisted actor IDs.
 
 Kitten N reentrant event and timer callbacks have per-invocation list frames: local bindings survive `wait`, including nested loops, inline functions and synchronous array callbacks capturing event locals. Sprite/clone invocations are independent. Top-level variables and named-variable APIs remain shared. Arrays/objects retain reference identity; their contents are not deep-copied. Restart cancels old tasks. Escaping closures which capture outer locals across scheduling are compile errors with a source location.
 
