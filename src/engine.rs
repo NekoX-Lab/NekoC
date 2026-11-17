@@ -1266,7 +1266,9 @@ impl Program {
                     compiler.actor_variables.insert(id.clone(), slot);
                     continue;
                 }
-                if var["type"] == "list" {
+                // KN `private_list` is LocalList: a device-local list, not an online
+                // one (docs/tower-defense-cloud.md). A fresh run starts from its value.
+                if var["type"] == "list" || var["type"] == "private_list" {
                     let items = value
                         .as_array()
                         .with_context(|| format!("list {id}: expected array"))?;
@@ -2114,6 +2116,10 @@ impl Compiler {
             "logic_boolean" => {
                 self.constant(Cell::Bool(field(b, "BOOL").eq_ignore_ascii_case("true")))
             }
+            // Boolean return-value shadow of a custom block (true/false dropdown).
+            "procedure_boolean" => {
+                self.constant(Cell::Bool(field(b, "VALUE").eq_ignore_ascii_case("true")))
+            }
             "mouse_down" if self.program.semantics == RuntimeSemantics::KnCurrent => {
                 let expression = self.expr(b)?;
                 let value = self.program.values.len();
@@ -2339,7 +2345,7 @@ impl Compiler {
                     .get("op")
                     .or_else(|| b["fields"].get("time"))
                     .and_then(Value::as_str)
-                    == Some("week") =>
+                    .is_some_and(|unit| matches!(unit, "week" | "weekday")) =>
             {
                 ValueExpr::WeekText
             }
@@ -2713,8 +2719,10 @@ impl Compiler {
     }
     fn expression_one(&mut self, b: &Value, _depth: usize) -> Result<()> {
         let kind = b["type"].as_str().unwrap_or("");
-        // Slider/dial/servo number shadows carry the same NUM field.
-        let kind = if kind.starts_with("math_number_with_") || kind == "math_number_not_allow_text"
+        // Slider/dial/servo number shadows carry the same NUM field. The pen size
+        // shadow `color_size_slider` is one of them (official self_set_pen_size).
+        let kind = if kind.starts_with("math_number_with_")
+            || matches!(kind, "math_number_not_allow_text" | "color_size_slider")
         {
             "math_number"
         } else {
@@ -2792,6 +2800,9 @@ impl Compiler {
             }
             "logic_boolean" => {
                 ExprOp::Constant(field(b, "BOOL").eq_ignore_ascii_case("true") as u8 as f64)
+            }
+            "procedure_boolean" => {
+                ExprOp::Constant(field(b, "VALUE").eq_ignore_ascii_case("true") as u8 as f64)
             }
             "variables_get" => {
                 if self.actor_variables.contains_key(field(b, "variable")) {
@@ -3023,6 +3034,13 @@ impl Compiler {
                         "bottom" | "down" => 2,
                         "left" => 3,
                         "right" => 4,
+                        // Official KN dropdown values: 0 all, 1 left, 2 top,
+                        // 3 bottom, 4 right (main.8ccf2442.js out_of_boundary).
+                        "0" => 0,
+                        "2" => 1,
+                        "3" => 2,
+                        "1" => 3,
+                        "4" => 4,
                         other => bail!("unknown boundary {other} at {}", b["id"]),
                     },
                 )
@@ -3057,7 +3075,9 @@ impl Compiler {
                     "year" => 0,
                     "month" => 1,
                     "date" | "day" => 2,
-                    "week" => return self.expression_value(b),
+                    // KN names the K4 week/week_num options weekday/weekday_num.
+                    "week" | "weekday" => return self.expression_value(b),
+                    "weekday_num" => 3,
                     "week_num" => 4,
                     "hour" => 5,
                     "minute" => 6,
@@ -3340,14 +3360,11 @@ impl Compiler {
                     ScriptEvent::Pointer(target, state.into())
                 }
                 // Official KN leaves disconnected statement stacks dormant.
-                // Keep this explicit and provenance-scoped: unknown event hats
-                // and unsupported blocks inside executable bodies still fail.
-                "mirror"
-                | "procedures_2_callnoreturn"
-                | "wait_until"
-                | "self_gradually_show_hide"
-                | "set_scale"
-                    if self.program.semantics == RuntimeSemantics::KnCurrent =>
+                // Only event hats start scripts, so any other root never runs.
+                // Unknown hat-shaped roots and unsupported blocks inside executable
+                // bodies still fail.
+                _ if self.program.semantics == RuntimeSemantics::KnCurrent
+                    && !kn_hat_like(kind) =>
                 {
                     continue;
                 }
@@ -4005,7 +4022,7 @@ impl Compiler {
                     ),
                     "self_set_position" => {
                         let value = self.arg(b, "value")?;
-                        match field(b, "coordinary") {
+                        match coordinate_axis(b) {
                             "x" => Op::X(value),
                             "y" => Op::Y(value),
                             other => bail!("unknown coordinate {other} at {}", b["id"]),
@@ -4013,7 +4030,7 @@ impl Compiler {
                     }
                     "self_change_coordinate" => {
                         let value = self.signed_arg(b, &["value"])?;
-                        match field(b, "coordinary") {
+                        match coordinate_axis(b) {
                             "x" => Op::AddX(value),
                             "y" => Op::AddY(value),
                             other => bail!("unknown coordinate {other} at {}", b["id"]),
@@ -4040,7 +4057,7 @@ impl Compiler {
                             let axis = match kind {
                                 "self_glide_coordinate_x" => "x",
                                 "self_glide_coordinate_y" => "y",
-                                _ => field(b, "coordinary"),
+                                _ => coordinate_axis(b),
                             };
                             let value = self.signed_arg(b, &["value"])?;
                             match axis {
@@ -4781,6 +4798,28 @@ impl Compiler {
         }
         Ok(())
     }
+}
+
+/// Axis dropdown of the set/change/glide coordinate blocks: K4 lowering writes
+/// `coordinary`, official KN projects store `coordinate`.
+fn coordinate_axis(b: &Value) -> &str {
+    match field(b, "coordinary") {
+        "" => field(b, "coordinate"),
+        axis => axis,
+    }
+}
+
+/// Event-hat naming in the KN catalog (`on_*`, `*_when`, `when`, `self_listen*`,
+/// `start_*`, procedure definitions). A root with such a name that `scripts` does not
+/// dispatch is an unknown event, not a dormant stack.
+fn kn_hat_like(kind: &str) -> bool {
+    kind.starts_with("on_")
+        || kind.starts_with("when")
+        || kind.ends_with("_when")
+        || kind.contains("listen")
+        || kind.starts_with("start_")
+        || kind.starts_with("procedures_2_def")
+        || kind.ends_with("_hat")
 }
 
 fn json_proxy(index: usize) -> Value {
@@ -10297,7 +10336,8 @@ pub fn encode_frame(frame: &Frame) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-/// [year, month, date, -, weekday (Sunday 0), hour, minute, second] in local time.
+/// [year, month, date, KN weekday (Sunday 7), weekday (Sunday 0), hour, minute, second]
+/// in local time.
 fn wall_time() -> f64 {
     web_time::SystemTime::now()
         .duration_since(web_time::UNIX_EPOCH)
@@ -10323,7 +10363,8 @@ fn local_time(now: f64, offset_min: f64) -> [f64; 8] {
         year as f64,
         month as f64,
         day as f64,
-        0.0,
+        // Official KN get_time weekday_num: `getDay() || 7`.
+        if weekday == 0 { 7.0 } else { weekday as f64 },
         weekday as f64,
         (secs / 3600) as f64,
         (secs / 60 % 60) as f64,
@@ -10680,6 +10721,18 @@ mod pivot_tests {
         });
         let program = Program::compile(&p).unwrap();
         assert_eq!(program.costumes["nekoc-costume"].center_point, [10.0, 6.0]);
+    }
+}
+
+#[cfg(test)]
+mod local_time_tests {
+    use super::local_time;
+
+    #[test]
+    fn kn_weekday_number_counts_sunday_as_seven() {
+        // 2000-01-01 is a Saturday, 2000-01-02 a Sunday (UTC).
+        assert_eq!(local_time(946_684_800.0, 0.0)[3..5], [6.0, 6.0]);
+        assert_eq!(local_time(946_771_200.0, 0.0)[3..5], [7.0, 0.0]);
     }
 }
 
