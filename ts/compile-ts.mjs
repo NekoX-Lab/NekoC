@@ -1522,32 +1522,58 @@ class WorkspaceCompiler {
 
   compileFunctionProcedureCall(call, parentId, asExpression) {
     const { fn, spec, returnsValue } = this.functionProcedures.get(calleeName(call.expression));
-    const args = this.functionArguments(fn, call);
     if (asExpression && !returnsValue) {
       this.unsupported(call, `Function ${spec.name} does not return a value`);
     }
-    if (!asExpression && returnsValue) {
-      // Value discarded: store it in a scratch variable.
-      const id = this.addBlock({ type: "variables_set", parent_id: parentId, fields: { variable: "__discard" } });
-      this.globalVariables.add("__discard");
-      this.connectInput(id, this.compileProcedureCallArgs(spec, args, id, true), "value", "value");
-      return id;
-    }
-    return this.compileProcedureCallArgs(spec, args, parentId, asExpression);
+    return this.withFunctionArguments(fn, call, parentId, asExpression, (args, parentId) => {
+      if (!asExpression && returnsValue) {
+        // Value discarded: store it in a scratch variable.
+        const id = this.addBlock({ type: "variables_set", parent_id: parentId, fields: { variable: "__discard" } });
+        this.globalVariables.add("__discard");
+        this.connectInput(id, this.compileProcedureCallArgs(spec, args, id, true), "value", "value");
+        return id;
+      }
+      return this.compileProcedureCallArgs(spec, args, parentId, asExpression);
+    });
   }
 
-  // Call arguments with defaults filled in for omitted trailing parameters.
-  // A non-constant default is expanded as an argument at the call site, where
-  // the call lowering evaluates it exactly once, in argument order. That is
-  // only the JS meaning when its names mean the same thing there: it must not
-  // read any formal (no substitution of caller expressions) and every free
+  // Defaults run only after every explicit argument has been frozen. Keep
+  // literals as ASTs for DSL resource/name sockets, and store other values in
+  // invocation-local procedure parameters (never shared scratch variables).
+  withFunctionArguments(fn, call, parentId, asExpression, compile) {
+    const args = this.functionArguments(fn, call);
+    const runtimeDefault = args.some((arg, i) => arg !== call.arguments[i] && !isConstantDefault(arg));
+    if (!runtimeDefault) return compile(args, parentId);
+    const indices = [];
+    const inputs = [];
+    call.arguments.forEach((arg, i) => {
+      if (args[i] !== arg) return; // omitted/explicit undefined: no evaluation
+      const constant = this.inlineConstantExpression(arg);
+      if (constant) args[i] = constant;
+      else { indices.push(i); inputs.push(arg); }
+    });
+    const finish = (values, parent) => {
+      indices.forEach((index, i) => { args[index] = values[i]; });
+      return compile(args, parent);
+    };
+    if (!inputs.length) return finish([], parentId);
+    if (!asExpression) return evaluatedStatement(this, inputs, parentId, finish);
+    return evaluatedChoice(this, inputs, parentId, (values, definition) => {
+      const ret = this.addReturnValueBlock(definition);
+      this.connectInput(ret, finish(values, ret), "VALUE", "value");
+      return ret;
+    });
+  }
+
+  // A call-site default must have the same bindings as at its definition:
+  // it must not read any formal (no substitution of caller expressions); every free
   // name must resolve to the same file-level binding at the definition and
   // at the call.
   isCallerSafeDefault(fn, index, call) {
     const value = fn.defaults[index];
     if (fn.params.some(param => runtimeContainsIdentifier(value, param))) return false;
     const file = value.pos >= 0 ? value.getSourceFile() : undefined;
-    if (!file || call.pos < 0 || call.getSourceFile() !== file) return false;
+    if (!file || call.pos < 0) return false;
     const names = new Set();
     const visit = node => {
       if (ts.isIdentifier(node)) names.add(node.text);
@@ -1560,6 +1586,12 @@ class WorkspaceCompiler {
     if (names.has("\0function")) return false;
     for (const name of names) {
       if (this.lookupExpressionBinding(name) || this.functionParams?.has(name)) return false;
+      if (call.getSourceFile() !== file) {
+        // Imported functions are registered with their defining AST. Only use
+        // those proven bindings across files; module variables are not globals.
+        const target = this.inlineFunctions.get(name);
+        if (!target || functionSourceFile(target) !== file) return false;
+      }
     }
     const definition = value.parent?.parent;
     const shadowed = (start, skip) => {
@@ -2653,7 +2685,12 @@ class WorkspaceCompiler {
 
   compileInlineStatementFunction(call, parentId, name) {
     const fn = this.inlineFunctions.get(name);
-    const args = this.functionArguments(fn, call);
+    return this.withFunctionArguments(fn, call, parentId, false, (args, parentId) =>
+      this.compileInlineStatementArguments(call, parentId, name, args));
+  }
+
+  compileInlineStatementArguments(call, parentId, name, args) {
+    const fn = this.inlineFunctions.get(name);
     const bindings = new Map();
     const body = parent => {
       if (this.inlineCallStack.includes(name)) this.unsupported(call, `Recursive inline function calls are not supported: ${name}`);
@@ -2677,10 +2714,10 @@ class WorkspaceCompiler {
       const constant = this.inlineConstantExpression(expression);
       if (constant) {
         bindings.set(fn.params[index], constant);
-      } else if (this.isArrayExpression(expression)) {
-        // Arrays are passed by reference: alias the caller's list instead of
-        // copying a value, and resolve the name in the caller scope so a
-        // same-name parameter cannot bind to itself.
+      } else if (this.isArrayExpression(expression) && expression === call.arguments[index]) {
+        // Preserve the legacy direct-argument alias for DSL wrappers. Defaults
+        // and already-frozen arguments must instead be evaluated in order below;
+        // storing a list in a procedure parameter keeps the same reference.
         bindings.set(fn.params[index], expression);
         bindings.callerScope.add(fn.params[index]);
       } else {
@@ -4888,6 +4925,12 @@ class WorkspaceCompiler {
 
   compileInlineExpressionFunction(call, parentId, name) {
     const fn = this.inlineFunctions.get(name);
+    return this.withFunctionArguments(fn, call, parentId, true, (args, parentId) =>
+      this.compileInlineExpressionArguments(call, parentId, name, args));
+  }
+
+  compileInlineExpressionArguments(call, parentId, name, args) {
+    const fn = this.inlineFunctions.get(name);
     const inspecting = new Set();
     const hasEvaluation = node => {
       if (ts.isCallExpression(node)) {
@@ -4907,8 +4950,8 @@ class WorkspaceCompiler {
       ts.forEachChild(node, child => { found ||= hasEvaluation(child); });
       return found;
     };
-    if (this.functionArguments(fn, call).some(hasEvaluation) || hasEvaluation(fn.body)) {
-      return this.compileEvaluatedInlineExpression(call, parentId, name);
+    if (args.some((arg, i) => hasEvaluation(arg) || arg !== call.arguments[i] && !isConstantDefault(arg)) || hasEvaluation(fn.body)) {
+      return this.compileEvaluatedInlineExpression(call, parentId, name, args);
     }
     return this.withInlineFunctionCall(call, name, () => {
       const fn = this.inlineFunctions.get(name);
@@ -4917,12 +4960,11 @@ class WorkspaceCompiler {
       }
       const statements = Array.from(fn.body.statements).filter(statement => !this.isTypeOnlyStatement(statement));
       return this.compileInlineExpressionFunctionBlock(call, parentId, name, statements);
-    });
+    }, args);
   }
 
-  compileEvaluatedInlineExpression(call, parentId, name) {
+  compileEvaluatedInlineExpression(call, parentId, name, args) {
     const fn = this.inlineFunctions.get(name);
-    const args = this.functionArguments(fn, call);
     const bound = new Map();
     const statements = ts.isBlock(fn.body) ? Array.from(fn.body.statements) : [];
     const locals = statements.slice(0, -1).flatMap(statement => {
@@ -5047,12 +5089,11 @@ class WorkspaceCompiler {
     }
   }
 
-  withInlineFunctionCall(call, name, compile) {
+  withInlineFunctionCall(call, name, compile, args) {
     if (this.inlineCallStack.includes(name)) {
       this.unsupported(call, `Recursive inline function calls are not supported: ${name}`);
     }
     const fn = this.inlineFunctions.get(name);
-    const args = this.functionArguments(fn, call);
     // Argument ASTs are expanded under the callee's binding map. Supplied
     // formals resolve in the caller scope (withExpressionBinding), but callee
     // locals and defaulted formals share runtime names: reject those captures
@@ -5661,14 +5702,11 @@ class WorkspaceCompiler {
     switch (method) {
       case "push": case "unshift":
       case "splice": {
-        if (method === "splice" && call.arguments[0] && constantNumber(call.arguments[0]) < 0) {
-          this.unsupported(call.arguments[0], "splice with a negative start is not supported; use a nonnegative index");
-        }
         // Parameters are invocation-local, including across nested/recursive
         // argument calls and yields. Freeze the receiver before every argument.
         return evaluatedStatement(this, [target, ...call.arguments], parentId, ([list, ...args], definition) => {
-          const valueBlock = (type, value, index) => {
-            const id = this.addBlock({ type, parent_id: definition });
+          const valueBlock = (type, value, index, parent = definition) => {
+            const id = this.addBlock({ type, parent_id: parent });
             this.connectInput(id, this.compileExpression(list, id), "list", "value");
             this.connectInput(id, this.compileExpression(value, id), "list_item_value", "value");
             if (index) this.connectInput(id, this.compilePlusOne(index, id), "list_index", "value");
@@ -5677,19 +5715,34 @@ class WorkspaceCompiler {
           if (method === "push") return chainAll(args.map(value => valueBlock("list_append", value)));
           if (method === "unshift") return chainAll(args.reverse().map(value => valueBlock("list_insert_value", value, ts.factory.createNumericLiteral(0))));
           if (!args.length) return null;
-          const [start, count, ...items] = args;
-          const deletes = this.addBlock({ type: "repeat_n_times", parent_id: definition });
-          const length = () => {
-            const id = this.addBlock({ type: "list_length", parent_id: deletes, is_output: true });
-            this.connectInput(id, this.compileExpression(list, id), "list", "value");
-            return id;
-          };
-          this.connectInput(deletes, count ? this.compileExpression(count, deletes) : length(), "times", "value");
-          const del = this.addBlock({ type: "delete_list_item", parent_id: deletes, fields: { item: "any" } });
-          this.connectInput(del, this.compileExpression(list, del), "list", "value");
-          this.connectInput(del, this.compilePlusOne(start, del), "list_index", "value");
-          this.connectInput(deletes, del, "DO", "statement");
-          return chainAll([deletes, ...items.reverse().map(value => valueBlock("list_insert_value", value, start))]);
+          const [rawStart, rawCount, ...items] = args;
+          const f = ts.factory, zero = f.createNumericLiteral(0);
+          const binary = (a, op, b) => f.createBinaryExpression(a, op, b);
+          const math = (name, ...values) => f.createCallExpression(f.createPropertyAccessExpression(f.createIdentifier("Math"), name), undefined, values);
+          const numeric = value => f.createConditionalExpression(
+            binary(binary(value, ts.SyntaxKind.GreaterThanEqualsToken, zero), ts.SyntaxKind.BarBarToken,
+              binary(value, ts.SyntaxKind.LessThanToken, zero)), undefined, value, undefined, zero);
+          // Read length only after ALL arguments. Snapshot the normalized start
+          // before deleting, so every reverse insertion uses one legal position.
+          this.arrayVariables.add(list.text);
+          try {
+            return evaluatedStatement(this, [f.createPropertyAccessExpression(list, "length")], definition, ([size], sized) => {
+              const start = math("trunc", math("max", zero, math("min", size,
+                f.createConditionalExpression(binary(math("trunc", rawStart), ts.SyntaxKind.LessThanToken, zero), undefined,
+                  binary(size, ts.SyntaxKind.PlusToken, math("trunc", rawStart)), undefined, numeric(rawStart)))));
+              return evaluatedStatement(this, [start], sized, ([position], positioned) => {
+                const remaining = binary(size, ts.SyntaxKind.MinusToken, position);
+                const count = rawCount ? math("trunc", math("max", zero, math("min", remaining, numeric(rawCount)))) : remaining;
+                const deletes = this.addBlock({ type: "repeat_n_times", parent_id: positioned });
+                this.connectInput(deletes, this.compileExpression(count, deletes), "times", "value");
+                const del = this.addBlock({ type: "delete_list_item", parent_id: deletes, fields: { item: "any" } });
+                this.connectInput(del, this.compileExpression(list, del), "list", "value");
+                this.connectInput(del, this.compilePlusOne(position, del), "list_index", "value");
+                this.connectInput(deletes, del, "DO", "statement");
+                return chainAll([deletes, ...items.reverse().map(value => valueBlock("list_insert_value", value, position, positioned))]);
+              });
+            });
+          } finally { this.arrayVariables.delete(list.text); }
         });
       }
       case "reverse":
@@ -5727,10 +5780,10 @@ class WorkspaceCompiler {
       && this.expressionType?.(call.arguments[1]) !== "number") {
       this.unsupported(call.arguments[1], `Array.${method} fromIndex must be a number; omit undefined or convert the value before this call`);
     }
-    if (method === "slice") {
-      for (const arg of call.arguments) {
+    if (method === "slice" || method === "splice") {
+      for (const arg of method === "slice" ? call.arguments : call.arguments.slice(0, 2)) {
         if (this.expressionType?.(arg) !== "number") {
-          this.unsupported(arg, "Array.slice boundaries must be numbers; omit optional arguments or convert the value to a number before this call");
+          this.unsupported(arg, `Array.${method} boundaries must be numbers; omit optional arguments or convert the value to a number before this call`);
         }
       }
     }
