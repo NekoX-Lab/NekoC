@@ -39,6 +39,28 @@ interface ReadonlyArray<T> {
   at(index: number): T | undefined;
 }
 
+interface String {
+  /** String search/replacement only. Supports $$, $&, $` and $' substitutions.
+   * RegExp, callback replacers and implicit coercion are rejected by the compiler.
+   * Nullable arguments must be narrowed first, use ?? with a string fallback,
+   * or explicitly convert with String(value). Applies to replaceAll as well.
+   * Calls/writes after narrowing may invalidate nullable reads; capture a stable
+   * string first, or convert/coalesce at the argument's evaluation point.
+   * String conversion preserves nullable conditional branches; unsupported
+   * nullable logical selections require explicit if/else or a string fallback.
+   * A capture made after narrowing was invalidated must convert/coalesce at
+   * capture time; converting that inferred string later is rejected.
+   * Scalar bindings with no possible null/undefined assignment keep their
+   * narrowing across calls; property/array reads remain conservative.
+   */
+  replace(searchValue: string, replaceValue: string): string;
+  /** Nonoverlapping replacement, including empty search on constant BMP strings.
+   * A possibly empty dynamic search needs a constant BMP-only receiver; use a
+   * nonempty constant search for dynamic/astral receivers (UTF-16 model limit).
+   */
+  replaceAll(searchValue: string, replaceValue: string): string;
+}
+
 // String methods use standard ES2020 signatures. charAt/substring normalize JS
 // numeric bounds; search methods preserve optional positions and split uses a
 // uint32 limit. Receivers/arguments evaluate once in order. Omit undefined;

@@ -33,6 +33,64 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
 `Map`. Programs without null/undefined compile exactly as before. See
 [null / undefined](ts-nullable.md).
 
+## TypeScript string replacement
+
+`s.replace(search, replacement)` and `s.replaceAll(search, replacement)` accept
+exactly two string arguments. The receiver, search and replacement evaluate once,
+left to right. `replace` changes the first match; `replaceAll` scans the original
+input for nonoverlapping matches and never searches text inserted by replacement.
+Empty prefixes/suffixes and empty replacements are supported; a missing match
+returns the original string. Matching is case-sensitive and preserves numeric
+text such as `007`, combining sequences and complete astral characters.
+
+Replacement strings follow JavaScript: `$$` inserts `$`, `$&` the matched text,
+`` $` `` the original input prefix, and `$'` the original input suffix. Substituted
+text is not expanded again. Without regex captures, `$1`, `$01` and `$<name>` stay
+literal, as do unrecognized dollar tokens and a trailing `$`. Dynamic replacement
+strings support the same rules.
+
+`replace("", replacement)` inserts once at the beginning, including empty input.
+`replaceAll("", replacement)` inserts at every UTF-16 boundary, including both
+ends. Since the VM cannot preserve isolated UTF-16 surrogate units, `replaceAll`
+requires either a provably nonempty constant search (a literal or immutable const
+alias), or a constant BMP-only receiver. A possibly empty search on a dynamic or
+astral receiver produces a located compile error: use a nonempty constant search,
+or a constant BMP-only receiver. This conservative rule also applies when the
+replacement is empty. RegExp searches, callback replacers, coercion, spread,
+missing arguments and extra arguments produce located diagnostics; use the two
+string arguments instead. Nullable search/replacement arguments must be strings
+at the call site: narrow them first (for example `if (a !== null)`), use `a ?? ""`,
+or explicitly convert with `String(a)`. The compiler does not implicitly convert
+null/undefined arguments; optional receiver short-circuiting remains supported.
+Calls or writes between narrowing and a nullable argument read are conservatively
+rejected, including earlier receiver/search evaluation and writes through aliases.
+Capture a string in a local before those effects, or coalesce/convert the value
+at its argument evaluation point. This check does not infer that a call is pure.
+Explicit `String(condition ? value : fallback)` converts only the selected value,
+including declared nullable values whose TS narrowing became stale. It preserves
+branch short-circuiting and single evaluation. Nullable conditions, arithmetic
+wrappers and logical selections inside `String` that cannot preserve the raw value domain are rejected with an if/else
+or `??` alternative; ordinary numeric/string `-1` and `-2` retain their values.
+If a local captures a nullable read after an intervening effect, its inferred
+`string` type does not prove that it contains text. A later `String(captured)`
+(including conditional wrappers and multiple capture layers) is rejected at the
+original conversion. Convert or coalesce when capturing instead:
+`const captured = String(value)` or `const captured = value ?? "fallback"`.
+The check follows initializers and possible assignments conservatively; a stable
+string captured before the effects remains supported.
+For scalar bindings, calls only invalidate this proof when the source file has
+an assignment that could write null/undefined to that binding (including writes
+inside nested functions). Calls alone do not invalidate an unchanged binding,
+and assignments of nonnullable values do not count as nullish writes. Property
+and array reads retain conservative alias handling.
+Isolated surrogate literals anywhere in source (also
+in `let` initializers, templates and imported modules) are rejected before
+lowering/JSON serialization with their original coordinates and a hint to use
+complete Unicode characters. Replacement diagnostics also retain the original
+call coordinates inside class methods and nullable optional calls.
+The ES2020 declarations include the implemented
+`replaceAll` overload for CLI, npm and browser checking.
+
 ## TypeScript strings
 
 - `charAt(index = 0)` truncates numeric indices toward zero and returns `""`
