@@ -56,3 +56,6 @@ for (const item of diagnosticCases) {
     });
   }
 }
+const nullableFiles = { "/main.ts": fs.readFileSync(new URL("fixtures/tsstrreplace-nullable.ts", import.meta.url), "utf8") };
+assert.equal(api.check("/main.ts", { files: nullableFiles }).ok, true);
+assert.doesNotThrow(() => api.compile("/main.ts", { files: nullableFiles }));

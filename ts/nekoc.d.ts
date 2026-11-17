@@ -42,6 +42,8 @@ interface ReadonlyArray<T> {
 interface String {
   /** String search/replacement only. Supports $$, $&, $` and $' substitutions.
    * RegExp, callback replacers and implicit coercion are rejected by the compiler.
+   * Nullable arguments must be narrowed first, use ?? with a string fallback,
+   * or explicitly convert with String(value). Applies to replaceAll as well.
    */
   replace(searchValue: string, replaceValue: string): string;
   /** Nonoverlapping replacement, including empty search on constant BMP strings.

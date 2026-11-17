@@ -58,7 +58,11 @@ astral receiver produces a located compile error: use a nonempty constant search
 or a constant BMP-only receiver. This conservative rule also applies when the
 replacement is empty. RegExp searches, callback replacers, coercion, spread,
 missing arguments and extra arguments produce located diagnostics; use the two
-string arguments instead. Isolated surrogate literals anywhere in source (also
+string arguments instead. Nullable search/replacement arguments must be strings
+at the call site: narrow them first (for example `if (a !== null)`), use `a ?? ""`,
+or explicitly convert with `String(a)`. The compiler does not implicitly convert
+null/undefined arguments; optional receiver short-circuiting remains supported.
+Isolated surrogate literals anywhere in source (also
 in `let` initializers, templates and imported modules) are rejected before
 lowering/JSON serialization with their original coordinates and a hint to use
 complete Unicode characters. Replacement diagnostics also retain the original

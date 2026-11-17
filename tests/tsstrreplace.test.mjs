@@ -72,6 +72,7 @@ test("tsstrreplace unsupported overloads and UTF-16 empty-search boundaries have
     'function f(s: string) { return s.replaceAll("", "X"); } console.log(f("abc"));',
     'function unused() { return "abc".replace(/b/, "X"); }',
   ]) assert.throws(() => compileFile(entry, guidance(source)), /String.replace/);
+  assert.throws(() => compileFile(entry, guidance('let a: string | null = null; console.log("abc".replace("a", a as string));')), /narrow it first/);
   for (const source of [
     'console.log("😀".replace("\\uD83D", "x"));',
     'console.log("abc".replace("a", "\\uDE00"));',
@@ -135,6 +136,8 @@ test("tsstrreplace string validation leaves the typed named-list replace API ava
     'class A { replace(n: number): number { return n + 1; } } console.log(new A().replace(2));',
     'class A { s: string = "abc"; f(): string { return this.s.replace("b", "X"); } } console.log(new A().f());',
   ]) assert.doesNotThrow(() => compileFile(entry, guidance(source)));
+  const nullable = fs.readFileSync(new URL("fixtures/tsstrreplace-nullable.ts", import.meta.url), "utf8");
+  assert.doesNotThrow(() => compileFile(entry, guidance(nullable)));
 });
 
 test("tsstrreplace check/build and npm/browser accept the same string overloads", async () => {
@@ -160,6 +163,9 @@ test("tsstrreplace check/build and npm/browser accept the same string overloads"
     const compiled = frontend.compile("/main.ts", { files });
     assert.ok(compiled.report.procedures.length > 0);
     assert.equal(assemblies, 2);
+    const nullableFiles = { "/main.ts": fs.readFileSync(new URL("fixtures/tsstrreplace-nullable.ts", import.meta.url), "utf8") };
+    assert.equal(frontend.check("/main.ts", { files: nullableFiles }).ok, true);
+    assert.doesNotThrow(() => frontend.compile("/main.ts", { files: nullableFiles }));
     for (const [expression, message] of invalid) {
       const files = { "/main.ts": `console.log(${expression});` };
       assert.equal(frontend.check("/main.ts", { files }).ok, false, expression);

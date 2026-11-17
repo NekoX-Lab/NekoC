@@ -4,15 +4,41 @@ use std::{fs, process::Command, time::Duration};
 
 #[test]
 fn replacements_match_node_in_interpreter_and_jit_with_both_optimizations() {
+    assert_replacements_match_node("tests/fixtures/tsstrreplace.ts");
+}
+
+#[test]
+fn narrowed_nullable_arguments_and_optional_receivers_match_node() {
+    assert_replacements_match_node("tests/fixtures/tsstrreplace-nullable.ts");
+}
+
+fn assert_replacements_match_node(input: &str) {
     let dir = tempfile::tempdir().unwrap();
-    let input = "tests/fixtures/tsstrreplace.ts";
     let oracle = Command::new("node")
         .args(["tests/tsarrayfix-oracle.mjs", input])
         .output()
         .unwrap();
     assert!(oracle.status.success(), "{oracle:?}");
     let expected: Vec<String> = serde_json::from_slice(&oracle.stdout).unwrap();
-    assert_eq!(&expected[..4], ["Xbc", "abX", "-abc", "a[b]c"]);
+    if input.ends_with("tsstrreplace.ts") {
+        assert_eq!(&expected[..4], ["Xbc", "abX", "-abc", "a[b]c"]);
+    } else {
+        assert_eq!(
+            expected,
+            [
+                "Xaba",
+                "skipped",
+                "XXbX",
+                "aaYa",
+                "undefinedundefined",
+                "XXbX",
+                "Xbc",
+                "NULL",
+                "NULL",
+                "0"
+            ]
+        );
+    }
     let check = Command::new(env!("CARGO_BIN_EXE_nekoc"))
         .args(["check", input, "--json"])
         .output()
@@ -177,6 +203,72 @@ fn cli_reports_original_coordinates_before_nullable_and_class_rewrites() {
             assert!(stderr.contains(&format!(":{line}:{column}:")), "{stderr}");
             assert!(stderr.contains(message), "{stderr}");
             assert!(!stderr.contains("invalid JSON"), "{stderr}");
+            assert!(!output.exists());
+        }
+    }
+}
+
+#[test]
+fn nullable_arguments_fail_cli_check_and_build_before_emitting_a_work() {
+    let cases = Command::new("node")
+        .args([
+            "--input-type=module",
+            "-e",
+            "import { diagnosticCases } from './tests/tsstrreplace-diagnostics.mjs'; console.log(JSON.stringify(diagnosticCases.filter(c => c.name.startsWith('nullable-'))));",
+        ])
+        .output()
+        .unwrap();
+    assert!(cases.status.success(), "{cases:?}");
+    let cases: Vec<Value> = serde_json::from_slice(&cases.stdout).unwrap();
+    assert_eq!(cases.len(), 12);
+    let dir = tempfile::tempdir().unwrap();
+    for case in cases {
+        let input = dir
+            .path()
+            .join(format!("{}.ts", case["name"].as_str().unwrap()));
+        fs::write(&input, case["source"].as_str().unwrap()).unwrap();
+        for types in [false, true] {
+            let mut check = Command::new(env!("CARGO_BIN_EXE_nekoc"));
+            check.arg("check").arg(&input).arg("--json");
+            if !types {
+                check.arg("--no-types");
+            }
+            let result = check.output().unwrap();
+            assert!(!result.status.success(), "{result:?}");
+            let checked: Value = serde_json::from_slice(&result.stdout).unwrap();
+            let diagnostic = checked["diagnostics"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|d| d["source"] == "compat")
+                .unwrap();
+            assert_eq!(diagnostic["line"], case["line"]);
+            assert_eq!(diagnostic["column"], case["column"]);
+            assert!(
+                diagnostic["message"]
+                    .as_str()
+                    .unwrap()
+                    .contains("without implicit conversion")
+            );
+        }
+        for optimize in [false, true] {
+            let output = dir.path().join(format!(
+                "{}-{optimize}.bcmkn",
+                case["name"].as_str().unwrap()
+            ));
+            let mut build = Command::new(env!("CARGO_BIN_EXE_nekoc"));
+            build.arg("build").arg(&input).arg("-o").arg(&output);
+            if optimize {
+                build.arg("--optimize");
+            }
+            let result = build.output().unwrap();
+            assert!(!result.status.success(), "{result:?}");
+            let stderr = String::from_utf8_lossy(&result.stderr);
+            assert!(stderr.contains("without implicit conversion"), "{stderr}");
+            assert!(
+                stderr.contains(&format!(":{}:{}:", case["line"], case["column"])),
+                "{stderr}"
+            );
             assert!(!output.exists());
         }
     }

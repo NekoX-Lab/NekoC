@@ -249,12 +249,19 @@ class WorkspaceCompiler {
       if (!replacementTypes.object(node.expression.expression)) {
         const method = node.expression.name.text;
         const receiver = node.expression.expression;
-        // Null safety (including narrowing/optional short-circuiting) belongs to
-        // the nullable pass. Here inspect only the present string overload.
+        // Receiver null safety/optional short-circuiting belongs to the nullable
+        // pass. Arguments are different: a nullable argument can reach the
+        // helper as a numeric sentinel, so require a string at this call site.
         const receiverKind = replacementTypes.nonNullableKind(receiver);
         if (node.arguments.length !== 2 || node.arguments.some(ts.isSpreadElement)
-          || receiverKind !== "string" || node.arguments.some(value => replacementTypes.nonNullableKind(value) !== "string")) {
+          || receiverKind !== "string") {
           this.unsupported(node, `String.${method} supports exactly two string arguments; use a string search and string replacement instead of RegExp, a replacer function, coercion or spread`);
+        }
+        for (const value of node.arguments) {
+          if (replacementTypes.nonNullableKind(value) !== "string"
+            || replacementTypes.flowKind(value) !== "string") {
+            this.unsupported(node, `String.${method} supports exactly two string arguments; search and replacement must be strings at the call site, without implicit conversion; narrow null/undefined first, use ?? with a string fallback, or explicitly use String(value)`);
+          }
         }
         if (method === "replaceAll") {
           const search = replacementTypes.stringConstant(node.arguments[0]);

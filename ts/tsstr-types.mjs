@@ -172,6 +172,15 @@ export function createExpressionTypes(files, declarations = "", path = portableP
   const concatKinds = new WeakMap();
   const stringConstants = new WeakMap();
   const nonNullableKinds = new WeakMap();
+  const flowKinds = new WeakMap();
+  // Assertions do not convert nullish sentinels. Inspect the operand's actual
+  // flow type, while retaining real narrowing and value-producing ??/String().
+  const flowKind = node => {
+    if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)
+      || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)
+      || ts.isSatisfiesExpression(node)) return flowKind(node.expression);
+    return classify(checker.getTypeAtLocation(node));
+  };
   const stringConstant = (node, seen = new Set()) => {
     if (!node || seen.has(node)) return null;
     seen.add(node);
@@ -204,6 +213,7 @@ export function createExpressionTypes(files, declarations = "", path = portableP
         concatKinds.set(node, concatKind(declaredReadType(node) ?? type));
         stringConstants.set(node, stringConstant(node));
         nonNullableKinds.set(node, classify(checker.getNonNullableType(declaredReadType(node) ?? type)));
+        flowKinds.set(node, flowKind(node));
       }
       ts.forEachChild(node, visit);
     };
@@ -218,6 +228,7 @@ export function createExpressionTypes(files, declarations = "", path = portableP
   result.concatKind = node => concatKinds.get(node && ts.getOriginalNode(node));
   result.stringConstant = node => stringConstants.get(node && ts.getOriginalNode(node)) ?? null;
   result.nonNullableKind = node => nonNullableKinds.get(node && ts.getOriginalNode(node));
+  result.flowKind = node => flowKinds.get(node && ts.getOriginalNode(node));
   return result;
 }
 
