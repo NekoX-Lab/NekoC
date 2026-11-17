@@ -9,6 +9,8 @@ export interface Diagnostic {
 }
 export type Project = Record<string, unknown>;
 export interface CompileOptions {
+  /** Lowering/preflight target. The returned project remains canonical .bcmkn. */
+  target?: "kitten-n" | "kitten4";
   /** Source files by path; the entry and every relative import must be here. */
   files: Record<string, string> | Map<string, string>;
   /** Template work; defaults to the bundled empty Kitten N work. */

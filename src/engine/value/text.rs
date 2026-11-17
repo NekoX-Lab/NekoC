@@ -12,6 +12,7 @@ pub struct Text(Rc<Node>);
 
 struct Node {
     len: usize,
+    utf16_len: usize,
     invalid_number: bool,
     flat: OnceCell<Rc<str>>,
     children: Option<(Text, Text)>,
@@ -27,6 +28,10 @@ impl Text {
         }
         Self(Rc::new(Node {
             len: a.len().checked_add(b.len()).expect("text length overflow"),
+            utf16_len: a
+                .utf16_len()
+                .checked_add(b.utf16_len())
+                .expect("text UTF-16 length overflow"),
             invalid_number: a.0.invalid_number || b.0.invalid_number,
             flat: OnceCell::new(),
             children: Some((a.for_concat(), b.for_concat())),
@@ -41,6 +46,7 @@ impl Text {
         {
             Self(Rc::new(Node {
                 len: self.len(),
+                utf16_len: self.utf16_len(),
                 invalid_number: self.0.invalid_number,
                 flat: OnceCell::from(flat.clone()),
                 children: None,
@@ -53,6 +59,12 @@ impl Text {
     /// Byte length, without forcing a tree into contiguous storage.
     pub fn len(&self) -> usize {
         self.0.len
+    }
+
+    /// UTF-16 code units, not bytes, scalar values, or graphemes. Reading this
+    /// immutable cache never traverses or flattens a concatenation tree.
+    pub fn utf16_len(&self) -> usize {
+        self.0.utf16_len
     }
 
     pub fn is_empty(&self) -> bool {
@@ -113,6 +125,7 @@ impl From<String> for Text {
     fn from(flat: String) -> Self {
         Self(Rc::new(Node {
             len: flat.len(),
+            utf16_len: flat.encode_utf16().count(),
             invalid_number: invalid_number(&flat),
             flat: OnceCell::from(Rc::<str>::from(flat)),
             children: None,
@@ -124,6 +137,7 @@ impl From<&str> for Text {
     fn from(flat: &str) -> Self {
         Self(Rc::new(Node {
             len: flat.len(),
+            utf16_len: flat.encode_utf16().count(),
             invalid_number: invalid_number(flat),
             flat: OnceCell::from(Rc::<str>::from(flat)),
             children: None,
@@ -195,6 +209,10 @@ impl Drop for Node {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/textlenfast/internal.rs"]
+mod textlenfast_tests;
 
 #[cfg(test)]
 mod tests {

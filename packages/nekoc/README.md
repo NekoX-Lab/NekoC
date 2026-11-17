@@ -41,6 +41,12 @@ try {
 check 包含 TypeScript 类型检查及 NekoC 兼容性检查，内置 NekoC 和 TS 标准声明。
 二进制帧沿用 [player SDK 协议](../../docs/player-sdk.md)。
 
+Node/浏览器的 `compile/check` 均可传 `target: "kitten4"`，选择 K4 普通 `for`
+的通用降低及源位置预检；默认 `"kitten-n"` 不变。`compile` 返回值仍是标准
+`.bcmkn`（内部表示），原生 `.bcm` 请用 Rust CLI `compile-ts-kitten4` 导出。
+`forRange`、重入事件内的普通 `for`、新自制积木等仍明确报错，详见
+[Kitten 4 支持](../../docs/kitten4.md)。
+
 ## 浏览器
 
 支持 browser export condition 的 bundler 可直接导入同一个包；也可显式导入
@@ -52,6 +58,7 @@ check 包含 TypeScript 类型检查及 NekoC 兼容性检查，内置 NekoC 和
 
 ```sh
 nekoc check main.ts --json
+nekoc check main.ts --target=kitten4 --json
 nekoc build main.ts -o main.bcmkn
 nekoc run main.bcmkn --frames 120
 ```

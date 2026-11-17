@@ -24,6 +24,9 @@ type NekoValue = any;
 // Deferred function mutations are considered regardless of declaration order;
 // parentheses, as, non-null and satisfies wrappers do not hide array mutations.
 // includes/indexOf/lastIndexOf accept numeric fromIndex (omit undefined).
+// slice saves receiver/args once before length; numeric bounds truncate, count
+// negatives from the end and clamp (NaN = 0, +/-Infinity supported). Omitted
+// bounds mean 0/length. Shallow copies preserve refs; omit null/undefined bounds.
 // concat accepts any number of statically known arrays/scalars, preserving refs.
 // push/unshift/statement splice freeze receiver then all args before mutation.
 // Callbacks snapshot length; filter/forEach/reduce/some/every skip removed tails.

@@ -55,8 +55,22 @@ pub fn compile_ts_kitten4(
     std::fs::write(&canonical_template, template_bytes)
         .context("failed to write canonical Kitten 4 compiler template")?;
 
-    bcmkn_compiler::compile_ts_bcmkn(input, &canonical_template, &canonical_output)
-        .with_context(|| format!("failed to compile TypeScript {}", input.display()))?;
+    let workspace = scratch.path().join("workspace.json");
+    crate::ts_frontend::compile_ts_for_target(
+        input,
+        &workspace,
+        None::<&Path>,
+        None::<&Path>,
+        "kitten4",
+    )
+    .with_context(|| format!("failed to compile TypeScript {}", input.display()))?;
+    let report = crate::json::from_slice(&std::fs::read(&workspace)?)?;
+    bcmkn_compiler::compile_workspace_bcmkn(
+        &report,
+        input,
+        &canonical_template,
+        &canonical_output,
+    )?;
     let canonical = project::load_project(&canonical_output)?.value;
     let mut native = kitten4::from_neko(&canonical)
         .context("compiled TypeScript cannot be represented as a native Kitten 4 project")?;

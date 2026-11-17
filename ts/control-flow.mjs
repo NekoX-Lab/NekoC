@@ -165,6 +165,20 @@ function compileSequence(c, expression, parent) {
 }
 
 export function forStatement(c, statement, parent) {
+  if (c.target.name === "kitten4") {
+    if (statement.initializer && ts.isVariableDeclarationList(statement.initializer)
+      && !(statement.initializer.flags & ts.NodeFlags.BlockScoped)) {
+      c.unsupported(statement.initializer, "Kitten 4 for (var ...) cannot preserve function/global-scoped var bindings; declare the variable outside the loop and use assignment-form for (i = ...; ...; ...)");
+    }
+    // K4 export has no per-invocation frames yet. Site-unique globals isolate
+    // disjoint start scripts, but not overlapping invocations of the same hat.
+    // Fail closed rather than introduce shared induction/completion storage.
+    for (let owner = parent; owner; owner = c.blocks[owner]?.parent_id) {
+      if (["self_listen", "on_keydown", "when"].includes(c.blocks[owner]?.type)) {
+        c.unsupported(statement, "A for loop in a reentrant Kitten 4 event needs per-invocation local storage, which the native exporter does not support; move the loop to onStart and communicate through explicit shared variables, or select target kitten-n");
+      }
+    }
+  }
   // Keep traverse_number only for constant integer bounds with a read-only
   // induction variable. Its inclusive integer range is not a general JS for.
   const decls = statement.initializer && ts.isVariableDeclarationList(statement.initializer) ? statement.initializer.declarations : [];
@@ -176,7 +190,7 @@ export function forStatement(c, statement, parent) {
   }
   const decl = decls.length === 1 ? decls[0] : null;
   let spec = null;
-  if (decl && ts.isIdentifier(decl.name) && statement.condition && ts.isBinaryExpression(statement.condition)) {
+  if (c.target.numberTraversal && decl && ts.isIdentifier(decl.name) && statement.condition && ts.isBinaryExpression(statement.condition)) {
     const literal = node => {
       if (!node) return null;
       if (ts.isNumericLiteral(node)) return Number(node.text);
