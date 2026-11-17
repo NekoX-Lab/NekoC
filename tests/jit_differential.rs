@@ -976,6 +976,40 @@ fn changed(id: &str, value: Value, decrease: bool) -> Value {
     },"inputs":{"value":value}})
 }
 
+#[test]
+fn hot_k4_private_change_reads_previous_after_reporter_delta_side_effects() {
+    use serde_json::json;
+    for decrease in [false, true] {
+        let mut delta = call("delta", &[]);
+        delta["type"] = json!("procedures_2_callreturn");
+        let mut p = private_project(
+            chain(vec![
+                set("private", num(7.0)),
+                changed("private", delta, decrease),
+                set("out", get("private")),
+            ]),
+            json!(0),
+            true,
+        );
+        p["procedures"]["proceduresDict"]["delta"] = procedure(
+            &[],
+            chain(vec![
+                set("private", num(0.3)),
+                json!({"type":"procedures_2_return_value","mutation":"<mutation items=\"1\"/>",
+                "inputs":{"VALUE":num(0.1)},"shadows":{"VALUE":num(0.0)}}),
+            ]),
+        );
+        for budget in [37, 100_000] {
+            let vm = compare_hot_budget(&p, None, budget, 1000);
+            assert_eq!(
+                vm.variable_text("out"),
+                if decrease { "0.2" } else { "0.4" }
+            );
+            assert_native_helper(&vm, "native/reentrant-Kitten4ChangeActor");
+        }
+    }
+}
+
 fn branch(condition: Value, body: Value) -> Value {
     serde_json::json!({"type":"controls_if","inputs":{"IF0":condition},"statements":{"DO0":body}})
 }
@@ -1274,9 +1308,11 @@ fn hot_k4_change_guards_keep_text_add_decrease_nan_and_negative_zero() {
     assert_eq!(vm.variable_text("typed_compared"), "x1201");
     assert!(matches!(vm.variable_value("nan"),Cell::Number(n) if n.is_nan()));
     assert!(
-        matches!(vm.variable_value("negative_zero"),Cell::Number(n) if n == 0.0 && n.is_sign_negative())
+        // Official Decimal change_variable normalizes -0 - 0 to +0;
+        // see the original nonfinite probe in docs/k4decimal-evidence.json.
+        matches!(vm.variable_value("negative_zero"),Cell::Number(n) if n == 0.0 && n.is_sign_positive())
     );
-    assert!(matches!(vm.variable_value("reciprocal"),Cell::Number(n) if n == f64::NEG_INFINITY));
+    assert!(matches!(vm.variable_value("reciprocal"),Cell::Number(n) if n == f64::INFINITY));
     assert_native_helper(&vm, "op/Kitten4Change");
     // This is the new guarded path itself, not merely the surrounding loop.
     let profile = vm.jit_profile();

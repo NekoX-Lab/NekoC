@@ -49,6 +49,64 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
 `Map`. Programs without null/undefined compile exactly as before. See
 [null / undefined](ts-nullable.md).
 
+## TypeScript string replacement
+
+`s.replace(search, replacement)` and `s.replaceAll(search, replacement)` accept
+exactly two string arguments. The receiver, search and replacement evaluate once,
+left to right. `replace` changes the first match; `replaceAll` scans the original
+input for nonoverlapping matches and never searches text inserted by replacement.
+Empty prefixes/suffixes and empty replacements are supported; a missing match
+returns the original string. Matching is case-sensitive and preserves numeric
+text such as `007`, combining sequences and complete astral characters.
+
+Replacement strings follow JavaScript: `$$` inserts `$`, `$&` the matched text,
+`` $` `` the original input prefix, and `$'` the original input suffix. Substituted
+text is not expanded again. Without regex captures, `$1`, `$01` and `$<name>` stay
+literal, as do unrecognized dollar tokens and a trailing `$`. Dynamic replacement
+strings support the same rules.
+
+`replace("", replacement)` inserts once at the beginning, including empty input.
+`replaceAll("", replacement)` inserts at every UTF-16 boundary, including both
+ends. Since the VM cannot preserve isolated UTF-16 surrogate units, `replaceAll`
+requires either a provably nonempty constant search (a literal or immutable const
+alias), or a constant BMP-only receiver. A possibly empty search on a dynamic or
+astral receiver produces a located compile error: use a nonempty constant search,
+or a constant BMP-only receiver. This conservative rule also applies when the
+replacement is empty. RegExp searches, callback replacers, coercion, spread,
+missing arguments and extra arguments produce located diagnostics; use the two
+string arguments instead. Nullable search/replacement arguments must be strings
+at the call site: narrow them first (for example `if (a !== null)`), use `a ?? ""`,
+or explicitly convert with `String(a)`. The compiler does not implicitly convert
+null/undefined arguments; optional receiver short-circuiting remains supported.
+Calls or writes between narrowing and a nullable argument read are conservatively
+rejected, including earlier receiver/search evaluation and writes through aliases.
+Capture a string in a local before those effects, or coalesce/convert the value
+at its argument evaluation point. This check does not infer that a call is pure.
+Explicit `String(condition ? value : fallback)` converts only the selected value,
+including declared nullable values whose TS narrowing became stale. It preserves
+branch short-circuiting and single evaluation. Nullable conditions, arithmetic
+wrappers and logical selections inside `String` that cannot preserve the raw value domain are rejected with an if/else
+or `??` alternative; ordinary numeric/string `-1` and `-2` retain their values.
+If a local captures a nullable read after an intervening effect, its inferred
+`string` type does not prove that it contains text. A later `String(captured)`
+(including conditional wrappers and multiple capture layers) is rejected at the
+original conversion. Convert or coalesce when capturing instead:
+`const captured = String(value)` or `const captured = value ?? "fallback"`.
+The check follows initializers and possible assignments conservatively; a stable
+string captured before the effects remains supported.
+For scalar bindings, calls only invalidate this proof when the source file has
+an assignment that could write null/undefined to that binding (including writes
+inside nested functions). Calls alone do not invalidate an unchanged binding,
+and assignments of nonnullable values do not count as nullish writes. Property
+and array reads retain conservative alias handling.
+Isolated surrogate literals anywhere in source (also
+in `let` initializers, templates and imported modules) are rejected before
+lowering/JSON serialization with their original coordinates and a hint to use
+complete Unicode characters. Replacement diagnostics also retain the original
+call coordinates inside class methods and nullable optional calls.
+The ES2020 declarations include the implemented
+`replaceAll` overload for CLI, npm and browser checking.
+
 ## TypeScript strings
 
 - `charAt(index = 0)` truncates numeric indices toward zero and returns `""`
@@ -169,8 +227,19 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
 - Statement calls to `push`, `unshift` and `splice` evaluate the receiver once,
   then every argument once from left to right, before changing the list. Saved
   references and values are invocation-local, including recursive argument calls.
-  `splice` retains the existing nonnegative-start subset; this does not add sparse
-  arrays or general JavaScript boundary/coercion semantics.
+  Statement `splice` reads length after all arguments and fixes the insertion
+  position before mutation. Numeric start/deleteCount truncate toward zero and
+  clamp to the original remaining range; negative starts count from the end,
+  NaN means zero, infinities use the respective boundary, and negative deleteCount
+  means zero. Omitted deleteCount deletes to the end; no arguments is a no-op.
+  Multiple inserted references retain their order and identity. Non-numeric or
+  explicit undefined bounds are diagnosed with conversion/omission hints.
+  Numeric type parameter constraints (including constraint chains such as
+  `T extends number, U extends T`) and numeric intersections such as
+  `number & { readonly brand?: "index" }` are accepted for start and deleteCount,
+  both directly and through generic constraints;
+  unconstrained or mixed number/string parameters still require narrowing.
+  This does not add the deleted-items return value, sparse arrays or coercion.
 - Array `includes`, `indexOf` and `lastIndexOf` accept a numeric `fromIndex`.
   Fractions truncate toward zero, negatives count from the end, NaN starts at
   zero, and out-of-range starts follow each method's direction. Omitted
@@ -210,7 +279,10 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
 - `Array.isArray(value)` folds statically known arrays and primitive literals;
   unknown types and arguments whose evaluation would have side effects are
   rejected (store the result in a variable first).
-- Inline array callbacks can read enclosing event-local variables. Capturing
+- Inline array callbacks can read and update enclosing event/timer-local variables through
+  the current invocation frame, including nested synchronous callbacks. Locals
+  survive cooperative waits in overlapping event invocations. Array/object
+  bindings are isolated without copying their referenced contents. Capturing
   enclosing inline-function parameters or locals is rejected; use an event-local
   or top-level variable instead.
   Captured string declarations and aliases retain their type before helper
@@ -241,6 +313,17 @@ defaults. Recursive scalar locals use per-call frames; recursive captures and
 function-argument specialization remain compile errors.
 
 ## Global Events
+
+Kitten N callbacks with local state run in suspendable statement procedures.
+Every invocation gets a fresh list frame, so broadcasts, timers and overlapping
+sprite/clone callbacks keep their own locals across `wait`. Synchronous nested
+callbacks share that invocation's captured frame. Top-level variables and
+`setVar`/`changeVar` remain shared; array/object bindings keep reference identity
+without deep copies. Restart cancels old tasks and starts with new frames.
+An early `return` exits only that callback; a returned expression is evaluated
+for its side effects and its result is ignored.
+Timer callbacks cannot capture outer invocation locals across scheduling; move
+that state to a top-level binding or use explicit event state instead.
 
 ### `onStart(body)`
 
@@ -795,6 +878,8 @@ does nothing and that enclosing continuation still runs; on a clone deletion
 cancels that clone's tasks. This physical socket rule does not make deletion
 equivalent to a function return. `nekoc check` reports
 `terminal_block_has_next` for existing works with either known illegal edge.
+The `NORMAL` form of `procedures_2_return_value` also has no next socket;
+event returns end the current path before loop increment/condition handling.
 
 ### `cloneCount(sprite)`
 

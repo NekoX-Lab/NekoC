@@ -134,6 +134,7 @@ enum Numeric {
     Actor(usize, usize),
     Parameter(usize),
     Add(usize, usize),
+    Arithmetic(usize, usize, Binary),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -299,6 +300,8 @@ impl Engine {
             | Op::Repeat(e, _) => vec![(false, e.end as usize - 1)],
             Op::SetValue(_, v)
             | Op::SetActorVariable(_, v)
+            | Op::Kitten4Change(_, v, _)
+            | Op::Kitten4ChangeActor(_, v, _)
             | Op::ReturnValue(v)
             | Op::AppendList(_, v) => vec![(true, v)],
             Op::Call(_, args) => self.program.call_arguments[args]
@@ -583,7 +586,10 @@ impl Engine {
             Op::Position(x, y) => pure(x) && pure(y),
             Op::Visible(_) | Op::Pen(_) | Op::Color(_) | Op::Clear => true,
             Op::ClearList(r) => list(r),
-            Op::SetValue(_, v) | Op::ReturnValue(v) | Op::Kitten4Change(_, v, _) => value(v),
+            Op::SetValue(_, v)
+            | Op::ReturnValue(v)
+            | Op::Kitten4Change(_, v, _)
+            | Op::Kitten4ChangeActor(_, v, _) => value(v),
             Op::AppendList(r, v) => list(r) && value(v),
             Op::SetActorVariable(_, v) => value(v),
             Op::ChangeActorVariable(_, e, _) => pure(e),
@@ -657,7 +663,10 @@ impl Engine {
             Op::AppendList(list, v) => {
                 !value(v) || matches!(list, ListRef::Expression(v) if !value(v as usize))
             }
-            Op::SetValue(_, v) | Op::ReturnValue(v) | Op::Kitten4Change(_, v, _) => !value(v),
+            Op::SetValue(_, v)
+            | Op::ReturnValue(v)
+            | Op::Kitten4Change(_, v, _)
+            | Op::Kitten4ChangeActor(_, v, _) => !value(v),
             _ => false,
         }
     }
@@ -798,6 +807,18 @@ unsafe extern "C" fn h_error(c: *mut NativeContext, pc: u64, next: u64) -> u64 {
 }
 extern "C" fn h_mod(a: f64, b: f64) -> f64 {
     Binary::Mod.apply(a, b)
+}
+extern "C" fn h_k4_add(a: f64, b: f64) -> f64 {
+    super::k4decimal::apply(super::k4decimal::Operation::Add, a, b)
+}
+extern "C" fn h_k4_sub(a: f64, b: f64) -> f64 {
+    Binary::K4Sub.apply(a, b)
+}
+extern "C" fn h_k4_mul(a: f64, b: f64) -> f64 {
+    Binary::K4Mul.apply(a, b)
+}
+extern "C" fn h_k4_div(a: f64, b: f64) -> f64 {
+    Binary::K4Div.apply(a, b)
 }
 extern "C" fn h_pow(a: f64, b: f64) -> f64 {
     Binary::Pow.apply(a, b)
@@ -1317,6 +1338,11 @@ impl Gen<'_, '_> {
                 self.numeric(b, guards)?;
                 Some(Numeric::Add(a, b))
             }
+            ValueExpr::Kitten4Arithmetic(a, b, op) => {
+                self.numeric(a, guards)?;
+                self.numeric(b, guards)?;
+                Some(Numeric::Arithmetic(a, b, op))
+            }
             _ => None,
         }
     }
@@ -1350,6 +1376,13 @@ impl Gen<'_, '_> {
 
     fn numeric_value(&mut self, value: Numeric) -> Value {
         match value {
+            Numeric::Arithmetic(a, b, op) => {
+                let a = self.numeric(a, &mut Vec::new()).unwrap();
+                let b = self.numeric(b, &mut Vec::new()).unwrap();
+                let a = self.numeric_value(a);
+                let b = self.numeric_value(b);
+                self.binary(op, a, b)
+            }
             Numeric::Expr(pc) => self.expr(pc),
             Numeric::Constant(n) => self.b.ins().f64const(n),
             Numeric::Global(s) => self.load(self.slots, s),
@@ -1374,7 +1407,7 @@ impl Gen<'_, '_> {
                 let b = self.numeric(b, &mut Vec::new()).unwrap();
                 let a = self.numeric_value(a);
                 let b = self.numeric_value(b);
-                self.b.ins().fadd(a, b)
+                self.call2(h_k4_add as *const () as usize, a, b)
             }
         }
     }
@@ -1548,6 +1581,9 @@ impl Gen<'_, '_> {
             Binary::Sub => self.b.ins().fsub(a, b),
             Binary::Mul => self.b.ins().fmul(a, b),
             Binary::Div => self.b.ins().fdiv(a, b),
+            Binary::K4Sub => self.call2(h_k4_sub as *const () as usize, a, b),
+            Binary::K4Mul => self.call2(h_k4_mul as *const () as usize, a, b),
+            Binary::K4Div => self.call2(h_k4_div as *const () as usize, a, b),
             Binary::Mod => self.call2(h_mod as *const () as usize, a, b),
             Binary::Pow => self.call2(h_pow as *const () as usize, a, b),
             Binary::Divisible => self.call2(h_divisible as *const () as usize, a, b),
@@ -1756,9 +1792,9 @@ impl Gen<'_, '_> {
             let base = if local { self.locals } else { self.slots };
             let old = self.load(base, slot);
             let number = if decrease {
-                self.b.ins().fsub(old, delta)
+                self.call2(h_k4_sub as *const () as usize, old, delta)
             } else {
-                self.b.ins().fadd(old, delta)
+                self.call2(h_k4_add as *const () as usize, old, delta)
             };
             self.store(base, slot, number);
             self.check_error(pc, remaining);
@@ -2045,6 +2081,40 @@ impl Gen<'_, '_> {
             Op::SetValue(target, v) => self.set_value(pc, target, v, blocks, remaining),
             Op::Kitten4Change(target, v, decrease) => {
                 self.kitten4_change(pc, target, v, decrease, blocks, remaining)
+            }
+            Op::Kitten4ChangeActor(slot, v, decrease) => {
+                let slow = self.b.create_block();
+                let mut guards = vec![Guard::Actor(usize::MAX, slot)];
+                if let Some(value) = self.numeric(v, &mut guards) {
+                    self.check_unboxed(&guards, slow);
+                    // Evaluate the delta first, including any throwing input.
+                    let delta = self.numeric_value(value);
+                    self.check_error(pc, remaining);
+                    let previous = self.numeric_value(Numeric::Actor(usize::MAX, slot));
+                    let number = self.call2(
+                        if decrease {
+                            h_k4_sub as *const () as usize
+                        } else {
+                            h_k4_add as *const () as usize
+                        },
+                        previous,
+                        delta,
+                    );
+                    let slot = self.b.ins().iconst(types::I64, slot as i64);
+                    self.call(
+                        h_set_actor_number as *const () as usize,
+                        &[types::I64, types::I64, types::F64],
+                        None,
+                        &[ctx, slot, number],
+                    );
+                    self.check_error(pc, remaining);
+                    self.b.ins().jump(block(pc + 1), &[]);
+                } else {
+                    self.b.ins().jump(slow, &[]);
+                }
+                self.b.switch_to_block(slow);
+                self.transfer(pc, remaining);
+                self.b.ins().jump(block(pc + 1), &[]);
             }
             Op::SetActorVariable(slot, v) => {
                 let slow = self.b.create_block();
