@@ -107,10 +107,20 @@ export function createExpressionTypes(files, declarations = "", path = portableP
   const checker = program.getTypeChecker();
   for (const [file, name] of originalNames) file.fileName = name;
   const classify = type => {
+    if (type.flags & ts.TypeFlags.TypeParameter) {
+      // A numeric constraint guarantees the runtime domain even when the
+      // parameter itself is not NumberLike (including T extends U extends number).
+      const constraint = checker.getBaseConstraintOfType(type);
+      return constraint && constraint !== type && classify(constraint) === "number" ? "number" : "unknown";
+    }
     if (type.isUnion()) {
       const kinds = new Set(type.types.map(classify));
       return kinds.size === 1 ? [...kinds][0] : "unknown";
     }
+    // Every inhabitant of an intersection satisfies each constituent. A
+    // numeric constituent therefore proves the numeric domain even when other
+    // constituents only add type-level brands. Do not broaden text/bool paths.
+    if (type.isIntersection() && type.types.some(part => classify(part) === "number")) return "number";
     if (type.flags & ts.TypeFlags.StringLike) return "string";
     if (type.flags & (ts.TypeFlags.NumberLike | ts.TypeFlags.EnumLike)) return "number";
     if (type.flags & ts.TypeFlags.BooleanLike) return "boolean";
