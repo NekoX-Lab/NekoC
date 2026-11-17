@@ -72,7 +72,19 @@ fn assert_replacements_match_node(input: &str) {
                 "-2",
                 "13",
                 "nullbc",
-                "undefinedbc"
+                "undefinedbc",
+                "Xbc",
+                "XXbX",
+                "nullbc",
+                "fallbackfallbackbfallback",
+                "Xbc",
+                "undefinedundefinedbundefined",
+                "Xbc",
+                "fallbackbc",
+                "Rbc",
+                "-2bc",
+                "-1bc",
+                "falsebc"
             ]
         );
     }
@@ -251,13 +263,13 @@ fn nullable_arguments_fail_cli_check_and_build_before_emitting_a_work() {
         .args([
             "--input-type=module",
             "-e",
-            "import { diagnosticCases } from './tests/tsstrreplace-diagnostics.mjs'; console.log(JSON.stringify(diagnosticCases.filter(c => c.name.startsWith('nullable-') || c.name.startsWith('stale-'))));",
+            "import { diagnosticCases } from './tests/tsstrreplace-diagnostics.mjs'; console.log(JSON.stringify(diagnosticCases.filter(c => /^(nullable-|stale-|capture-)/.test(c.name))));",
         ])
         .output()
         .unwrap();
     assert!(cases.status.success(), "{cases:?}");
     let cases: Vec<Value> = serde_json::from_slice(&cases.stdout).unwrap();
-    assert_eq!(cases.len(), 30);
+    assert_eq!(cases.len(), 72);
     let dir = tempfile::tempdir().unwrap();
     for case in cases {
         let input = dir

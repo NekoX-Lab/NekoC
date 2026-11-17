@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { createNullableReadAnalysis } from "./nullable-reads.mjs";
 
 // null / undefined as runtime values (docs/ts-nullable.md).
 //
@@ -199,6 +200,8 @@ export function lowerTsNullable(input) {
   // Declared nullable, even where TS has narrowed this read to non-null.
   const nilDeclared = node => !legacyOptionalParameter(node) && (mayHoldNil(node) || maybeNil(declaredType(node)))
     && domain(declaredType(node)) !== null;
+  const nullableReads = createNullableReadAnalysis(checker, declaredType,
+    node => isStringType(node) ? "string" : "unknown");
 
   // Do not erase nullish slice boundaries into numeric-typed sentinels: the
   // array helper intentionally accepts numbers only, not JS ToNumber coercion.
@@ -567,6 +570,10 @@ export function lowerTsNullable(input) {
 
   function specificRule(node) {
     if (ts.isCallExpression(node) && calleeText(node) === "String" && node.arguments.length === 1) {
+      if (nullableReads.unsafeCapture(node.arguments[0])) {
+        fail(node, "String conversion cannot trust a captured nullable value after intervening side effects",
+          "convert at capture time with String(value), or use ?? with a string fallback before storing the value");
+      }
       // TS may keep a stale string flow type across earlier calls. Decode at
       // each selected value's origin, preserving branches and single evaluation.
       const nullableSource = part => ts.isExpression(part) && valuePosition(part) && nilDeclared(part)

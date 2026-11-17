@@ -60,5 +60,6 @@ const nullableFiles = { "/main.ts": fs.readFileSync(new URL("fixtures/tsstrrepla
 assert.equal(api.check("/main.ts", { files: nullableFiles }).ok, true);
 assert.doesNotThrow(() => api.compile("/main.ts", { files: nullableFiles }));
 const conversionFiles = { "/main.ts": fs.readFileSync(new URL("fixtures/tsstrreplace-conversion.ts", import.meta.url), "utf8") };
-assert.equal(api.check("/main.ts", { files: conversionFiles }).ok, true);
+const conversionChecked = api.check("/main.ts", { files: conversionFiles });
+assert.equal(conversionChecked.ok, true, JSON.stringify(conversionChecked.diagnostics));
 assert.doesNotThrow(() => api.compile("/main.ts", { files: conversionFiles }));

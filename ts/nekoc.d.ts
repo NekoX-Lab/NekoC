@@ -48,6 +48,8 @@ interface String {
    * string first, or convert/coalesce at the argument's evaluation point.
    * String conversion preserves nullable conditional branches; unsupported
    * nullable logical selections require explicit if/else or a string fallback.
+   * A capture made after narrowing was invalidated must convert/coalesce at
+   * capture time; converting that inferred string later is rejected.
    */
   replace(searchValue: string, replaceValue: string): string;
   /** Nonoverlapping replacement, including empty search on constant BMP strings.

@@ -43,4 +43,35 @@ export const diagnosticCases = [
     source: `let value: string | null = "X";\nfunction search(): string { value = null; return "a"; }\nconsole.log("abc".replace(search(), String(${expression})));`,
     line: 3, column: 44, message: /String conversion cannot preserve nullable value selection.*explicit if\/else/,
   })),
+  ...["replace", "replaceAll"].flatMap(method => ["null", "undefined"].flatMap(nil =>
+    ["variable", "field", "array"].flatMap(origin => [false, true].map(conditional => {
+      const declaration = origin === "variable" ? `let value: string | ${nil} = "X";`
+        : origin === "field" ? `const box: { value: string | ${nil} } = { value: "X" };`
+        : `let values: (string | ${nil})[] = ["X"];`;
+      const read = origin === "variable" ? "value" : origin === "field" ? "box.value" : "values[0]";
+      return {
+        name: `capture-${method}-${nil}-${origin}-${conditional}`,
+        source: `${declaration}\nfunction change(): void { ${read} = ${nil}; }\nif (${read} !== ${nil}) {\n  change();\n  const captured = ${read};\n  console.log("aaba".${method}("a", String(${conditional ? 'true ? captured : "Y"' : "captured"})));\n}`,
+        line: 6, column: method === "replace" ? 35 : 38,
+        message: /String conversion cannot trust a captured nullable value.*intervening side effects.*capture time.*\?\?/,
+      };
+    })))),
+  ...["null", "undefined"].flatMap(nil => ["multilevel", "assignment", "conditional-init", "field-init", "array-init", "template-init", "array-assignment", "shorthand"].map(mode => ({
+    name: `capture-${nil}-${mode}`,
+    source: `let value: string | ${nil} = "X";\nfunction change(): void { value = ${nil}; }\nchange();\n${mode === "multilevel" ? "const first = value; const second = first; const captured = second;"
+      : mode === "assignment" ? 'let captured = "safe"; captured = value;'
+      : mode === "conditional-init" ? 'const captured = true ? value : "Y";'
+      : mode === "field-init" ? "const box = { captured: value };"
+      : mode === "array-init" ? "const values = [value];"
+      : mode === "array-assignment" ? 'let values = ["safe"]; values[0] = value;'
+      : mode === "shorthand" ? "const captured = value; const box = { captured };"
+      : 'const first = value; const captured = `!${first}`;'}\nconsole.log("abc".replace("a", String(${["field-init", "shorthand"].includes(mode) ? "box.captured" : mode.startsWith("array-") ? "values[0]" : "captured"})));`,
+    line: 5, column: 32,
+    message: /String conversion cannot trust a captured nullable value.*intervening side effects.*capture time.*\?\?/,
+  }))),
+  ...["null", "undefined"].map(nil => ({
+    name: `stale-assigned-capture-${nil}`,
+    source: `let value: string | ${nil} = "X";\nlet captured = "safe";\nfunction change(): void { value = ${nil}; }\nchange();\ncaptured = value;\nconsole.log("abc".replace("a", captured));`,
+    line: 6, column: 13, message: /nullable argument after intervening side effects/,
+  })),
 ];

@@ -71,6 +71,13 @@ including declared nullable values whose TS narrowing became stale. It preserves
 branch short-circuiting and single evaluation. Nullable conditions, arithmetic
 wrappers and logical selections inside `String` that cannot preserve the raw value domain are rejected with an if/else
 or `??` alternative; ordinary numeric/string `-1` and `-2` retain their values.
+If a local captures a nullable read after an intervening effect, its inferred
+`string` type does not prove that it contains text. A later `String(captured)`
+(including conditional wrappers and multiple capture layers) is rejected at the
+original conversion. Convert or coalesce when capturing instead:
+`const captured = String(value)` or `const captured = value ?? "fallback"`.
+The check follows initializers and possible assignments conservatively; a stable
+string captured before the effects remains supported.
 Isolated surrogate literals anywhere in source (also
 in `let` initializers, templates and imported modules) are rejected before
 lowering/JSON serialization with their original coordinates and a hint to use
