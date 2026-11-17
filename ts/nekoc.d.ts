@@ -43,10 +43,10 @@ interface ReadonlyArray<T> {
 // numeric bounds; search methods preserve optional positions and split uses a
 // uint32 limit. Receivers/arguments evaluate once in order. Omit undefined;
 // regex, spread and extra arguments are rejected by the compatibility checker.
-// repeat/padStart/padEnd additionally require provably finite bounded growth
-// (65536 count/target/result units); see docs/api.md#typescript-strings. String
+// repeat/padStart/padEnd support dynamic inputs with runtime growth caps
+// (65536 target/result units); see docs/api.md#typescript-strings. String
 // lengths use UTF-16; isolated surrogate results cannot be represented.
-// Runtime code-unit selecting/searching paths require provably BMP-only text;
+// Runtime code-unit selecting/searching paths guard unknown text for BMP safety;
 // safe native includes(search) and split(nonemptySeparator, limit?) also accept
 // complete emoji variables/parameters. See the API's conservative proof boundary.
 

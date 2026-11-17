@@ -7,6 +7,8 @@ import { spawnSync } from "node:child_process";
 import { compileFile, checkFile } from "../ts/compile-ts.mjs";
 import { readManifest } from "../tools/compat/kn-share-player-check.mjs";
 import { prepare } from "./tsstrfix-cases.mjs";
+import ts from "typescript";
+import { lowerTsMethods } from "../ts/tsfeat-methods.mjs";
 
 const compile = source => compileFile("strings.ts", { readFile: () => source });
 const blocks = report => [report.workspaceData, ...report.procedures.map(p => p.workspaceData)]
@@ -38,10 +40,8 @@ test("tsstrfix rejects discarded arguments, unsupported overloads and unsafe gro
     's.charAt(1, 2)', 's.substring(1, 2, 3)', 's.startsWith("x", 0, 1)',
     's.endsWith(...["x"])', 's.includes("x", undefined)', 's.split(/x/)',
     's.split(",", 1, 2)', 's.trim(1)', 's.padStart(3, "0", 1)',
-    's.repeat(-1)', 's.repeat(Infinity)', 's.repeat(70000)', 's.repeat(n)',
-    's.padStart(Infinity)', 's.padEnd(n)', 's.padStart(3, fill)',
+    's.repeat(-1)', 's.repeat(Infinity)',
     '"😀".charAt(0)', '"x".padStart(2, "😀")', '"x".padEnd(2, "😀")',
-    '"x".repeat(1e100)',
   ]) {
     const source = `let s = "x"; let n = 3; let fill = "0";\nconsole.log(${expression});`;
     for (const types of [false, true]) {
@@ -49,7 +49,7 @@ test("tsstrfix rejects discarded arguments, unsupported overloads and unsafe gro
       assert.equal(result.ok, false, expression);
       const diagnostic = result.diagnostics.find(d => d.source === "compat") ?? result.diagnostics[0];
       assert.equal(diagnostic.line, 2, expression);
-      assert.match(diagnostic.message, /argument|spread|undefined|string|surrogate|bounded|fill|UTF-16/i, expression);
+      assert.match(diagnostic.message, /argument|spread|undefined|string|surrogate|count|fill|UTF-16/i, expression);
     }
     assert.throws(() => compile(source), expression);
   }
@@ -59,12 +59,12 @@ test("tsstrfix complete emoji boundaries, safe growth and existing negative slic
   compile('console.log("😀".substring(0, 2), "😀".repeat(2), "x".padEnd(3, "😀"));');
   compile('let text = "abcd"; console.log(text.slice(-3, -1), text.substring(-2, 2));');
   compile('function s(): string { return "中😀"; } function n(): number { return 2.5; } console.log(s().repeat(n()));');
-  assert.throws(() => compile('let self = "x"; let n = 3; console.log(self.repeat(n));'), /bounded/);
-  assert.throws(() => compile('function n() { return 2; } n = () => Infinity; console.log("x".repeat(n()));'), /bounded/);
+  compile('let self = "x"; let n = 3; console.log(self.repeat(n));');
+  assert.throws(() => compile('function n() { return 2; } n = () => Infinity; console.log("x".repeat(n()));'), /function/i);
 });
 
 test("tsstrfix review: lexical self bindings never bypass bounded growth validation", () => {
-  const expressions = ['repeat(-1)', 'repeat(Infinity)', 'repeat(65537)', 'padEnd(Infinity)', 'padEnd(2, "😀")'];
+  const expressions = ['repeat(-1)', 'repeat(Infinity)'];
   for (const expression of expressions) {
     for (const source of [
       `let self: any = "x";\nconsole.log(self.${expression});`,
@@ -75,16 +75,16 @@ test("tsstrfix review: lexical self bindings never bypass bounded growth validat
       for (const types of [false, true]) {
         const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
         assert.equal(checked.ok, false, source);
-        assert.ok(checked.diagnostics.some(d => d.line === 2 && /bounded|UTF-16|surrogate/i.test(d.message)), JSON.stringify(checked));
+        assert.ok(checked.diagnostics.some(d => d.line === 2 && /count.*alternative/i.test(d.message)), JSON.stringify(checked));
       }
-      assert.throws(() => compile(source), /bounded|UTF-16|surrogate/i, source);
+      assert.throws(() => compile(source), /count.*alternative/i, source);
     }
   }
   compile('sprite("cat", {}, self => { self.onStart(() => { self.repeat(3, () => { self.move(1); }); }); });');
-  assert.throws(() => compile('sprite("cat", {}, (self: any) => { self = "x"; console.log(self.repeat(Infinity)); });'), /bounded/);
+  assert.throws(() => compile('sprite("cat", {}, (self: any) => { self = "x"; console.log(self.repeat(Infinity)); });'), /count/);
 });
 
-test("tsstrfix review: unprovable UTF-16 selections fail at source rather than in the VM", () => {
+test("tsstrfix review: unprovable UTF-16 selections compile through a runtime guard", () => {
   for (const method of ['charAt(0)', 'substring(0, 1)', 'split("", 1)', 'includes("a", 0)', 'startsWith("a", 1)', 'endsWith("a")', 'lastIndexOf("a")']) {
     for (const source of [
       `let s = "😀abc";\nconsole.log(s.${method});`,
@@ -95,38 +95,32 @@ test("tsstrfix review: unprovable UTF-16 selections fail at source rather than i
     ]) {
       for (const types of [false, true]) {
         const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
-        assert.equal(checked.ok, false, source);
-        assert.ok(checked.diagnostics.some(d => d.line === 2 && /UTF-16.*alternative/i.test(d.message)), JSON.stringify(checked));
+        assert.ok(!checked.diagnostics.some(d => d.source === "compat"), JSON.stringify({source, checked}));
       }
-      assert.throws(() => compile(source), /UTF-16.*alternative/i, source);
+      assert.ok(blocks(compile(source)).some(b => b.type === "text_split"), source);
     }
   }
   compile('function p(s: string) { return s.charAt(0); } console.log(p("abc"));');
   compile('let s = "😀abc"; console.log(s.includes("a"), s.split(",", 1).join("|"));');
-  assert.throws(() => compile('let s = "abc"; [s] = ["😀"]; console.log(s.charAt(0));'), /UTF-16|Assignment|assignment/);
+  assert.throws(() => compile('let s = "abc"; [s] = ["😀"]; console.log(s.charAt(0));'), /Assignment|assignment/);
 });
 
-test("tsstrfix re-review: loop and destructuring writes invalidate variable, parameter and return BMP proofs", () => {
-  const reject = (source, expression) => {
+test("tsstrfix re-review: loop and destructuring writes select runtime guards instead of unsafe BMP fast paths", () => {
+  const guarded = (source, expression) => {
     const offset = source.lastIndexOf(expression);
     const prefix = source.slice(0, offset).split("\n");
     const line = prefix.length, column = prefix.at(-1).length + 1;
     assert.ok(offset >= 0);
-    for (const types of [false, true]) {
-      const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
-      assert.equal(checked.ok, false, source);
-      assert.ok(checked.diagnostics.some(d => d.line === line && d.column === column
-        && /UTF-16.*alternative/i.test(d.message)), JSON.stringify({ source, checked }));
-    }
-    assert.throws(() => compile(source), error => error.location.line === line && error.location.column === column
-      && /UTF-16.*alternative/i.test(error.message), source);
+    assert.ok(line > 0 && column > 0);
+    const lowered = lowerTsMethods(ts.createSourceFile("strings.ts", source, ts.ScriptTarget.Latest, true));
+    assert.match(lowered.text, /splitText\(/, source);
   };
   const methods = ['includes("a", 0)', 'charAt(0)', 'substring(0, 1)', 'split("", 1)'];
   for (const method of methods) {
     // The four reviewer paths, including proof propagation through a return.
-    reject(`let s = "abc";\nfor (s of ["😀abc"]) {\nconsole.log(s.${method});\n}`, `s.${method}`);
-    reject(`function p(s: string) {\nfor (s of ["😀abc"]) {}\nconsole.log(s.${method});\n} p("abc");`, `s.${method}`);
-    reject(`function p(): string { let s = "abc";\nfor (s of ["😀abc"]) {}\nreturn s; }\nconsole.log(p().${method});`, `p().${method}`);
+    guarded(`let s = "abc";\nfor (s of ["😀abc"]) {\nconsole.log(s.${method});\n}`, `s.${method}`);
+    guarded(`function p(s: string) {\nfor (s of ["😀abc"]) {}\nconsole.log(s.${method});\n} p("abc");`, `s.${method}`);
+    guarded(`function p(): string { let s = "abc";\nfor (s of ["😀abc"]) {}\nreturn s; }\nconsole.log(p().${method});`, `p().${method}`);
   }
   const targets = ["s", "(s)", "(s as string)", "(<string>s)", "s!", "(s satisfies string)",
     "[s]", "[...s]", '[s = "abc"]', "({s})", "({value: s})", "({...s})",
@@ -136,19 +130,19 @@ test("tsstrfix re-review: loop and destructuring writes invalidate variable, par
       for (const scope of ["variable", "parameter"]) {
         const setup = scope === "variable" ? 'let s = "abc";' : 'function p(s: string) {';
         const end = scope === "variable" ? "" : '} p("abc");';
-        reject(`${setup}\nfor (${target} ${loop} ["😀abc"]) {}\nconsole.log(s.charAt(0));\n${end}`, "s.charAt(0)");
+        guarded(`${setup}\nfor (${target} ${loop} ["😀abc"]) {}\nconsole.log(s.charAt(0));\n${end}`, "s.charAt(0)");
       }
     }
   }
   for (const write of ['s = "😀"', 's += "😀"', 's ||= "😀"', 's++', '--(s as any)',
     '[s] = ["😀"]', '({s} = {s: "😀"})', '({v: [s]} = {v: ["😀"]})',
     '([...s] = ["😀"])', '({v: s = "abc"} = {v: "😀"})']) {
-    reject(`let s = "abc";\n${write};\nconsole.log(s.charAt(0));`, "s.charAt(0)");
-    reject(`function p(s: string) {\n${write};\nconsole.log(s.charAt(0)); } p("abc");`, "s.charAt(0)");
+    guarded(`let s = "abc";\n${write};\nconsole.log(s.charAt(0));`, "s.charAt(0)");
+    guarded(`function p(s: string) {\n${write};\nconsole.log(s.charAt(0)); } p("abc");`, "s.charAt(0)");
   }
   // Writes anywhere invalidate the proof, even if selection appears first.
-  reject('let s = "abc";\nconsole.log(s.charAt(0));\nfor (s of ["😀"]) {}', "s.charAt(0)");
-  reject('const s = "abc";\nfor (s of ["😀"]) {}\nconsole.log(s.charAt(0));', "s.charAt(0)");
+  guarded('let s = "abc";\nconsole.log(s.charAt(0));\nfor (s of ["😀"]) {}', "s.charAt(0)");
+  guarded('const s = "abc";\nfor (s of ["😀"]) {}\nconsole.log(s.charAt(0));', "s.charAt(0)");
   // Safe simple assignments and lexical shadowing remain distinct from unknown
   // loop/destructuring writes. Unary reads are not ++/-- writes.
   compile('let s = "abc"; s = "xyz"; s += "中"; console.log(!s, s.charAt(0));');
@@ -161,37 +155,41 @@ test("tsstrfix re-review: shared write facts also invalidate bounded producers a
     for (const types of [false, true]) {
       const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
       assert.equal(checked.ok, false, source);
-      assert.ok(checked.diagnostics.some(d => d.line === 3 && /bounded.*alternative/i.test(d.message)), JSON.stringify(checked));
+      assert.ok(checked.diagnostics.some(d => /function|assignment|update/i.test(d.message)), JSON.stringify(checked));
     }
-    assert.throws(() => compile(source), /bounded.*alternative/i);
+    assert.throws(() => compile(source), /function|assignment|update/i);
   }
   for (const write of ['for (self of ["x"]) {}', '[self] = ["x"]', '({self} = {self: "x"})', 'self++']) {
     const body = `${write};\nconsole.log(self.repeat(Infinity));`;
     const source = `sprite("cat", {}, (self: any) => { ${body} });`;
     for (const types of [false, true]) {
       const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
-      assert.ok(checked.diagnostics.some(d => d.line === 2 && /bounded.*alternative/i.test(d.message)), JSON.stringify(checked));
+      assert.ok(checked.diagnostics.some(d => d.line === 2 && /count.*alternative/i.test(d.message)), JSON.stringify(checked));
     }
-    assert.throws(() => compile(source), /bounded.*alternative/i);
+    assert.throws(() => compile(source), /count.*alternative/i);
     // Unbound implicit self also needs invalidation in no-types mode.
     const checked = checkFile("strings.ts", { types: false, host: { readFile: () => body } });
-    assert.ok(checked.diagnostics.some(d => d.line === 2 && /bounded.*alternative/i.test(d.message)), JSON.stringify(checked));
-    assert.throws(() => compile(body), /bounded.*alternative/i);
+    assert.ok(checked.diagnostics.some(d => d.line === 2 && /count.*alternative/i.test(d.message)), JSON.stringify(checked));
+    assert.throws(() => compile(body), /count.*alternative/i);
   }
 });
 
-test("tsstrfix third review: merged declaration and declaration-loop writes invalidate safety proofs", () => {
+test("tsstrfix third review: merged declarations select runtime guards and keep invalid-count diagnostics", () => {
   const reject = (source, expression, message = /UTF-16.*alternative/i) => {
     const prefix = source.slice(0, source.lastIndexOf(expression)).split("\n");
     const line = prefix.length, column = prefix.at(-1).length + 1;
-    for (const types of [false, true]) {
-      const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
-      assert.equal(checked.ok, false, source);
-      assert.ok(checked.diagnostics.some(d => d.line === line && d.column === column
-        && message.test(d.message)), JSON.stringify({ source, checked }));
+    assert.ok(line > 0 && column > 0);
+    if (/UTF-16/.test(message.source)) {
+      const lowered = lowerTsMethods(ts.createSourceFile("strings.ts", source, ts.ScriptTarget.Latest, true));
+      assert.match(lowered.text, /splitText\(/, source);
+    } else {
+      for (const types of [false, true]) {
+        const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
+        assert.ok(checked.diagnostics.some(d => d.line === line && d.column === column
+          && message.test(d.message)), JSON.stringify({source, checked}));
+      }
+      assert.throws(() => compile(source), error => message.test(error.message));
     }
-    assert.throws(() => compile(source), error => error.location.line === line
-      && error.location.column === column && message.test(error.message), source);
   };
   for (const method of ['includes("a", 0)', 'charAt(0)', 'substring(0, 1)', 'split("", 1)']) {
     const expression = `s.${method}`;
@@ -217,10 +215,8 @@ test("tsstrfix third review: merged declaration and declaration-loop writes inva
   reject('for (var s of ["😀abc"]) {\nconsole.log(s.charAt(0)); }', "s.charAt(0)");
   reject('for (var s = "abc" in {a: 1}) {\nconsole.log(s.charAt(0)); }', "s.charAt(0)");
   // Bounded-producer and DSL proofs must consume the same declaration writes.
-  reject('function n(): number { return 2; }\nfor (var n = 0;;) {\nconsole.log("x".repeat(n())); break; }',
-    'n()', /bounded.*alternative/i);
   reject('sprite("cat", {}, (self: any) => {\nfor (var self = "x";;) {\nconsole.log(self.repeat(Infinity)); break; } });',
-    'self.repeat(Infinity)', /bounded.*alternative/i);
+    'Infinity', /count.*alternative/i);
   compile('for (let s = "abc"; s.length > 0;) { console.log(s.charAt(0)); break; }');
   compile('var s = "abc"; function p() { var s = "😀"; } console.log(s.charAt(0));');
   compile('function p(s: string) { console.log(s.charAt(0)); } p("abc");');

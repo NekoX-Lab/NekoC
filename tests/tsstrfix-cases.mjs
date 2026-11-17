@@ -130,15 +130,56 @@ for (let freshText = "中文"; freshText.length > 0;) {
   console.log(freshText.charAt(0)); break;
 }
 // Hot procedure paths, without wall-clock assertions.
+let dynamicCount = 3;
+let score = 42;
+console.log("=".repeat(dynamicCount)); console.log(String(score).padStart(5, "0"));
+function bar(k: number): string { return "#".repeat(k); }
+console.log(bar(4));
+for (let stars = 1; stars <= 3; stars++) console.log("*".repeat(stars));
+let dynamicFill = "ab";
+function grow(value: string, n: number, fill: string): string {
+  return value.repeat(n) + "|" + value.padStart(n, fill) + "|" + value.padEnd(n, fill);
+}
+for (const n of [0, -0.5, 1, 2.9, 5, Number("NaN")]) console.log(grow("中", n, dynamicFill));
+console.log(grow("x", 5, "")); console.log(grow("😀", 6, "🙂"));
+let inputStrings = ["abc中文", "0123", " a b ", "中文中文"];
+function selectUnknown(s: string, i: number, a: number, b: number, needle: string, from: number, sep: string) {
+  console.log(s.charAt(i)); console.log(s.substring(a, b)); console.log(s.indexOf(needle, from));
+  console.log(s.includes(needle, from)); console.log(s.startsWith(needle, from));
+  console.log(s.endsWith(needle, b)); console.log(s.lastIndexOf(needle, from));
+  console.log(s.split(sep, 3).join("|"));
+}
+for (const input of inputStrings) selectUnknown(input, 1, 1, 4, "中", 1, "");
 for (let hot = 0; hot < 700; hot++) console.log(s.substring(0, 1));
 `;
+
+// Deliberate target-runtime differences: no exceptions or isolated surrogates.
+// Keep explicit expectations separate from the JS-valid Node oracle above.
+export const edgeSource = `
+function boundedRepeat(n: number): string { return "ab".repeat(n); }
+console.log(boundedRepeat(-1)); console.log(boundedRepeat(Infinity));
+console.log(boundedRepeat(-Infinity)); console.log(boundedRepeat(Number("NaN")));
+console.log(boundedRepeat(1e100).length);
+function boundedPad(n: number, fill: string): string { return "x".padEnd(n, fill); }
+console.log(boundedPad(Infinity, "0").length); console.log(boundedPad(-Infinity, "0"));
+console.log(boundedPad(Number("NaN"), "0")); console.log(boundedPad(5, ""));
+console.log(boundedPad(2, "😀")); console.log(boundedPad(3, "😀"));
+function unicodeGuard(s: string) {
+  console.log(s.charAt(0)); console.log(s.substring(0, 1));
+  console.log(s.includes("a", 0)); console.log(s.indexOf("a", 0));
+  console.log(s.split("", 1).join("|"));
+}
+unicodeGuard("😀abc");
+`;
+export const edgeExpected = ["", "", "", "", "65536", "65536", "x", "x", "x", "x", "x😀", "", "", "false", "-1", ""];
 
 export function prepare() {
   const expected = [];
   vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText,
     { console: { log: (...args) => expected.push(args.map(String).join(" ")) } });
   const filename = path.resolve("tests/tsstrfix-generated.ts");
-  const report = compileFile(filename, { readFile: name => path.resolve(name) === filename ? source : undefined });
+  expected.push(...edgeExpected);
+  const report = compileFile(filename, { readFile: name => path.resolve(name) === filename ? source + edgeSource : undefined });
   return { expected, report };
 }
 

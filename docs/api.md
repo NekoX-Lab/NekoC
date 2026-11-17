@@ -56,22 +56,25 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   are not supported. Omit optional arguments rather than passing `undefined`.
 - `padStart`/`padEnd` truncate target length, never truncate the source, and take
   exactly the required prefix of repeated fill (default `" "`, empty fill is a
-  no-op). `repeat` truncates its count toward zero. For safe generation, counts
-  and target lengths must be provably finite constants or functions returning
-  bounded literal values, at most 65536; repeat counts must truncate to a
-  nonnegative number, and receiver/count must prove a result of at most 65536
-  UTF-16 code units. Padding accepts a literal fill or a function returning
-  literal fills. Unknown dynamic inputs, negative repeat counts, non-finites and
-  excessive growth produce located diagnostics with alternatives. This is a
-  deliberate supported subset, not JavaScript's maximum string size or RangeError.
+  no-op). `repeat` truncates its count toward zero. Counts, target lengths,
+  receivers and fill strings can be variables, parameters, expressions or calls.
+  NaN means zero. Helpers save every argument once, in order, before normalization.
+- Known differences for bounded runtime growth: dynamic negative repeat counts
+  (after truncation) and either infinity return `""` instead of throwing RangeError;
+  invalid literal counts are compile errors. Repeat reduces its count to fit at
+  most 65536 UTF-16 units, retaining whole copies. Padding clamps its target to
+  `[0,65536]` (positive infinity becomes 65536), never truncates the receiver,
+  and returns the receiver for empty fill. These limits apply at runtime, not as
+  a requirement to prove bounds at compile time. Helpers grow by doubling.
 - Lengths/indices count UTF-16 code units. Constant results containing isolated
-  surrogates are rejected. Padding with astral fills additionally requires known
-  receiver/length bounds proving complete characters. Complete Chinese/emoji
+  surrogates are rejected. Dynamic padding with a non-BMP fill returns the receiver
+  if padding would require a partial fill copy; complete copies remain supported.
+  This conservative runtime fallback avoids splitting a surrogate pair. Complete Chinese/emoji
   strings and whole-character padding/repeat are supported; arbitrary isolated
   UTF-16 surrogates and `s[i]` returning `undefined` are not represented.
 - Runtime `charAt`/`substring`, `indexOf`/`lastIndexOf`/`endsWith`, and
   `includes`/`startsWith` with an explicit position require a provably BMP-only
-  receiver. The proof follows lexical initializers, all assignments, visible
+  receiver for an unguarded fast path. The proof follows lexical initializers, all assignments, visible
   function returns and direct call arguments, not just a `string` annotation.
   A shared symbol-based write analysis includes wrapped/destructured targets,
   compound assignments, updates, and nondeclaration `for-of`/`for-in` targets.
@@ -83,24 +86,26 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   and declaration-style `for-of`/`for-in` targets invalidate these safety proofs.
   A fresh simple declaration keeps its first initializer as its producer; a
   same-spelled binding in another lexical scope does not invalidate it.
-  Unknown parameters, array elements and class fields are conservatively
-  rejected for these paths, with a source location and alternative. This avoids
-  constructing isolated surrogate temporaries even when a search's final result
-  would be boolean/numeric. Constants still fold with exact JS semantics.
+  Unknown parameters, array elements, class fields and rewritten bindings now
+  compile through a runtime guard: ASCII/Chinese/BMP text uses the normal helper.
+  A non-BMP receiver is replaced with `""` before code-unit selection/search;
+  that method then has the empty receiver's result (e.g. charAt/substring `""`,
+  indexOf `-1` for a nonempty needle). This documented difference prevents a VM
+  isolated-surrogate failure without rejecting common dynamic BMP programs.
+  Arguments still evaluate once in source order. Constants fold with exact JS semantics.
 - `includes(search)` without position and `startsWith(search)` without position
   use native containment/splitting rather than code-unit scanning, so full emoji
   receivers (including variables and parameters) are safe. `split` uses native
   splitting followed by a fresh limited copy; a provably nonempty separator is
-  safe with full emoji and with a limit. An empty or unknown separator requires a
-  provably BMP-only receiver, since splitting an astral character into code units
-  would itself produce unrepresentable strings. Use a nonempty literal separator
-  or keep complete characters instead.
+  safe with full emoji and with a limit. Empty/unknown separators use the same
+  runtime BMP guard when safety is unknown. Prefer a nonempty literal separator
+  when preserving a full emoji receiver is required.
 - Only the actual symbol bound by a `sprite` callback is a DSL receiver; naming
   an ordinary variable/parameter `self`, or asserting `any`, does not exempt it
   from growth validation. Any write (including loops/destructuring/updates) also
-  invalidates a DSL receiver exemption or a bounded function-producer proof.
-  Validated dynamic growth is lowered immediately into
-  a bounded helper; any remaining string repeat/padding at final lowering fails
+  invalidates a DSL receiver exemption or a static producer proof.
+  Dynamic growth is lowered immediately into a runtime-bounded helper;
+  any remaining string repeat/padding at final lowering fails
   closed instead of generating an unchecked loop.
 - String methods reject extra/spread arguments instead of silently discarding
   them. Existing string `slice` keeps its constant-index subset, negative-index

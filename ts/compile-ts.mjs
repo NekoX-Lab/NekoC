@@ -5964,7 +5964,7 @@ class WorkspaceCompiler {
       case "trim": case "trimStart": case "trimEnd": case "toUpperCase": case "toLowerCase":
         return helper(`__str_${method}`);
       case "repeat": case "padStart": case "padEnd":
-        this.unsupported(call, `String.${method} requires validated bounded growth; use a constant receiver/count or a function returning bounded literals instead of an unknown receiver`);
+        this.unsupported(call, `String.${method} requires runtime-bounded method lowering; use a direct string method call with a string receiver`);
       case "concat": return this.compileTextJoin([{ expression: target }, ...Array.from(args, (arg) => ({ expression: arg }))], parentId);
       case "split": return helper("__str_split", args[0] ?? literal(""), args[1] ?? literal(4294967295), literal(args.length > 0 ? 1 : 0));
       default:

@@ -390,32 +390,32 @@ export function lowerTsMethods(sourceFile) {
       && call.arguments[2] === callback && callback.parameters[0] === declaration;
   };
   const checkGrowth = (node, receiver, method, args) => {
-    const counts = possible(args[0]);
-    const texts = possible(receiver);
-    const fills = args.length > 1 ? possible(args[1]) : [" "];
-    if (kind(receiver) !== "string" && !texts?.every(s => typeof s === "string")) {
-      fail(receiver, `${method} requires a statically string receiver for bounded growth`, "use an accurate string type and bounded literal inputs instead of any/unknown");
-    }
-    if (!counts || counts.some(n => typeof n !== "number" || !Number.isFinite(n)
-      || method === "repeat" && Math.trunc(n) < 0 || Math.trunc(n) > 65536)) {
-      fail(args[0], `${method} requires a provably finite bounded ${method === "repeat" ? "nonnegative count" : "target length"} (at most 65536)`, "use a numeric constant or a function with bounded literal returns; validate dynamic input before choosing a bounded literal");
-    }
-    if (method === "repeat") {
-      if (!texts || texts.some(s => typeof s !== "string" || counts.some(n => s.length * Math.trunc(n) > 65536))) {
-        fail(node, "repeat requires a provably bounded result (at most 65536 UTF-16 code units)", "use a constant string or a function returning bounded literal strings, and a bounded count");
-      }
-    } else {
-      if (!fills || fills.some(s => typeof s !== "string")) fail(node, "padding requires a statically known fill alphabet", "use a literal fill string or a function returning literal strings");
-      if (fills.some(s => /[\uD800-\uDFFF]/.test(s))) {
-        if (!texts || texts.some(s => typeof s !== "string")) fail(node, "padding cannot prove a complete UTF-16 character boundary", "use a BMP fill string or a constant receiver and target length");
-        for (const s of texts) for (const n of counts) for (const fill of fills) {
-          literal(s[method](n, fill), node); // validates, does not replace effects
-        }
-      }
+    const count = constant(args[0]);
+    if (method === "repeat" && typeof count === "number"
+      && (Math.trunc(count) < 0 || Math.abs(count) === Infinity)) {
+      fail(args[0], "repeat has an invalid negative or infinite constant count", "use a nonnegative finite count; dynamic invalid counts return an empty string");
     }
   };
+  let bmpGuard;
+  const runtimeBmpGuard = () => {
+    if (bmpGuard) return bmpGuard;
+    bmpGuard = fresh();
+    const text = fresh(), parts = fresh(), item = fresh(), rebuilt = fresh();
+    // splitText never selects a surrogate with text_select. The official player
+    // keeps code units; the VM replaces isolated units. Check both representations
+    // before any unit-selecting block, without relying on a mutable-source proof.
+    helpers.push(`function ${bmpGuard}(${text}: string): boolean {
+      const ${parts} = splitText(${text}, ""); let ${rebuilt} = "";
+      for (const ${item} of ${parts}) {
+        if (String(${item}) > "\uD7FF" && String(${item}) < "\uE000") return false;
+        ${rebuilt} = join(${rebuilt}, ${item});
+      }
+      return ${rebuilt} === ${text};
+    }`);
+    return bmpGuard;
+  };
   const growthHelper = (node, receiver, method, args, visit) => {
-    for (const builtin of ["Math", "join", "length", "selectText"]) {
+    for (const builtin of ["Math", "String", "join", "length", "selectText", "splitText"]) {
       if (checker.resolveName(builtin, node, ts.SymbolFlags.Value, false)?.declarations?.length) {
         fail(node, `Cannot lower ${method} while ${builtin} is shadowed`, `rename the local ${builtin} binding`);
       }
@@ -423,15 +423,29 @@ export function lowerTsMethods(sourceFile) {
     const name = fresh(), text = fresh(), count = fresh(), fill = fresh();
     const out = fresh(), index = fresh(), needed = fresh();
     helpers.push(method === "repeat" ? `function ${name}(${text}: string, ${count}: number): string {
+      if (String(${count}) === "NaN") ${count} = 0;
+      if (Math.trunc(${count}) < 0 || String(${count}) === "Infinity" || String(${count}) === "-Infinity") return "";
+      if (length(${text}) === 0) return "";
+      ${count} = Math.min(Math.max(0, Math.trunc(${count})), Math.floor(65536 / length(${text})));
       let ${out} = "";
-      for (let ${index} = 0; ${index} < Math.trunc(${count}); ${index}++) ${out} = join(${out}, ${text});
+      while (${count} > 0) {
+        if (${count} % 2 === 1) ${out} = join(${out}, ${text});
+        ${count} = Math.floor(${count} / 2);
+        if (${count} > 0) ${text} = join(${text}, ${text});
+      }
       return ${out};
     }` : `function ${name}(${text}: string, ${count}: number, ${fill}: string): string {
+      if (String(${count}) === "NaN") ${count} = 0;
+      ${count} = Math.min(65536, Math.max(0, Math.trunc(${count})));
       const ${needed}: number = Math.max(0, Math.trunc(${count}) - length(${text}));
       if (${needed} === 0 || length(${fill}) === 0) return ${text};
+      if (${needed} % length(${fill}) !== 0 && !${runtimeBmpGuard()}(${fill})) return ${text};
       let ${out} = "";
-      while (length(${out}) < ${needed}) ${out} = join(${out}, ${fill});
-      ${out} = selectText(${out}, 1, ${needed});
+      while (length(${out}) + length(${fill}) <= ${needed}) {
+        ${out} = join(${out}, ${fill});
+        if (length(${out}) + length(${fill}) * 2 <= ${needed}) ${fill} = join(${fill}, ${fill});
+      }
+      if (length(${out}) < ${needed}) ${out} = join(${out}, selectText(${fill}, 1, ${needed} - length(${out})));
       return ${method === "padStart" ? `join(${out}, ${text})` : `join(${text}, ${out})`};
     }`);
     const actual = [receiver, ...args];
@@ -519,7 +533,10 @@ export function lowerTsMethods(sourceFile) {
           const text = constant(receiver);
           if (["repeat", "padStart", "padEnd"].includes(method)) checkGrowth(node, receiver, method, args);
           if (["charAt", "substring", "includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "split", "repeat", "padStart", "padEnd"].includes(method)
-            && typeof text === "string" && values.every(v => v !== UNKNOWN && (typeof v === "string" || typeof v === "number"))) {
+            && typeof text === "string" && values.every(v => v !== UNKNOWN && (typeof v === "string" || typeof v === "number"))
+            && (!["repeat", "padStart", "padEnd"].includes(method)
+              || Number.isFinite(values[0]) && values[0] <= 65536
+                && (method !== "repeat" || text.length * Math.max(0, Math.trunc(values[0])) <= 65536))) {
             const output = fold(node, () => text[method](...values));
             return replace(node, Array.isArray(output) ? f.createArrayLiteralExpression(output.map(v => literal(v, node))) : literal(output, node));
           }
@@ -528,7 +545,16 @@ export function lowerTsMethods(sourceFile) {
             || method === "includes" && args.length > 1
             || method === "split" && args.length > 0 && !(possible(args[0])?.every(v => typeof v === "string" && v.length > 0));
           if (selectsUnits && !bmp(receiver)) {
-            fail(node, `${method} cannot prove safe UTF-16 character boundaries for this receiver`, "use constant text and indices, a provably BMP-only string, includes(search) without position, or split with a nonempty literal separator");
+            for (const builtin of ["String", "join", "splitText"]) {
+              if (checker.resolveName(builtin, node, ts.SymbolFlags.Value, false)?.declarations?.length) {
+                fail(node, `Cannot guard ${method} while ${builtin} is shadowed`, `rename the local ${builtin} binding`);
+              }
+            }
+            const name = fresh(), textArg = fresh();
+            helpers.push(`function ${name}(${textArg}: string): string { if (!${runtimeBmpGuard()}(${textArg})) return ""; return ${textArg}; }`);
+            return replace(node, f.updateCallExpression(node,
+              f.updatePropertyAccessExpression(callee, f.createCallExpression(f.createIdentifier(name), undefined, [ts.visitNode(receiver, visit)]), callee.name),
+              node.typeArguments, args.map(arg => ts.visitNode(arg, visit))));
           }
           if (["repeat", "padStart", "padEnd"].includes(method)) return replace(node, growthHelper(node, receiver, method, args, visit));
         }

@@ -73,13 +73,11 @@
 - `.length`、`s[i]`、`s.charAt(i)`、`s.slice(a, b)`、`s.substring(a, b)`、`s.includes(x, position?)`、`s.split(sep?, limit?)`。
 - `charAt/substring` 按接收者、实参顺序各求值一次；数字下标向零截断，substring 钳位到 `[0,length]` 后交换反序边界，相等返回空串。charAt 越界返回空串。NaN 按 0，Infinity 按边界处理；不修改原生 selectText 的反向截取规则。slice 保持原有常量下标（含负数）和半开空区间语义，不交换边界。
 - `startsWith/includes/indexOf` 的 position 默认 0；`endsWith` 的 endPosition、`lastIndexOf` 的 position 默认文本长度。支持负数/小数/超界/空 needle；lastIndexOf 的 NaN 按末端，其余按 0。split limit 按 uint32 截断/模 2^32（非有限值按 0），省略为 2^32−1；每次返回新数组，接收者不变。额外实参、spread、显式 undefined 和正则/强制转换重载定位拒绝，提示省略可选参数或使用字符串。
-- padding 精确补至截断后的长度，空 fill 或无需补齐直接返回；repeat 次数向零截断。为避免无可靠 RangeError 的目标平台无限增长，仅接受可证明有限且不超过 65536 的常量或返回有限字面量的函数作为长度/次数；repeat 还须证明接收者/次数组合的结果不超过 65536 UTF-16 单元，次数截断后非负。fill 须为字面量或返回字面量的函数；会切开代理对的常量或无法证明完整边界的 astral fill 明确拒绝。不是完整 JS 资源上限语义，详见 docs/api.md。
+- padding 精确补至截断后的长度，空 fill 或无需补齐直接返回；repeat 次数向零截断。支持动态变量/表达式/函数/循环次数、目标长度和 fill。NaN 按 0；动态 repeat 负整数/正负 Infinity 返回空串，非法常量计数可编译报错；repeat 运行时只保留总长不超过 65536 UTF-16 单元的完整副本，padding target 运行时钳位到 [0,65536] 且不截原串。非 BMP fill 若需不完整副本则保守返回原串，常量可精确折叠时仍检查孤立代理项。以上是已知差异，不是完整 JS RangeError/资源语义，详见 docs/api.md。
 - `indexOf`、`lastIndexOf`、`startsWith`、`endsWith`、`replace`、`replaceAll`、`trim`、`trimStart`、`trimEnd`、`repeat`、`padStart`、`padEnd`、`toUpperCase`、`toLowerCase`（只转换英文字母）、`concat`。
   - 这些方法没有对应积木，编译器会生成用循环实现的辅助自制积木，用到哪个才加哪个。
   - 比较字符时用的是积木的"等于"，和积木本身的规则一致（例如数字形式的文本 `"1.0"` 和 `"1"` 视为相等）。
-- UTF-16 安全子集：运行时 charAt/substring/indexOf/lastIndexOf/endsWith、显式 position 的 includes/startsWith 需证明接收者仅含 BMP；分析按词法符号检查初始化/全部赋值、函数返回和直接调用实参，未知形参、数组元素、class 字段等保守定位拒绝。常量仍按 JS 折叠；不以 string 注解假定没有 emoji。无 position 的 includes/startsWith 和确定非空 separator 的 split 使用原生积木，不扫描出孤立代理项，支持变量/形参中的完整 emoji，split limit 通过分割后复制限制。空或未知 separator 须证明接收者 BMP，否则明确拒绝。普通名为 self 的变量/形参及 any/as 不豁免增长校验；真实 sprite callback 参数按绑定识别，最终 lowering 对未验证增长失败关闭。
-- BMP、增长函数来源和 DSL 豁免共用按符号收集的写入事实，涵盖普通/复合赋值、++/--、非声明 for-of/for-in initializer，以及括号、as、非空断言、解构目标。循环/解构/更新写入保守取消变量和形参的 BMP 证明（即使来源看似 BMP）；只对可证明 BMP 的简单 =/+= 保留变量证明。所有这些写入也取消函数来源的增长边界证明和被改写 DSL 参数/隐式 self 的豁免，不依赖后续编译器偶然拒绝解构。
-- 声明式写入同样纳入证明：重复/合并 var（含 C-style for initializer、形参与 var 合并）、解构声明和声明式 for-of/for-in 目标保守取消证明，而不是仅读取 symbol.valueDeclaration 的第一次初始化。检查全部 declarations，并按读取位置解析到的实际符号处理函数/var 冲突；新简单声明仍以首次 initializer 为来源，不污染不同词法作用域的同名绑定。
+- UTF-16 安全：BMP 证明只作为快速路径优化。未知形参/容器/字段/被循环与声明重写的绑定不再编译拒绝，而在代码单元选择/搜索前运行时检查；ASCII/中文保持正常结果，非 BMP 保守替换为空接收者，避免孤立代理项 VM 异常（文档化差异）。无 position includes/startsWith 和确定非空 separator split 仍使用安全原生路径保留 emoji；空/未知 separator 走 guard。写入事实继续覆盖赋值、更新、循环、解构和全部合并声明，使不可靠静态证明转为 guard。普通 self/any/as 不豁免运行时安全限制。
 - `join()`、`selectText()`、`length(x)`。
 
 ### 数组（列表值）
