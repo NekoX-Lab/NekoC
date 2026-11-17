@@ -1411,7 +1411,7 @@ class WorkspaceCompiler {
       "Math.sign": "function __jsSign(__jsSignX) { if (__jsSignX === 0) return __jsSignX; if (__jsSignX > 0) return 1; if (__jsSignX < 0) return -1; return __jsSignX; }",
       "Math.cbrt": "function __jsCbrt(__jsCbrtX) { if (__jsCbrtX < 0) return -Math.pow(-__jsCbrtX, 1 / 3); return Math.pow(__jsCbrtX, 1 / 3); }",
       "Math.log2": "function __jsLog2(__jsLog2X) { return Math.log(__jsLog2X) / Math.LN2; }",
-      "Number.isInteger": "function __jsIsInteger(__jsIntegerX) { return __jsIntegerX === Math.trunc(__jsIntegerX); }",
+      "Number.isInteger": "function __jsIsInteger(__jsIntegerX) { return String(__jsIntegerX) !== \"NaN\" && String(__jsIntegerX) !== \"Infinity\" && String(__jsIntegerX) !== \"-Infinity\" && __jsIntegerX === Math.trunc(__jsIntegerX); }",
       "Math.atan2": "function __jsAtan2(__jsAtanY, __jsAtanX) { if (__jsAtanX > 0) return Math.atan(__jsAtanY / __jsAtanX); if (__jsAtanX < 0) { if (__jsAtanY < 0) return Math.atan(__jsAtanY / __jsAtanX) - Math.PI; return Math.atan(__jsAtanY / __jsAtanX) + Math.PI; } if (__jsAtanY > 0) return Math.PI / 2; if (__jsAtanY < 0) return -Math.PI / 2; return 0; }",
     };
     const globalNames = { "Math.sign": "__jsSign", "Math.cbrt": "__jsCbrt", "Math.log2": "__jsLog2", "Math.atan2": "__jsAtan2", "Number.isInteger": "__jsIsInteger" };
@@ -5174,12 +5174,31 @@ class WorkspaceCompiler {
         // Every argument is evaluated once, left to right, then compared:
         // max(a, b, c) is max2(a, max(b, c)) with a evaluated first.
         const rest = args.length === 2 ? args[1] : ts.factory.createCallExpression(call.expression, undefined, args.slice(1));
+        // Parsed numeric types and synthesized numeric helpers use KN's verified
+        // String(number) representation (docs/kn-conversion-evidence.json).
+        // Do not use x === x: KN equality does not follow JS NaN equality.
+        // Keep legacy nonnumeric call forms; this adds no coercion or rejection.
+        const numeric = args.every(arg => {
+          const kind = this.expressionType?.(arg);
+          return kind === "number" || (kind == null && !this.isStringExpression(arg));
+        });
         return evaluatedChoice(this, [args[0], rest], parentId, ([a, b], definition) =>
           returnChoice(this, definition, parent => {
-            const cmp = this.addBlock({ type: "logic_compare", parent_id: parent, fields: { OP: method === "max" ? "GT" : "LT" }, is_output: true });
+            const choice = numeric ? this.addBlock({ type: "logic_operation", parent_id: parent, fields: { type: "or" }, is_output: true }) : null;
+            const cmp = this.addBlock({ type: "logic_compare", parent_id: choice ?? parent, fields: { OP: method === "max" ? "GT" : "LT" }, is_output: true });
             this.connectInput(cmp, this.compileExpression(a, cmp), "A", "value");
             this.connectInput(cmp, this.compileExpression(b, cmp), "B", "value");
-            return cmp;
+            if (!choice) return cmp;
+            const nan = this.addBlock({ type: "logic_compare", parent_id: choice, fields: { OP: "EQ" }, is_output: true });
+            const text = ts.factory.createCallExpression(ts.factory.createIdentifier("String"), undefined, [a]);
+            this.connectInput(nan, this.compileExpression(text, nan), "A", "value");
+            this.connectInput(nan, this.compileExpression(ts.factory.createStringLiteral("NaN"), nan), "B", "value");
+            this.connectInput(choice, nan, "A", "value");
+            this.connectInput(choice, cmp, "B", "value");
+            // All original arguments have already run before this branch, even
+            // when a is NaN. Return the original numeric NaN, never text "NaN".
+            // A NaN b already wins because GT/LT with NaN is false.
+            return choice;
           }, parent => this.compileExpression(a, parent), parent => this.compileExpression(b, parent)));
       }
       case "random": {
