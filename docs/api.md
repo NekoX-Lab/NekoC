@@ -222,7 +222,13 @@ The ES2020 declarations include the implemented
   comparators remain supported. Sparse arrays and undefined sort keys have not
   been verified.
 - `const [head, ...tail] = value` evaluates `value` once and copies the remaining
-  elements into a new list. Nested/default destructuring is rejected.
+  elements into a new list (shallow: array/object/instance elements keep their
+  reference identity). Top-level array bindings are registered globally, then
+  initialized at their source position in the implicit startup script, before
+  explicit root `onStart` handlers. Omitted bindings (`[head, , third]`) and other
+  declarations in the same statement are supported. Nested/default patterns and
+  object destructuring are rejected; sparse/missing-element semantics and normal
+  array out-of-bounds access are unchanged.
 - `a.at(index)` supports negative indices and truncates fractional indices.
   The ES2020 declaration set includes this frontend-supported method.
 - Array `slice(start?, end?)` evaluates its receiver once, then each explicit
