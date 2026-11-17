@@ -923,7 +923,7 @@ class WorkspaceCompiler {
       const simpleStatement = ts.isBlock(fn.body) && !hasReturn;
       // Array helpers and their callbacks must freeze reference arguments and
       // keep mutable loop state in the invocation frame, even for simple bodies.
-      const arrayHelper = name.startsWith("__arr") || /^__(cb|map|filter|forEach|reduce|find|findIndex|some|every)\d+$/.test(name);
+      const arrayHelper = name.startsWith("__arr") || name.startsWith("__str_") || /^__(cb|map|filter|forEach|reduce|find|findIndex|some|every)\d+$/.test(name);
       returnValues.set(name, returnsValue);
       if (!this.objectSlots.size && !fn.classGenerated && !arrayHelper
         && !reaches(name, name) && (simpleExpression || simpleStatement)) {
@@ -5735,6 +5735,38 @@ class WorkspaceCompiler {
     }
   }
 
+  checkStringMethodArguments(call) {
+    const method = call.expression.name.text;
+    const limits = { charAt: [0, 1], substring: [0, 2], slice: [0, 2],
+      includes: [1, 2], indexOf: [1, 2], lastIndexOf: [1, 2], startsWith: [1, 2], endsWith: [1, 2],
+      split: [0, 2], repeat: [1, 1], padStart: [1, 2], padEnd: [1, 2], concat: [0, Infinity],
+      replace: [2, 2], replaceAll: [2, 2], trim: [0, 0], trimStart: [0, 0], trimEnd: [0, 0],
+      toUpperCase: [0, 0], toLowerCase: [0, 0] };
+    if (!Object.hasOwn(limits, method)) return;
+    const [min, max] = limits[method];
+    if (call.arguments.length < min || call.arguments.length > max) {
+      this.unsupported(call, `String.${method} supports ${min}..${max} arguments; remove extra arguments or split the operation into separate calls`);
+    }
+    for (const arg of call.arguments) {
+      if (ts.isSpreadElement(arg)) this.unsupported(arg, `String.${method} spread is not supported; pass each argument explicitly`);
+      if (ts.isIdentifier(stripParens(arg)) && stripParens(arg).text === "undefined") {
+        this.unsupported(arg, `String.${method} explicit undefined is not supported; omit the optional argument instead`);
+      }
+    }
+    const numeric = ["charAt", "substring", "slice", "repeat", "padStart", "padEnd"].includes(method)
+      ? (method === "padStart" || method === "padEnd" || method === "repeat" ? [0] : [0, 1])
+      : ["includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "split"].includes(method) ? [1] : [];
+    for (const index of numeric) {
+      if (call.arguments[index] && this.expressionType?.(call.arguments[index]) !== "number") {
+        this.unsupported(call.arguments[index], `String.${method} numeric argument required; convert to a number before the call or omit the optional argument`);
+      }
+    }
+    if (["includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "split", "replace", "replaceAll"].includes(method)
+      && call.arguments[0] && this.expressionType?.(call.arguments[0]) !== "string") {
+      this.unsupported(call.arguments[0], `String.${method} supports string search/separator only; use a string instead of a regular expression or coercing overload`);
+    }
+  }
+
   checkCallbackShrink(call, method) {
     const functions = new Map();
     const procedures = new Map();
@@ -5861,6 +5893,7 @@ class WorkspaceCompiler {
     const method = call.expression.name.text;
     const args = call.arguments;
     if (this.isArrayExpression(target)) this.checkArrayMethodArguments(call);
+    else this.checkStringMethodArguments(call);
     const literal = (value) => (typeof value === "number" ? ts.factory.createNumericLiteral(value) : ts.factory.createStringLiteral(value));
     const helper = (name, ...extra) => this.compileHelperCall(name, target, extra, parentId);
     const synthesized = this.helperCalls.get(call);
@@ -5903,16 +5936,11 @@ class WorkspaceCompiler {
       return null;
     }
     switch (method) {
-      case "includes": {
-        const id = this.addBlock({ type: "text_contain", parent_id: parentId, is_output: true });
-        this.connectInput(id, this.compileExpression(target, id), "A", "value");
-        this.connectInput(id, this.compileExpression(args[0], id), "B", "value");
-        return id;
-      }
-      case "charAt":
-      case "slice":
-      case "substring": {
-        if (method !== "charAt" && args.some((arg) => { const v = constantNumber(arg); return v !== null && v < 0; })) {
+      case "includes": return helper(args.length > 1 ? "__str_includes" : "__str_contains", args[0], ...(args.length > 1 ? [args[1]] : []));
+      case "charAt": return helper("__str_charAt", args[0] ?? literal(0));
+      case "substring": return helper("__str_substring", args[0] ?? literal(0), args[1] ?? literal(0), literal(args.length > 1 ? 1 : 0));
+      case "slice": {
+        if (args.some((arg) => { const v = constantNumber(arg); return v !== null && v < 0; })) {
           this.unsupported(call, `${method} with negative indices is not supported`);
         }
         const id = this.addBlock({
@@ -5923,30 +5951,22 @@ class WorkspaceCompiler {
         });
         this.connectInput(id, this.compileExpression(target, id), "text", "value");
         this.connectInput(id, this.compilePlusOne(args[0] ?? ts.factory.createNumericLiteral(0), id), "start_index", "value");
-        let endId;
-        if (method === "charAt") endId = this.compilePlusOne(args[0], id);
-        else if (args[1]) endId = this.compileExpression(args[1], id);
-        else endId = this.compileLength(target, id);
+        const endId = args[1] ? this.compileExpression(args[1], id) : this.compileLength(target, id);
         this.connectInput(id, endId, "end_index", "value");
         return id;
       }
       case "indexOf": return helper("__str_indexOf", args[0], args[1] ?? literal(0));
-      case "lastIndexOf": return helper("__str_lastIndexOf", args[0]);
-      case "startsWith": return helper("__str_startsWith", args[0]);
-      case "endsWith": return helper("__str_endsWith", args[0]);
+      case "lastIndexOf": return helper("__str_lastIndexOf", args[0], args[1] ?? literal(0), literal(args.length > 1 ? 1 : 0));
+      case "startsWith": return args.length > 1 ? helper("__str_startsWith", args[0], args[1]) : helper("__str_starts", args[0]);
+      case "endsWith": return helper("__str_endsWith", args[0], args[1] ?? literal(0), literal(args.length > 1 ? 1 : 0));
       case "replace": return helper("__str_replace", args[0], args[1]);
       case "replaceAll": return helper("__str_replaceAll", args[0], args[1]);
       case "trim": case "trimStart": case "trimEnd": case "toUpperCase": case "toLowerCase":
         return helper(`__str_${method}`);
-      case "repeat": return helper("__str_repeat", args[0]);
-      case "padStart": case "padEnd": return helper(`__str_${method}`, args[0], args[1] ?? literal(" "));
+      case "repeat": case "padStart": case "padEnd":
+        this.unsupported(call, `String.${method} requires runtime-bounded method lowering; use a direct string method call with a string receiver`);
       case "concat": return this.compileTextJoin([{ expression: target }, ...Array.from(args, (arg) => ({ expression: arg }))], parentId);
-      case "split": {
-        const id = this.addBlock({ type: "text_split", parent_id: parentId, is_output: true });
-        this.connectInput(id, this.compileExpression(target, id), "TEXT_TO_SPLIT", "value");
-        this.connectInput(id, this.compileExpression(args[0], id), "SPLIT_TEXT", "value");
-        return id;
-      }
+      case "split": return helper("__str_split", args[0] ?? literal(""), args[1] ?? literal(4294967295), literal(args.length > 0 ? 1 : 0));
       default:
         return null;
     }
@@ -6522,18 +6542,24 @@ const SHARED_HELPERS = {
   // Official convert_type(type=string) calls String(value); logic_compare
   // GT uses JS > (crc_libs.8196dbd1.js, module 70542, offset 820058).
   __arr_sort: { source: sortHelper("__arr_sort", 'String(__arrL[__bD]) > String(__vD)', "D") },
-  __str_indexOf: { source: `function __str_indexOf(__s, __t, __from) { for (let __iK = __from; __iK <= length(__s) - length(__t); __iK++) { if (selectText(__s, __iK + 1, __iK + length(__t)) === __t) { return __iK; } } return -1; }` },
-  __str_lastIndexOf: { source: `function __str_lastIndexOf(__s, __t) { for (let __lK = length(__s) - length(__t); __lK >= 0; __lK--) { if (selectText(__s, __lK + 1, __lK + length(__t)) === __t) { return __lK; } } return -1; }` },
-  __str_startsWith: { source: `function __str_startsWith(__s, __t) { return selectText(__s, 1, length(__t)) === __t; }` },
-  __str_endsWith: { source: `function __str_endsWith(__s, __t) { return selectText(__s, length(__s) - length(__t) + 1, length(__s)) === __t; }` },
+  __str_position: { source: `function __str_position(__position, __size) { if (String(__position) === "NaN") return 0; return Math.trunc(Math.max(0, Math.min(__position, __size))); }` },
+  __str_range: { source: `function __str_range(__s, __lo, __hi) { if (__lo >= __hi) return ""; return selectText(__s, __lo + 1, __hi); }` },
+  __str_charAt: { source: `function __str_charAt(__s, __input) { let __index = __input; if (String(__index) === "NaN") __index = 0; if (__index <= -1 || __index >= length(__s)) return ""; const __charIndex = Math.trunc(__index) + 1; return selectText(__s, __charIndex, __charIndex); }` },
+  __str_substring: { needs: ["__str_position", "__str_range"], source: `function __str_substring(__s, __start, __end, __given) { const __size = length(__s); const __lo = __str_position(__start, __size); let __hi = __size; if (__given) __hi = __str_position(__end, __size); return __str_range(__s, Math.min(__lo, __hi), Math.max(__lo, __hi)); }` },
+  __str_indexOf: { needs: ["__str_position", "__str_range"], source: `function __str_indexOf(__s, __t, __from) { const __start = __str_position(__from, length(__s)); if (length(__t) === 0) return __start; for (let __iK = __start; __iK <= length(__s) - length(__t); __iK++) { if (__str_range(__s, __iK, __iK + length(__t)) === __t) return __iK; } return -1; }` },
+  __str_includes: { needs: ["__str_indexOf"], source: `function __str_includes(__s, __t, __from) { return __str_indexOf(__s, __t, __from) >= 0; }` },
+  __str_contains: { source: `function __str_contains(__s, __t) { return contains(__s, __t); }` },
+  __str_firstIndex: { source: `function __str_firstIndex(__s, __t) { if (length(__t) === 0) return 0; const __parts = splitText(__s, __t); if (__parts.length < 2) return -1; return length(__parts[0]); }` },
+  __str_starts: { needs: ["__str_firstIndex"], source: `function __str_starts(__s, __t) { return __str_firstIndex(__s, __t) === 0; }` },
+  __str_lastIndexOf: { needs: ["__str_position", "__str_range"], source: `function __str_lastIndexOf(__s, __t, __from, __given) { let __start = length(__s); if (__given && String(__from) !== "NaN") __start = __str_position(__from, length(__s)); if (length(__t) === 0) return __start; for (let __lK = Math.min(__start, length(__s) - length(__t)); __lK >= 0; __lK--) { if (__str_range(__s, __lK, __lK + length(__t)) === __t) return __lK; } return -1; }` },
+  __str_startsWith: { needs: ["__str_position", "__str_range"], source: `function __str_startsWith(__s, __t, __from) { const __start = __str_position(__from, length(__s)); if (length(__t) === 0) return true; if (__start + length(__t) > length(__s)) return false; return __str_range(__s, __start, __start + length(__t)) === __t; }` },
+  __str_endsWith: { needs: ["__str_position", "__str_range"], source: `function __str_endsWith(__s, __t, __from, __given) { let __end = length(__s); if (__given) __end = __str_position(__from, length(__s)); if (length(__t) === 0) return true; if (length(__t) > __end) return false; return __str_range(__s, __end - length(__t), __end) === __t; }` },
+  __str_split: { source: `function __str_split(__s, __separator, __inputLimit, __given) { const __out = []; let __limit = __inputLimit; if (String(__limit) === "NaN" || String(__limit) === "Infinity" || String(__limit) === "-Infinity") __limit = 0; __limit = Math.trunc(__limit) % 4294967296; if (__limit < 0) __limit += 4294967296; if (__limit === 0) return __out; if (!__given) { __out.push(__s); return __out; } const __parts = splitText(__s, __separator); let __cursor = 0; while (__cursor < __parts.length && __out.length < __limit) { __out.push(__parts[__cursor]); __cursor++; } return __out; }` },
   __str_replace: { needs: ["__str_indexOf"], source: `function __str_replace(__s, __a, __b) { const __rI = __str_indexOf(__s, __a, 0); if (__rI < 0) { return __s; } return join(selectText(__s, 1, __rI), __b, selectText(__s, __rI + length(__a) + 1, length(__s))); }` },
   __str_replaceAll: { needs: ["__str_indexOf"], source: `function __str_replaceAll(__s, __a, __b) { let __aO = ""; let __aP = 0; let __aI = __str_indexOf(__s, __a, 0); while (__aI >= 0 && length(__a) > 0) { __aO = join(__aO, selectText(__s, __aP + 1, __aI), __b); __aP = __aI + length(__a); __aI = __str_indexOf(__s, __a, __aP); } return join(__aO, selectText(__s, __aP + 1, length(__s))); }` },
   __str_trimStart: { source: `function __str_trimStart(__s) { let __tA = 1; while (__tA <= length(__s) && contains(" \\t\\n\\r", selectText(__s, __tA, __tA))) { __tA = __tA + 1; } return selectText(__s, __tA, length(__s)); }` },
   __str_trimEnd: { source: `function __str_trimEnd(__s) { let __tB = length(__s); while (__tB >= 1 && contains(" \\t\\n\\r", selectText(__s, __tB, __tB))) { __tB = __tB - 1; } return selectText(__s, 1, __tB); }` },
   __str_trim: { needs: ["__str_trimStart", "__str_trimEnd"], source: `function __str_trim(__s) { return __str_trimEnd(__str_trimStart(__s)); }` },
-  __str_repeat: { source: `function __str_repeat(__s, __n) { let __pO = ""; for (let __pK = 0; __pK < __n; __pK++) { __pO = join(__pO, __s); } return __pO; }` },
-  __str_padStart: { source: `function __str_padStart(__s, __n, __f) { let __qO = __s; while (length(__qO) < __n && length(__f) > 0) { __qO = join(__f, __qO); } return __qO; }` },
-  __str_padEnd: { source: `function __str_padEnd(__s, __n, __f) { let __qE = __s; while (length(__qE) < __n && length(__f) > 0) { __qE = join(__qE, __f); } return __qE; }` },
   __str_toUpperCase: { needs: ["__str_indexOf"], source: `function __str_toUpperCase(__s) { let __uO = ""; for (let __uK = 1; __uK <= length(__s); __uK++) { const __uC = selectText(__s, __uK, __uK); const __uI = __str_indexOf("abcdefghijklmnopqrstuvwxyz", __uC, 0); if (__uI >= 0) { __uO = join(__uO, selectText("ABCDEFGHIJKLMNOPQRSTUVWXYZ", __uI + 1, __uI + 1)); } else { __uO = join(__uO, __uC); } } return __uO; }` },
   __str_toLowerCase: { needs: ["__str_indexOf"], source: `function __str_toLowerCase(__s) { let __wO = ""; for (let __wK = 1; __wK <= length(__s); __wK++) { const __wC = selectText(__s, __wK, __wK); const __wI = __str_indexOf("ABCDEFGHIJKLMNOPQRSTUVWXYZ", __wC, 0); if (__wI >= 0) { __wO = join(__wO, selectText("abcdefghijklmnopqrstuvwxyz", __wI + 1, __wI + 1)); } else { __wO = join(__wO, __wC); } } return __wO; }` },
 };
@@ -6543,9 +6569,10 @@ const METHOD_HELPERS = {
   join: ["__arr_join"], slice: ["__arr_slice"], reverse: ["__arr_reverse"],
   at: ["__arr_at"], flat: ["__arr_flat"],
   lastIndexOf: ["__arr_lastIndexOf", "__str_lastIndexOf"], pop: ["__arr_pop"], shift: ["__arr_shift"],
-  sort: ["__arr_sort"], includes: ["__arr_includes"], indexOf: ["__arr_indexOf", "__str_indexOf"], startsWith: ["__str_startsWith"], endsWith: ["__str_endsWith"],
+  sort: ["__arr_sort"], includes: ["__arr_includes", "__str_includes", "__str_contains"], indexOf: ["__arr_indexOf", "__str_indexOf"], startsWith: ["__str_startsWith", "__str_starts"], endsWith: ["__str_endsWith"],
+  charAt: ["__str_charAt"], substring: ["__str_substring"], split: ["__str_split"],
   replace: ["__str_replace"], replaceAll: ["__str_replaceAll"], trim: ["__str_trim"], trimStart: ["__str_trimStart"],
-  trimEnd: ["__str_trimEnd"], repeat: ["__str_repeat"], padStart: ["__str_padStart"], padEnd: ["__str_padEnd"],
+  trimEnd: ["__str_trimEnd"],
   toUpperCase: ["__str_toUpperCase"], toLowerCase: ["__str_toLowerCase"],
 };
 

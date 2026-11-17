@@ -39,6 +39,17 @@ interface ReadonlyArray<T> {
   at(index: number): T | undefined;
 }
 
+// String methods use standard ES2020 signatures. charAt/substring normalize JS
+// numeric bounds; search methods preserve optional positions and split uses a
+// uint32 limit. Receivers/arguments evaluate once in order. Omit undefined;
+// regex, spread and extra arguments are rejected by the compatibility checker.
+// repeat/padStart/padEnd support dynamic inputs with runtime growth caps
+// (65536 target/result units); see docs/api.md#typescript-strings. String
+// lengths use UTF-16; isolated surrogate results cannot be represented.
+// Runtime code-unit selecting/searching paths guard unknown text for BMP safety;
+// safe native includes(search) and split(nonemptySeparator, limit?) also accept
+// complete emoji variables/parameters. See the API's conservative proof boundary.
+
 // Native ES2020 Map/Set declarations provide the public signatures (including
 // Map.get: V | undefined). NekoC lowers concrete string/number keys to heap
 // references; values may be scalars or initialized object/class/collection

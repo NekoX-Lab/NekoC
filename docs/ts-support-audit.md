@@ -70,10 +70,14 @@
 
 - `+` / `+=`：按 TS 类型检查器给出的操作数类型决定。有一边是字符串（字面量、模板字符串、`string` 标注、函数返回值、元组位、`string[]` 元素、对象属性等）就编译成"连接"积木；`any`、混合联合类型（如 `string | number`）和非原始值编译报错，拼接请写 `String(x)`，相加请给出准确的数字类型（如 `getVar<number>("x")`）。
 - 模板字符串 `` `n=${x}` ``。
-- `.length`、`s[i]`、`s.charAt(i)`、`s.slice(a, b)`、`s.substring(a, b)`（不支持负数下标）、`s.includes(x)`、`s.split(sep)`。
+- `.length`、`s[i]`、`s.charAt(i)`、`s.slice(a, b)`、`s.substring(a, b)`、`s.includes(x, position?)`、`s.split(sep?, limit?)`。
+- `charAt/substring` 按接收者、实参顺序各求值一次；数字下标向零截断，substring 钳位到 `[0,length]` 后交换反序边界，相等返回空串。charAt 越界返回空串。NaN 按 0，Infinity 按边界处理；不修改原生 selectText 的反向截取规则。slice 保持原有常量下标（含负数）和半开空区间语义，不交换边界。
+- `startsWith/includes/indexOf` 的 position 默认 0；`endsWith` 的 endPosition、`lastIndexOf` 的 position 默认文本长度。支持负数/小数/超界/空 needle；lastIndexOf 的 NaN 按末端，其余按 0。split limit 按 uint32 截断/模 2^32（非有限值按 0），省略为 2^32−1；每次返回新数组，接收者不变。额外实参、spread、显式 undefined 和正则/强制转换重载定位拒绝，提示省略可选参数或使用字符串。
+- padding 精确补至截断后的长度，空 fill 或无需补齐直接返回；repeat 次数向零截断。支持动态变量/表达式/函数/循环次数、目标长度和 fill。NaN 按 0；动态 repeat 负整数/正负 Infinity 返回空串，非法常量计数可编译报错；repeat 运行时只保留总长不超过 65536 UTF-16 单元的完整副本，padding target 运行时钳位到 [0,65536] 且不截原串。非 BMP fill 若需不完整副本则保守返回原串，常量可精确折叠时仍检查孤立代理项。以上是已知差异，不是完整 JS RangeError/资源语义，详见 docs/api.md。
 - `indexOf`、`lastIndexOf`、`startsWith`、`endsWith`、`replace`、`replaceAll`、`trim`、`trimStart`、`trimEnd`、`repeat`、`padStart`、`padEnd`、`toUpperCase`、`toLowerCase`（只转换英文字母）、`concat`。
   - 这些方法没有对应积木，编译器会生成用循环实现的辅助自制积木，用到哪个才加哪个。
   - 比较字符时用的是积木的"等于"，和积木本身的规则一致（例如数字形式的文本 `"1.0"` 和 `"1"` 视为相等）。
+- UTF-16 安全：BMP 证明只作为快速路径优化。未知形参/容器/字段/被循环与声明重写的绑定不再编译拒绝，而在代码单元选择/搜索前运行时检查；ASCII/中文保持正常结果，非 BMP 保守替换为空接收者，避免孤立代理项 VM 异常（文档化差异）。无 position includes/startsWith 和确定非空 separator split 仍使用安全原生路径保留 emoji；空/未知 separator 走 guard。写入事实继续覆盖赋值、更新、循环、解构和全部合并声明，使不可靠静态证明转为 guard。普通 self/any/as 不豁免运行时安全限制。
 - `join()`、`selectText()`、`length(x)`。
 
 ### 数组（列表值）
