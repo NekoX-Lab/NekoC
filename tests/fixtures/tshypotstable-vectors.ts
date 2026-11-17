@@ -1,0 +1,25 @@
+let big = 1e200;
+let small = 1e-200;
+let nearMax = 1.27e308;
+let minNormal = 2.2250738585072014e-308;
+let subnormal = 5e-324;
+console.log(Math.hypot());
+console.log(Math.hypot(0));
+console.log(Math.hypot(0, -0, 0, 0));
+console.log(Math.hypot(3, 4));
+console.log(Math.hypot(-3, 4, -12));
+console.log(Math.hypot(-7));
+console.log(Math.hypot(-big));
+console.log(Math.hypot(-small));
+console.log(Math.hypot(big, 3, small));
+console.log(Math.hypot(small, 3, big));
+console.log(Math.hypot(small, -small, small, -small));
+console.log(Math.hypot(nearMax, nearMax));
+console.log(Math.hypot(1.7976931348623157e308));
+console.log(Math.hypot(minNormal, -minNormal));
+console.log(Math.hypot(subnormal, subnormal));
+console.log(Math.hypot(1e-320, -1e-320, 1e-320));
+console.log(Math.hypot(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12));
+console.log(Math.hypot(Math.hypot(big, big), Math.hypot(small, small)));
+// Finite inputs whose actual norm overflows still produce Infinity.
+console.log(Math.hypot(1.7976931348623157e308, 1.7976931348623157e308) === Infinity);

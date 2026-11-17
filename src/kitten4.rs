@@ -231,9 +231,21 @@ fn lower_for_vm_inner(project: &Value) -> crate::json::Json {
         groups: project
             .pointer(&format!("/{METADATA}/source/theatre/groups"))
             .unwrap_or(&Value::Null),
+        variables: lowered["variables"]["variablesDict"]
+            .as_object()
+            .map(|dict| dict.keys().cloned().collect())
+            .unwrap_or_default(),
+        missing_lists: RefCell::default(),
     };
     for section in ["scenes", "actors", "procedures"] {
         lower_blocks(&mut lowered[section], &targets);
+    }
+    // get_var_or_list(id, []) stores a fresh global [] on first access, so a block
+    // that still names a deleted list reads and mutates an empty list.
+    for id in targets.missing_lists.take() {
+        lowered["variables"]["variablesDict"][&id] = json!({
+            "id": id, "name": id, "type": "list", "value": [], "visible": false,
+        });
     }
     lowered
 }
@@ -243,6 +255,9 @@ struct Targets<'a> {
     scenes: &'a Value,
     procedures: &'a Value,
     groups: &'a Value,
+    variables: BTreeSet<String>,
+    /// Deleted lists still referenced by list reporters; declared empty after lowering.
+    missing_lists: RefCell<BTreeSet<String>>,
 }
 
 impl Targets<'_> {
@@ -292,6 +307,30 @@ fn lower_missing_reference(block: &mut Value, targets: &Targets) {
         // These reporters distinguish invalid strings, dangling UUIDs and
         // missing clones themselves. Generic deleted-reference zeroing loses
         // their native NaN/error behavior (Tn6a/get_3 and clone reporter).
+        return;
+    }
+    let list_kind = kind.trim_start_matches(OPAQUE);
+    if matches!(
+        list_kind,
+        "pure_list_get" | "list_get" | "lists_get" | "show_hide_list"
+    ) {
+        // Opaque native blocks still name the list in VAR.
+        let list = match field(block, "list") {
+            "" => field(block, "VAR"),
+            list => list,
+        };
+        if list.is_empty() || targets.variables.contains(list) {
+            return;
+        }
+        if list_kind != "show_hide_list" {
+            targets.missing_lists.borrow_mut().insert(list.to_owned());
+            return;
+        }
+        // show_hide_list only acts on an existing list monitor.
+        block["type"] = json!("kitten4_noop");
+        block["fields"] = json!({"NUM": "0"});
+        remove(block, "inputs");
+        remove(block, "mutation");
         return;
     }
     let mut missing = call && targets.procedures.get(field(block, "NAME")).is_none();
