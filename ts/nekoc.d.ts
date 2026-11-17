@@ -46,6 +46,8 @@ interface String {
    * or explicitly convert with String(value). Applies to replaceAll as well.
    * Calls/writes after narrowing may invalidate nullable reads; capture a stable
    * string first, or convert/coalesce at the argument's evaluation point.
+   * String conversion preserves nullable conditional branches; unsupported
+   * nullable logical selections require explicit if/else or a string fallback.
    */
   replace(searchValue: string, replaceValue: string): string;
   /** Nonoverlapping replacement, including empty search on constant BMP strings.

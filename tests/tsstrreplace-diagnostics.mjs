@@ -38,4 +38,9 @@ export const diagnosticCases = [
     ["loop-back-edge", 'let value: string | null = "X";\nfunction change(): void { value = null; }\nfor (let i = 0; i < 2; i++) {\n  console.log("abc".replace("a", value));\n  change();\n}', 4, 15],
   ].map(([name, source, line, column]) => ({ name: `stale-${name}`, source, line, column,
     message: /nullable argument after intervening side effects.*stable string.*\?\?.*String\(value\)/ })),
+  ...["true && value", '(true ? value : "Y") ?? "fallback"', 'value ? "X" : "Y"', 'value + "!"'].map((expression, index) => ({
+    name: `conversion-selection-${index}`,
+    source: `let value: string | null = "X";\nfunction search(): string { value = null; return "a"; }\nconsole.log("abc".replace(search(), String(${expression})));`,
+    line: 3, column: 44, message: /String conversion cannot preserve nullable value selection.*explicit if\/else/,
+  })),
 ];

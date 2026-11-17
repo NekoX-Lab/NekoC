@@ -66,6 +66,11 @@ Calls or writes between narrowing and a nullable argument read are conservativel
 rejected, including earlier receiver/search evaluation and writes through aliases.
 Capture a string in a local before those effects, or coalesce/convert the value
 at its argument evaluation point. This check does not infer that a call is pure.
+Explicit `String(condition ? value : fallback)` converts only the selected value,
+including declared nullable values whose TS narrowing became stale. It preserves
+branch short-circuiting and single evaluation. Nullable conditions, arithmetic
+wrappers and logical selections inside `String` that cannot preserve the raw value domain are rejected with an if/else
+or `??` alternative; ordinary numeric/string `-1` and `-2` retain their values.
 Isolated surrogate literals anywhere in source (also
 in `let` initializers, templates and imported modules) are rejected before
 lowering/JSON serialization with their original coordinates and a hint to use

@@ -12,6 +12,11 @@ fn narrowed_nullable_arguments_and_optional_receivers_match_node() {
     assert_replacements_match_node("tests/fixtures/tsstrreplace-nullable.ts");
 }
 
+#[test]
+fn wrapped_string_conversions_match_node_and_preserve_branch_effects() {
+    assert_replacements_match_node("tests/fixtures/tsstrreplace-conversion.ts");
+}
+
 fn assert_replacements_match_node(input: &str) {
     let dir = tempfile::tempdir().unwrap();
     let oracle = Command::new("node")
@@ -22,7 +27,7 @@ fn assert_replacements_match_node(input: &str) {
     let expected: Vec<String> = serde_json::from_slice(&oracle.stdout).unwrap();
     if input.ends_with("tsstrreplace.ts") {
         assert_eq!(&expected[..4], ["Xbc", "abX", "-abc", "a[b]c"]);
-    } else {
+    } else if input.ends_with("tsstrreplace-nullable.ts") {
         assert_eq!(
             expected,
             [
@@ -41,6 +46,32 @@ fn assert_replacements_match_node(input: &str) {
                 "nullbc",
                 "fallbackfallbackbfallback",
                 "nullnullbnull",
+                "undefinedbc"
+            ]
+        );
+    } else {
+        assert_eq!(
+            expected,
+            [
+                "nullbc",
+                "undefinedbc",
+                "nullnullbnull",
+                "undefinedundefinedbundefined",
+                "Xnull",
+                "Xundefined",
+                "XX",
+                "XX",
+                "nullnull",
+                "undefinedundefined",
+                "nullbc",
+                "undefinedbc",
+                "fallbackbc",
+                "-1",
+                "-2",
+                "-1",
+                "-2",
+                "13",
+                "nullbc",
                 "undefinedbc"
             ]
         );
