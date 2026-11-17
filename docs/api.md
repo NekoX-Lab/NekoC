@@ -370,9 +370,16 @@ forever(() => {
 
 Stops the current script.
 
+`stop` has a next socket in Kitten N; its dynamic scope behavior is unchanged.
+
 ### `restart()`
 
-Restarts the current script.
+Restarts the work and starts its startup scripts again. The official Kitten N
+`restart` block has no next socket. It must end its block stack; a direct
+following statement (including after an inline helper that ends in `restart`)
+is a `NEKOC_TERMINAL_NEXT` compile error with a source location. Place it last
+in an explicit branch/loop/procedure body when that structure is intended.
+The enclosing container may still have a legal next connection.
 
 ### `warp(body)`
 
@@ -741,6 +748,16 @@ createClone("enemy");
 ### `deleteClone()`
 
 Deletes the current clone.
+
+The official Kitten N `dispose_clone` block has no next socket. Like `restart`,
+`deleteClone()` (also `self.deleteClone()`) must end its block stack; direct
+following code is rejected with `NEKOC_TERMINAL_NEXT`, never silently dropped.
+An explicit `if`/loop/procedure body may end with it while the enclosing
+container/call still connects to later code. On the original actor deletion
+does nothing and that enclosing continuation still runs; on a clone deletion
+cancels that clone's tasks. This physical socket rule does not make deletion
+equivalent to a function return. `nekoc check` reports
+`terminal_block_has_next` for existing works with either known illegal edge.
 
 ### `cloneCount(sprite)`
 

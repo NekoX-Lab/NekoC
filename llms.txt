@@ -92,6 +92,8 @@ onStart(() => {
 
 `wait(seconds)`, `waitUntil(cond)`, `forever(body)`, `repeatTimes(n, body)`, `repeatUntil(cond, body)`, `forRange(name, from, to, step, body)`, `breakLoop()`, `stop(option?)` (no argument: this script; `"0"`: everything), `restart()`, `warp(body)` (run without frame yields), `broadcast(message, value?)`, `broadcastAndWait(message)`, `switchScreen(name)`.
 
+Kitten N `deleteClone()`/`self.deleteClone()` and `restart()` have no physical next socket: end their block stack with them. Direct following statements (also after inline expansion) produce `NEKOC_TERMINAL_NEXT` with a source location and rewrite hint. An explicit branch/loop/procedure may end with either while its enclosing container/call retains a legal continuation. Deleting an original actor can continue there; deleting a clone cancels its tasks; restart resets the work. No code is silently discarded. `stop` retains its next socket and dynamic scope. Existing works with illegal next edges fail `nekoc check` as `terminal_block_has_next`.
+
 ## Sprite actions
 
 Motion: `moveSteps(n)`, `moveTo(x, y)`, `setX(x)`, `setY(y)`, `changeX(dx)`, `changeY(dy)`, `glideTo(x, y, seconds)`, `turn(deg)`, `pointTowards(deg)`, `faceTo(target)`, `bounceOffEdge()`, `setRotationType(type)`.

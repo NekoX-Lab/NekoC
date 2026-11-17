@@ -231,6 +231,7 @@ interface NekoSpriteSelf {
   // --- Clones ---
   clone(sprite?: string): void;
   createClone(): void;
+  /** Kitten N: must end its block stack (no next socket); enclosing containers may continue. */
   deleteClone(): void;
 
   // --- Timer ---
@@ -260,6 +261,7 @@ interface NekoSpriteSelf {
   forRange(variable: string, from: NekoValue, to: NekoValue, by: NekoValue, body: NekoStatementBody): void;
   breakLoop(): void;
   stop(option?: string): void;
+  /** Kitten N: must end its block stack (no next socket). Restarts the work. */
   restart(): void;
   warp(body: NekoStatementBody): void;
   tell(target: string, body: NekoStatementBody): void;
@@ -383,6 +385,7 @@ declare function mathFunc(type: string, value: NekoValue): number;
 declare function trig(type: "sin" | "cos" | "tan", degrees: NekoValue): number;
 declare function askChoice(question: NekoValue, ...choices: NekoValue[]): void;
 declare function clone(sprite?: string): void;
+/** Kitten N: must end its block stack (no next socket); enclosing containers may continue. */
 declare function deleteClone(): void;
 declare function timerStart(): void;
 declare function showTimer(): void;
@@ -400,6 +403,7 @@ declare function repeatUntil(condition: NekoValue, body: NekoStatementBody): voi
 declare function forRange(variable: string, from: NekoValue, to: NekoValue, by: NekoValue, body: NekoStatementBody): void;
 declare function breakLoop(): void;
 declare function stop(option?: string): void;
+/** Kitten N: must end its block stack (no next socket). Restarts the work. */
 declare function restart(): void;
 declare function warp(body: NekoStatementBody): void;
 declare function tell(target: string, body: NekoStatementBody): void;

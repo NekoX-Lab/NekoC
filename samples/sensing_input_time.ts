@@ -1,7 +1,8 @@
 onStart(() => {
   askChoice("1+1=?", "1", "2");
   clone("--self");
-  deleteClone();
+  // dispose_clone has no next socket. The enclosing if can continue on the original.
+  if (true) { deleteClone(); }
   timerStart();
   timerStop();
   timerReset();

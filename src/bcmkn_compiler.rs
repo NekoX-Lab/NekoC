@@ -397,6 +397,13 @@ fn build_nested_block(
                 continue;
             };
             if connection_type == "next" {
+                ensure!(
+                    !crate::validate::has_no_next_socket(
+                        block["type"].as_str().unwrap_or_default()
+                    ),
+                    "Kitten N block {} ({id}) has no next socket; cannot connect {child_id}",
+                    block["type"]
+                );
                 next_id = Some(child_id.to_owned());
                 continue;
             }
