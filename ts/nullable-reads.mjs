@@ -13,6 +13,7 @@ const nilType = type => !!type && (type.isUnion() ? type.types : [type])
 // the same proof for a raw value captured after TS narrowing became stale.
 export function createNullableReadAnalysis(checker, declaredReadType, flowKind) {
   const writesByFile = new WeakMap();
+  const nullishWritesByFile = new WeakMap();
   const readSymbol = node => ts.isIdentifier(node) ? checker.getSymbolAtLocation(node)
     : ts.isPropertyAccessExpression(node) ? checker.getSymbolAtLocation(node.name)
     : ts.isElementAccessExpression(node) ? readSymbol(node.expression) : null;
@@ -48,6 +49,24 @@ export function createNullableReadAnalysis(checker, declaredReadType, flowKind) 
       : sources.concat((writesByFile.get(file).get(symbol) ?? [])
         .filter(write => !write.element || ts.isElementAccessExpression(node)).map(write => write.source));
   };
+  const canWriteNullish = node => {
+    const file = node.getSourceFile();
+    if (!nullishWritesByFile.has(file)) {
+      const symbols = new Set();
+      const visit = part => {
+        if (ts.isBinaryExpression(part) && part.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+          && part.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
+          const target = unwrap(part.left);
+          if (ts.isIdentifier(target) && (nilType(checker.getTypeAtLocation(part.right))
+            || nilType(declaredReadType(unwrap(part.right))))) symbols.add(readSymbol(target));
+        }
+        ts.forEachChild(part, visit);
+      };
+      visit(file);
+      nullishWritesByFile.set(file, symbols);
+    }
+    return nullishWritesByFile.get(file).has(readSymbol(node));
+  };
   const unstableRead = (expression, seen = new Set()) => {
     const node = unwrap(expression);
     if (seen.has(node)) return false;
@@ -63,6 +82,10 @@ export function createNullableReadAnalysis(checker, declaredReadType, flowKind) 
     if (ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node)) return unstableRead(node.operand, seen);
     if (captureSources(node).some(source => unstableRead(source, seen))) return true;
     if ((!readSymbol(node) && !ts.isElementAccessExpression(node)) || !nilType(declaredReadType(node))) return false;
+    // Calls alone cannot invalidate a scalar binding when this program has no
+    // assignment that could put null/undefined in it. Inspect nested functions
+    // too, but do not infer property/array alias safety from this binding fact.
+    if (ts.isIdentifier(node) && !canWriteNullish(node)) return false;
     let scope = node;
     while (scope.parent && !ts.isFunctionLike(scope) && !ts.isSourceFile(scope)) scope = scope.parent;
     const readStart = node.end;

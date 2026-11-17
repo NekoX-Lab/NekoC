@@ -140,6 +140,10 @@ test("tsstrreplace string validation leaves the typed named-list replace API ava
   assert.doesNotThrow(() => compileFile(entry, guidance(nullable)));
   const conversion = fs.readFileSync(new URL("fixtures/tsstrreplace-conversion.ts", import.meta.url), "utf8");
   assert.doesNotThrow(() => compileFile(entry, guidance(conversion)));
+  for (const name of ["s1", "s2", "s3", "s4", "u1", "u3", "u4", "u5"]) {
+    const source = fs.readFileSync(new URL(`fixtures/tsstrreplace-usability/${name}.ts`, import.meta.url), "utf8");
+    assert.doesNotThrow(() => compileFile(entry, guidance(source)), name);
+  }
 });
 
 test("tsstrreplace check/build and npm/browser accept the same string overloads", async () => {
@@ -171,6 +175,11 @@ test("tsstrreplace check/build and npm/browser accept the same string overloads"
     const conversionFiles = { "/main.ts": fs.readFileSync(new URL("fixtures/tsstrreplace-conversion.ts", import.meta.url), "utf8") };
     assert.equal(frontend.check("/main.ts", { files: conversionFiles }).ok, true);
     assert.doesNotThrow(() => frontend.compile("/main.ts", { files: conversionFiles }));
+    for (const name of ["s1", "s2", "s3", "s4", "u1", "u3", "u4", "u5"]) {
+      const files = { "/main.ts": fs.readFileSync(new URL(`fixtures/tsstrreplace-usability/${name}.ts`, import.meta.url), "utf8") };
+      for (const types of [false, true]) assert.equal(frontend.check("/main.ts", { files, types }).ok, true, name);
+      assert.doesNotThrow(() => frontend.compile("/main.ts", { files }), name);
+    }
     for (const [expression, message] of invalid) {
       const files = { "/main.ts": `console.log(${expression});` };
       assert.equal(frontend.check("/main.ts", { files }).ok, false, expression);

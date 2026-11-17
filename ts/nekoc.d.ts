@@ -50,6 +50,8 @@ interface String {
    * nullable logical selections require explicit if/else or a string fallback.
    * A capture made after narrowing was invalidated must convert/coalesce at
    * capture time; converting that inferred string later is rejected.
+   * Scalar bindings with no possible null/undefined assignment keep their
+   * narrowing across calls; property/array reads remain conservative.
    */
   replace(searchValue: string, replaceValue: string): string;
   /** Nonoverlapping replacement, including empty search on constant BMP strings.

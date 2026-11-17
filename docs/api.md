@@ -78,6 +78,11 @@ original conversion. Convert or coalesce when capturing instead:
 `const captured = String(value)` or `const captured = value ?? "fallback"`.
 The check follows initializers and possible assignments conservatively; a stable
 string captured before the effects remains supported.
+For scalar bindings, calls only invalidate this proof when the source file has
+an assignment that could write null/undefined to that binding (including writes
+inside nested functions). Calls alone do not invalidate an unchanged binding,
+and assignments of nonnullable values do not count as nullish writes. Property
+and array reads retain conservative alias handling.
 Isolated surrogate literals anywhere in source (also
 in `let` initializers, templates and imported modules) are rejected before
 lowering/JSON serialization with their original coordinates and a hint to use

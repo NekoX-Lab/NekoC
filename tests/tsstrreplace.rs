@@ -17,6 +17,13 @@ fn wrapped_string_conversions_match_node_and_preserve_branch_effects() {
     assert_replacements_match_node("tests/fixtures/tsstrreplace-conversion.ts");
 }
 
+#[test]
+fn nullable_usability_matches_node_without_boundary_rejections() {
+    for name in ["s1", "s2", "s3", "s4", "u1", "u3", "u4", "u5"] {
+        assert_replacements_match_node(&format!("tests/fixtures/tsstrreplace-usability/{name}.ts"));
+    }
+}
+
 fn assert_replacements_match_node(input: &str) {
     let dir = tempfile::tempdir().unwrap();
     let oracle = Command::new("node")
@@ -49,7 +56,7 @@ fn assert_replacements_match_node(input: &str) {
                 "undefinedbc"
             ]
         );
-    } else {
+    } else if input.ends_with("tsstrreplace-conversion.ts") {
         assert_eq!(
             expected,
             [

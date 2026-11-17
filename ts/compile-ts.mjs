@@ -2120,6 +2120,12 @@ class WorkspaceCompiler {
 
   compileStatementCall(call, parentId) {
     const name = calleeName(call.expression);
+    // A declared function shadows ambient APIs (for example show(message)).
+    // Resolve it before dispatching statement builtins by their text name.
+    if (ts.isIdentifier(call.expression)) {
+      if (this.functionProcedures.has(name)) return this.compileFunctionProcedureCall(call, parentId, false);
+      if (this.inlineFunctions.has(name)) return this.compileInlineStatementFunction(call, parentId, name);
+    }
     if (name === "clearInterval" || name === "clearTimeout") {
       if (call.arguments.length !== 1) this.unsupported(call, `${name} expects one timer handle`);
       const target = ts.factory.createPropertyAccessExpression(call.arguments[0], "active");

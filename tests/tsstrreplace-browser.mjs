@@ -63,3 +63,8 @@ const conversionFiles = { "/main.ts": fs.readFileSync(new URL("fixtures/tsstrrep
 const conversionChecked = api.check("/main.ts", { files: conversionFiles });
 assert.equal(conversionChecked.ok, true, JSON.stringify(conversionChecked.diagnostics));
 assert.doesNotThrow(() => api.compile("/main.ts", { files: conversionFiles }));
+for (const name of ["s1", "s2", "s3", "s4", "u1", "u3", "u4", "u5"]) {
+  const files = { "/main.ts": fs.readFileSync(new URL(`fixtures/tsstrreplace-usability/${name}.ts`, import.meta.url), "utf8") };
+  for (const types of [false, true]) assert.equal(api.check("/main.ts", { files, types }).ok, true, name);
+  assert.doesNotThrow(() => api.compile("/main.ts", { files }), name);
+}
