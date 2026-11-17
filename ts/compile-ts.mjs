@@ -40,6 +40,7 @@ function fail(message, location = null, code = "NEKOC") {
 }
 
 const helperOrigins = new WeakMap();
+const frontendOriginals = new WeakMap();
 const blockSourceNodes = new WeakMap();
 
 function nodeLocation(node) {
@@ -91,13 +92,20 @@ function lowerFrontendFeatures(sourceFile) {
     rejectAsyncSyntax(sourceFile);
     // Validate raw entry/module identifiers before lexical renaming or helper
     // registration can hide a collision with the compiler's bitwise procedures.
-    const reserveBitwiseNames = node => {
+    const validateRawSyntax = node => {
       if (ts.isIdentifier(node) && node.text.startsWith("__nekocBit_")) {
         fail("Names starting with __nekocBit_ are reserved for bitwise lowering; rename this identifier", nodeLocation(node));
       }
-      ts.forEachChild(node, reserveBitwiseNames);
+      // JSON/Rust strings cannot represent lone UTF-16 units, even when a
+      // literal reaches a replacement through a mutable variable or import.
+      if ((ts.isStringLiteralLike(node) || ts.isTemplateHead(node)
+        || ts.isTemplateMiddle(node) || ts.isTemplateTail(node))
+        && /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(node.text)) {
+        fail("String literals cannot preserve isolated UTF-16 surrogates; use complete Unicode characters instead", nodeLocation(node));
+      }
+      ts.forEachChild(node, validateRawSyntax);
     };
-    reserveBitwiseNames(sourceFile);
+    validateRawSyntax(sourceFile);
     const classes = lowerTsClasses(lowerTsNullable(lowerTsCollections(sourceFile)));
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
@@ -122,6 +130,7 @@ function lowerFrontendFeatures(sourceFile) {
         if (origin) mark(statement, origin);
       }
     }
+    frontendOriginals.set(lowered, sourceFile);
     return lowered;
   } catch (error) {
     if (error instanceof CompileError) throw error;
@@ -200,6 +209,7 @@ class WorkspaceCompiler {
     // Type queries use the last parsed file: tsfeat transforms may leave
     // synthesized nodes that the TypeScript checker cannot bind.
     this.typeSourceFiles = new Map([[this.entryPath, ts.getOriginalNode(sourceFile)]]);
+    this.replacementSourceFiles = new Map([[this.entryPath, frontendOriginals.get(sourceFile) ?? sourceFile]]);
     this.loopDepth = 0;
     this.tryStack = [];
     this.rangeBindings = [];
@@ -226,6 +236,52 @@ class WorkspaceCompiler {
       // TypeScript's own lib files come from the installed package when one
       // exists; a catch-all memory host must not replace them with user code.
       name => defaultHost.readFile(name) ?? this.host.readFile(name));
+    // Nullable/class lowering reprints source and can retain only method-level
+    // origins. Validate replacement calls on untouched, fully loaded modules so
+    // diagnostics identify the actual call, not generated text or a declaration.
+    const replacementCalls = [];
+    const collectReplacement = node => {
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+        && ["replace", "replaceAll"].includes(node.expression.name.text)
+        && !selfListHandleCall(node)) replacementCalls.push(node);
+      ts.forEachChild(node, collectReplacement);
+    };
+    for (const file of this.replacementSourceFiles.values()) collectReplacement(file);
+    const replacementTypes = replacementCalls.length ? createExpressionTypes(this.replacementSourceFiles,
+      this.host.readFile(DECLARATIONS) ?? defaultHost.readFile(DECLARATIONS) ?? "", path,
+      name => defaultHost.readFile(name) ?? this.host.readFile(name)) : null;
+    const validateReplacement = node => {
+      if (!replacementTypes.object(node.expression.expression)) {
+        const method = node.expression.name.text;
+        const receiver = node.expression.expression;
+        // Receiver null safety/optional short-circuiting belongs to the nullable
+        // pass. Arguments are different: a nullable argument can reach the
+        // helper as a numeric sentinel, so require a string at this call site.
+        const receiverKind = replacementTypes.nonNullableKind(receiver);
+        if (node.arguments.length !== 2 || node.arguments.some(ts.isSpreadElement)
+          || receiverKind !== "string") {
+          this.unsupported(node, `String.${method} supports exactly two string arguments; use a string search and string replacement instead of RegExp, a replacer function, coercion or spread`);
+        }
+        for (const value of node.arguments) {
+          if (replacementTypes.unstableNullableRead(value)) {
+            this.unsupported(node, `String.${method} cannot trust a nullable argument after intervening side effects; first capture a stable string value after narrowing, use ?? with a string fallback, or explicitly use String(value)`);
+          }
+          if (replacementTypes.nonNullableKind(value) !== "string"
+            || replacementTypes.flowKind(value) !== "string") {
+            this.unsupported(node, `String.${method} supports exactly two string arguments; search and replacement must be strings at the call site, without implicit conversion; narrow null/undefined first, use ?? with a string fallback, or explicitly use String(value)`);
+          }
+        }
+        if (method === "replaceAll") {
+          const search = replacementTypes.stringConstant(node.arguments[0]);
+          const text = replacementTypes.stringConstant(receiver);
+          if (!(search !== null && search.length > 0)
+            && (text === null || /[\uD800-\uDFFF]/.test(text))) {
+            this.unsupported(node, "String.replaceAll with a possibly empty search requires a constant BMP-only receiver: empty matches advance by UTF-16 code unit and may split surrogate pairs; use a nonempty constant string search or a constant BMP-only receiver");
+          }
+        }
+      }
+    };
+    for (const call of replacementCalls) validateReplacement(call);
     // Callback bodies are copied into generated helper ASTs below. Validate
     // user additions before copying so an any/union type cannot lose its type
     // information and accidentally fall back to numeric helper lowering.
@@ -457,6 +513,7 @@ class WorkspaceCompiler {
       );
       rejectParseDiagnostics(moduleSourceFile);
       moduleSourceFile = lowerFrontendFeatures(moduleSourceFile);
+      this.replacementSourceFiles.set(resolvedPath, frontendOriginals.get(moduleSourceFile) ?? moduleSourceFile);
       this.objectSourceFiles.push(moduleSourceFile);
       this.typeSourceFiles.set(resolvedPath, ts.getOriginalNode(moduleSourceFile));
       this.loadImports(moduleSourceFile, resolvedPath);
@@ -1068,8 +1125,8 @@ class WorkspaceCompiler {
         && statements.slice(0, -1).every((statement) => ts.isVariableStatement(statement))
       );
       const simpleStatement = ts.isBlock(fn.body) && !hasReturn;
-      // Array helpers and their callbacks must freeze reference arguments and
-      // keep mutable loop state in the invocation frame, even for simple bodies.
+      // Array/callback and string helpers (including replacement) freeze arguments
+      // and keep loop state in the invocation frame, even for simple bodies.
       const arrayHelper = name.startsWith("__arr") || name.startsWith("__str_") || /^__(cb|map|filter|forEach|reduce|find|findIndex|some|every)\d+$/.test(name);
       returnValues.set(name, fn.statementEvent ? false : returnsValue);
       if (!fn.event && !fn.capturedEvents?.size
@@ -2528,6 +2585,12 @@ class WorkspaceCompiler {
 
   compileStatementCall(call, parentId) {
     const name = calleeName(call.expression);
+    // A declared function shadows ambient APIs (for example show(message)).
+    // Resolve it before dispatching statement builtins by their text name.
+    if (ts.isIdentifier(call.expression)) {
+      if (this.functionProcedures.has(name)) return this.compileFunctionProcedureCall(call, parentId, false);
+      if (this.inlineFunctions.has(name)) return this.compileInlineStatementFunction(call, parentId, name);
+    }
     if (name === "clearInterval" || name === "clearTimeout") {
       if (call.arguments.length !== 1) this.unsupported(call, `${name} expects one timer handle`);
       const target = ts.factory.createPropertyAccessExpression(call.arguments[0], "active");
@@ -6861,8 +6924,59 @@ const SHARED_HELPERS = {
   __str_startsWith: { needs: ["__str_position", "__str_range"], source: `function __str_startsWith(__s, __t, __from) { const __start = __str_position(__from, length(__s)); if (length(__t) === 0) return true; if (__start + length(__t) > length(__s)) return false; return __str_range(__s, __start, __start + length(__t)) === __t; }` },
   __str_endsWith: { needs: ["__str_position", "__str_range"], source: `function __str_endsWith(__s, __t, __from, __given) { let __end = length(__s); if (__given) __end = __str_position(__from, length(__s)); if (length(__t) === 0) return true; if (length(__t) > __end) return false; return __str_range(__s, __end - length(__t), __end) === __t; }` },
   __str_split: { source: `function __str_split(__s, __separator, __inputLimit, __given) { const __out = []; let __limit = __inputLimit; if (String(__limit) === "NaN" || String(__limit) === "Infinity" || String(__limit) === "-Infinity") __limit = 0; __limit = Math.trunc(__limit) % 4294967296; if (__limit < 0) __limit += 4294967296; if (__limit === 0) return __out; if (!__given) { __out.push(__s); return __out; } const __parts = splitText(__s, __separator); let __cursor = 0; while (__cursor < __parts.length && __out.length < __limit) { __out.push(__parts[__cursor]); __cursor++; } return __out; }` },
-  __str_replace: { needs: ["__str_indexOf"], source: `function __str_replace(__s, __a, __b) { const __rI = __str_indexOf(__s, __a, 0); if (__rI < 0) { return __s; } return join(selectText(__s, 1, __rI), __b, selectText(__s, __rI + length(__a) + 1, length(__s))); }` },
-  __str_replaceAll: { needs: ["__str_indexOf"], source: `function __str_replaceAll(__s, __a, __b) { let __aO = ""; let __aP = 0; let __aI = __str_indexOf(__s, __a, 0); while (__aI >= 0 && length(__a) > 0) { __aO = join(__aO, selectText(__s, __aP + 1, __aI), __b); __aP = __aI + length(__a); __aI = __str_indexOf(__s, __a, __aP); } return join(__aO, selectText(__s, __aP + 1, length(__s))); }` },
+  // KN selection reverses an empty interval. Guard it before using zero-based,
+  // half-open JS ranges. Keep all replacement helpers invocation-local.
+  __str_replaceSlice: { source: `function __str_replaceSlice(__s, __start, __end) { if (__start >= __end) return ""; return selectText(__s, __start + 1, __end); }` },
+  // Split finds whole string matches without probing isolated surrogate units.
+  // A nonnumeric guard preserves e.g. "007" against KN split's Number coercion.
+  // Pick a guard different from the search's first character so it cannot match
+  // across the guard/input boundary (including searches containing both guards).
+  __str_replaceIndex: { source: `function __str_replaceIndex(__s, __a) {
+    if (length(__a) === 0) return 0;
+    const __guardParts = splitText(__a, "~"); let __guard = "~";
+    if (String(__guardParts[0]) === "") __guard = "!";
+    const __parts = splitText(join(__guard, __s), __a);
+    if (__parts.length < 2) return -1;
+    return length(String(__parts[0])) - 1;
+  }` },
+  __str_replaceSubstitution: { needs: ["__str_replaceSlice", "__str_replaceIndex"], source: `function __str_replaceSubstitution(__s, __a, __b, __position) {
+    let __rest = __b; let __out = "";
+    while (length(__rest) > 0) {
+      const __dollar = __str_replaceIndex(__rest, "$");
+      if (__dollar < 0) return join(__out, __rest);
+      __out = join(__out, __str_replaceSlice(__rest, 0, __dollar));
+      __rest = __str_replaceSlice(__rest, __dollar, length(__rest));
+      let __take = 2;
+      if (__str_replaceIndex(__rest, "$$") === 0) __out = join(__out, "$");
+      else if (__str_replaceIndex(__rest, "$&") === 0) __out = join(__out, __a);
+      else if (__str_replaceIndex(__rest, "$\u0060") === 0) __out = join(__out, __str_replaceSlice(__s, 0, __position));
+      else if (__str_replaceIndex(__rest, "$'") === 0) __out = join(__out, __str_replaceSlice(__s, __position + length(__a), length(__s)));
+      else { __out = join(__out, "$"); __take = 1; }
+      __rest = __str_replaceSlice(__rest, __take, length(__rest));
+    }
+    return __out;
+  }` },
+  __str_replace: { needs: ["__str_replaceIndex", "__str_replaceSlice", "__str_replaceSubstitution"], source: `function __str_replace(__s, __a, __b) {
+    const __position = __str_replaceIndex(__s, __a);
+    if (__position < 0) return __s;
+    return join(__str_replaceSlice(__s, 0, __position), __str_replaceSubstitution(__s, __a, __b, __position), __str_replaceSlice(__s, __position + length(__a), length(__s)));
+  }` },
+  __str_replaceAll: { needs: ["__str_replaceIndex", "__str_replaceSlice", "__str_replaceSubstitution"], source: `function __str_replaceAll(__s, __a, __b) {
+    let __out = ""; let __position = 0; let __tail = __s;
+    while (__position <= length(__s)) {
+      const __offset = __str_replaceIndex(__tail, __a);
+      if (__offset < 0) return join(__out, __tail);
+      __position = __position + __offset;
+      __out = join(__out, __str_replaceSlice(__tail, 0, __offset), __str_replaceSubstitution(__s, __a, __b, __position));
+      if (length(__a) === 0) {
+        if (__position === length(__s)) return __out;
+        __out = join(__out, __str_replaceSlice(__s, __position, __position + 1));
+        __position++;
+      } else __position = __position + length(__a);
+      __tail = __str_replaceSlice(__s, __position, length(__s));
+    }
+    return __out;
+  }` },
   __str_trimStart: { source: `function __str_trimStart(__s) { let __tA = 1; while (__tA <= length(__s) && contains(" \\t\\n\\r", selectText(__s, __tA, __tA))) { __tA = __tA + 1; } return selectText(__s, __tA, length(__s)); }` },
   __str_trimEnd: { source: `function __str_trimEnd(__s) { let __tB = length(__s); while (__tB >= 1 && contains(" \\t\\n\\r", selectText(__s, __tB, __tB))) { __tB = __tB - 1; } return selectText(__s, 1, __tB); }` },
   __str_trim: { needs: ["__str_trimStart", "__str_trimEnd"], source: `function __str_trim(__s) { return __str_trimEnd(__str_trimStart(__s)); }` },
