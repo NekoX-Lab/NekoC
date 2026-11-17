@@ -69,6 +69,13 @@
 
 ### 字符串
 
+- replace/replaceAll 的兼容性检查在保留的原始 AST 上进行，class 方法和 nullable 可选调用也指向原始调用的行列。孤立 UTF-16 代理项字面量（含 let 初值、模板、导入模块）在降低和 JSON 序列化前定位拒绝，提示改用完整 Unicode 字符；不等到 Rust JSON 解码失败。
+- replace/replaceAll 的 search/replacement 必须在调用点确定为 string；不能先去除 null/undefined 再认定参数合法。nullable 实参定位拒绝并提示先判空、使用 `??` 提供 string 回退或显式 `String(value)`；合法缩窄、class/数组字段缩窄和接收者 `?.` 短路保留。
+- TS flow 不追踪任意调用/别名写入导致的缩窄失效。替换参数的 nullable 读取若在初始化或显式判空后经过调用/赋值等副作用（包括接收者及较早 search 实参），保守拒绝；不推断调用纯度。请在副作用前保存稳定 string，或在读取位置使用 `??` / `String(value)`。
+- 显式 String 转换沿条件表达式的实际选中分支解码声明 nullable 值，嵌套/括号分支保持单次求值及短路；不靠外层已缩窄的 string 类型推断内部无哨兵。不能可靠保持原始值域的 nullable 逻辑选择定位拒绝，提示 if/else 或 nullable 变量的 `??` 字符串回退；普通数字/字符串 -1、-2 不受影响。
+- 副作用后捕获的值可能被 TS 过期缩窄推断为 string；裸替换读取和显式 String 转换共用来源/副作用证明，沿多层初始化及可能赋值追踪，不安全转换在原始 String 位置拒绝。请在捕获时转换或使用 `??`，副作用前取得的稳定 string 仍合法。赋值扫描包含嵌套函数及循环回边，保守拒绝不等于通用跨过程别名分析。
+- 标量绑定仅在源文件存在可能写入null/undefined的赋值时继续按调用副作用判断失效，扫描包含嵌套函数；无重赋或只赋非空值的绑定不会仅因调用而被拒绝。属性和数组读取仍保守处理别名；不增加数组保存或函数传递边界拒绝规则。
+
 - `+` / `+=`：按 TS 类型检查器给出的操作数类型决定。有一边是字符串（字面量、模板字符串、`string` 标注、函数返回值、元组位、`string[]` 元素、对象属性等）就编译成"连接"积木；`any`、混合联合类型（如 `string | number`）和非原始值编译报错，拼接请写 `String(x)`，相加请给出准确的数字类型（如 `getVar<number>("x")`）。
 - 模板字符串 `` `n=${x}` ``。
 - `.length`、`s[i]`、`s.charAt(i)`、`s.slice(a, b)`、`s.substring(a, b)`、`s.includes(x, position?)`、`s.split(sep?, limit?)`。
@@ -76,8 +83,10 @@
 - `startsWith/includes/indexOf` 的 position 默认 0；`endsWith` 的 endPosition、`lastIndexOf` 的 position 默认文本长度。支持负数/小数/超界/空 needle；lastIndexOf 的 NaN 按末端，其余按 0。split limit 按 uint32 截断/模 2^32（非有限值按 0），省略为 2^32−1；每次返回新数组，接收者不变。额外实参、spread、显式 undefined 和正则/强制转换重载定位拒绝，提示省略可选参数或使用字符串。
 - padding 精确补至截断后的长度，空 fill 或无需补齐直接返回；repeat 次数向零截断。支持动态变量/表达式/函数/循环次数、目标长度和 fill。NaN 按 0；动态 repeat 负整数/正负 Infinity 返回空串，非法常量计数可编译报错；repeat 运行时只保留总长不超过 65536 UTF-16 单元的完整副本，padding target 运行时钳位到 [0,65536] 且不截原串。非 BMP fill 若需不完整副本则保守返回原串，常量可精确折叠时仍检查孤立代理项。以上是已知差异，不是完整 JS RangeError/资源语义，详见 docs/api.md。
 - `indexOf`、`lastIndexOf`、`startsWith`、`endsWith`、`replace`、`replaceAll`、`trim`、`trimStart`、`trimEnd`、`repeat`、`padStart`、`padEnd`、`toUpperCase`、`toLowerCase`（只转换英文字母）、`concat`。
+  - `replace/replaceAll` 仅接受两个 string 实参，接收者与实参从左到右各求值一次。修正首尾、整串、未命中与空片段；支持动态替换串的 `$$`、`$&`、前缀 `` $` `` 和后缀 `$'`，无捕获组时 `$1/$01/$<name>` 保留字面文本，与 Node 一致。replaceAll 非重叠扫描原串，插入内容不重新搜索。完整 Unicode 字符（含 emoji）匹配、数字文本 `007` 不失真。
+  - 空 search 的 replace 在开头插入一次；replaceAll 在每个 UTF-16 单元边界插入并保证推进。VM 无法保存孤立代理项，因此 replaceAll 必须能证明 search 是非空常量（含不可变 const 别名），或接收者是 BMP-only 常量；其他可能为空的模式定位报错，并提示使用非空常量 search 或 BMP-only 常量接收者。正则、函数替换、隐式转换、spread、多余/缺失参数定位拒绝。ES2020 类型声明补齐同一 replaceAll string 重载，CLI/npm/browser 一致。详见 [API](api.md#typescript-string-replacement)。
   - 这些方法没有对应积木，编译器会生成用循环实现的辅助自制积木，用到哪个才加哪个。
-  - 比较字符时用的是积木的"等于"，和积木本身的规则一致（例如数字形式的文本 `"1.0"` 和 `"1"` 视为相等）。
+  - 除 replace/replaceAll 使用精确字符串分割查找外，其他辅助方法比较字符时用的是积木的"等于"，和积木本身的规则一致（例如数字形式的文本 `"1.0"` 和 `"1"` 视为相等）。
 - UTF-16 安全：BMP 证明只作为快速路径优化。未知形参/容器/字段/被循环与声明重写的绑定不再编译拒绝，而在代码单元选择/搜索前运行时检查；ASCII/中文保持正常结果，非 BMP 保守替换为空接收者，避免孤立代理项 VM 异常（文档化差异）。无 position includes/startsWith 和确定非空 separator split 仍使用安全原生路径保留 emoji；空/未知 separator 走 guard。写入事实继续覆盖赋值、更新、循环、解构和全部合并声明，使不可靠静态证明转为 guard。普通 self/any/as 不豁免运行时安全限制。
 - `join()`、`selectText()`、`length(x)`。
 
