@@ -172,3 +172,62 @@ fn coordinate_blocks_read_the_official_kn_field_name() {
     assert_eq!(vm.variable_value("x").number(), 40.0);
     assert_eq!(vm.variable_value("y").number(), 10.0);
 }
+
+#[test]
+fn unknown_effect_option_is_skipped() {
+    // Official setTargetEffects logs "cant find effect type_" and returns.
+    let effect = |kind: &str| {
+        json!({"type":kind,"fields":{"scope":"?","increase":"increase"},
+            "inputs":{"value":num(50.0)}})
+    };
+    let p = project(
+        vec![start(chain(vec![
+            effect("self_set_effect"),
+            effect("self_change_effect"),
+            json!({"type":"change_variables","fields":{"variable":"count","method":"increase"},
+                "inputs":{"value":num(1.0)}}),
+            set_ghost_probe(),
+        ]))],
+        &["count", "ghost"],
+    );
+    let vm = run(&p);
+    assert_eq!(vm.variable_value("count").number(), 1.0);
+    assert_eq!(vm.variable_value("ghost").number(), 0.0);
+}
+
+fn set_ghost_probe() -> Value {
+    set(
+        "ghost",
+        json!({"type":"get_clone_index_property","fields":{"sprite":"--self","attribute":"1"},
+            "inputs":{"index":num(0.0)}}),
+    )
+}
+
+#[test]
+fn clone_property_of_a_deleted_actor_is_nan() {
+    let deleted = json!({"type":"get_clone_index_property",
+        "fields":{"sprite":"deleted-actor-id","attribute":"scale"},"inputs":{"index":num(1.0)}});
+    let sensing = |kind: &str, option: &str, value: &str| json!({"type":kind,"fields":{"sprite":"deleted-actor-id",option:value}});
+    let p = project(
+        vec![start(chain(vec![
+            set("value", deleted),
+            set("x", sensing("coordinate_of_sprite", "coordinate", "x")),
+            set(
+                "width",
+                sensing("appearance_of_sprite", "appearance", "width"),
+            ),
+            set("effect", sensing("effect_of_sprite", "effect", "1")),
+            set(
+                "style",
+                json!({"type":"style_of_sprite","fields":{"sprite":"deleted-actor-id"}}),
+            ),
+            set("after", num(1.0)),
+        ]))],
+        &["value", "x", "width", "effect", "style", "after"],
+    );
+    let vm = run(&p);
+    for name in ["value", "x", "width", "effect", "style"] {
+        assert!(vm.variable_value(name).number().is_nan(), "{name}");
+    }
+    assert_eq!(vm.variable_value("after").number(), 1.0);
+}
