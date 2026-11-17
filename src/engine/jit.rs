@@ -300,6 +300,8 @@ impl Engine {
             | Op::Repeat(e, _) => vec![(false, e.end as usize - 1)],
             Op::SetValue(_, v)
             | Op::SetActorVariable(_, v)
+            | Op::Kitten4Change(_, v, _)
+            | Op::Kitten4ChangeActor(_, v, _)
             | Op::ReturnValue(v)
             | Op::AppendList(_, v) => vec![(true, v)],
             Op::Call(_, args) => self.program.call_arguments[args]
@@ -584,7 +586,10 @@ impl Engine {
             Op::Position(x, y) => pure(x) && pure(y),
             Op::Visible(_) | Op::Pen(_) | Op::Color(_) | Op::Clear => true,
             Op::ClearList(r) => list(r),
-            Op::SetValue(_, v) | Op::ReturnValue(v) | Op::Kitten4Change(_, v, _) => value(v),
+            Op::SetValue(_, v)
+            | Op::ReturnValue(v)
+            | Op::Kitten4Change(_, v, _)
+            | Op::Kitten4ChangeActor(_, v, _) => value(v),
             Op::AppendList(r, v) => list(r) && value(v),
             Op::SetActorVariable(_, v) => value(v),
             Op::ChangeActorVariable(_, e, _) => pure(e),
@@ -658,7 +663,10 @@ impl Engine {
             Op::AppendList(list, v) => {
                 !value(v) || matches!(list, ListRef::Expression(v) if !value(v as usize))
             }
-            Op::SetValue(_, v) | Op::ReturnValue(v) | Op::Kitten4Change(_, v, _) => !value(v),
+            Op::SetValue(_, v)
+            | Op::ReturnValue(v)
+            | Op::Kitten4Change(_, v, _)
+            | Op::Kitten4ChangeActor(_, v, _) => !value(v),
             _ => false,
         }
     }
@@ -2073,6 +2081,40 @@ impl Gen<'_, '_> {
             Op::SetValue(target, v) => self.set_value(pc, target, v, blocks, remaining),
             Op::Kitten4Change(target, v, decrease) => {
                 self.kitten4_change(pc, target, v, decrease, blocks, remaining)
+            }
+            Op::Kitten4ChangeActor(slot, v, decrease) => {
+                let slow = self.b.create_block();
+                let mut guards = vec![Guard::Actor(usize::MAX, slot)];
+                if let Some(value) = self.numeric(v, &mut guards) {
+                    self.check_unboxed(&guards, slow);
+                    // Evaluate the delta first, including any throwing input.
+                    let delta = self.numeric_value(value);
+                    self.check_error(pc, remaining);
+                    let previous = self.numeric_value(Numeric::Actor(usize::MAX, slot));
+                    let number = self.call2(
+                        if decrease {
+                            h_k4_sub as *const () as usize
+                        } else {
+                            h_k4_add as *const () as usize
+                        },
+                        previous,
+                        delta,
+                    );
+                    let slot = self.b.ins().iconst(types::I64, slot as i64);
+                    self.call(
+                        h_set_actor_number as *const () as usize,
+                        &[types::I64, types::I64, types::F64],
+                        None,
+                        &[ctx, slot, number],
+                    );
+                    self.check_error(pc, remaining);
+                    self.b.ins().jump(block(pc + 1), &[]);
+                } else {
+                    self.b.ins().jump(slow, &[]);
+                }
+                self.b.switch_to_block(slow);
+                self.transfer(pc, remaining);
+                self.b.ins().jump(block(pc + 1), &[]);
             }
             Op::SetActorVariable(slot, v) => {
                 let slow = self.b.create_block();

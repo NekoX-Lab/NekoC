@@ -976,6 +976,40 @@ fn changed(id: &str, value: Value, decrease: bool) -> Value {
     },"inputs":{"value":value}})
 }
 
+#[test]
+fn hot_k4_private_change_reads_previous_after_reporter_delta_side_effects() {
+    use serde_json::json;
+    for decrease in [false, true] {
+        let mut delta = call("delta", &[]);
+        delta["type"] = json!("procedures_2_callreturn");
+        let mut p = private_project(
+            chain(vec![
+                set("private", num(7.0)),
+                changed("private", delta, decrease),
+                set("out", get("private")),
+            ]),
+            json!(0),
+            true,
+        );
+        p["procedures"]["proceduresDict"]["delta"] = procedure(
+            &[],
+            chain(vec![
+                set("private", num(0.3)),
+                json!({"type":"procedures_2_return_value","mutation":"<mutation items=\"1\"/>",
+                "inputs":{"VALUE":num(0.1)},"shadows":{"VALUE":num(0.0)}}),
+            ]),
+        );
+        for budget in [37, 100_000] {
+            let vm = compare_hot_budget(&p, None, budget, 1000);
+            assert_eq!(
+                vm.variable_text("out"),
+                if decrease { "0.2" } else { "0.4" }
+            );
+            assert_native_helper(&vm, "native/reentrant-Kitten4ChangeActor");
+        }
+    }
+}
+
 fn branch(condition: Value, body: Value) -> Value {
     serde_json::json!({"type":"controls_if","inputs":{"IF0":condition},"statements":{"DO0":body}})
 }

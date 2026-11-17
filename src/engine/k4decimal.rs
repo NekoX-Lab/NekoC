@@ -9,8 +9,21 @@ pub(super) fn cells(op: super::Binary, a: &super::Cell, b: &super::Cell) -> f64 
     if let (super::Cell::Number(a), super::Cell::Number(b)) = (a, b) {
         op.apply(*a, *b)
     } else if let (Some(decimal_a), Some(decimal_b)) = (cell_decimal(a), cell_decimal(b)) {
-        if matches!(op, super::Binary::K4Div) && decimal_b.0.is_zero() {
-            return a.number() / b.number();
+        if matches!(op, super::Binary::K4Div) {
+            // Tn6a intercepts only Number zero and the exact string "0".
+            // Other decimal zero strings enter haXk, whose division checks
+            // the zero numerator before rejecting the zero denominator.
+            if matches!(b, super::Cell::Number(n) if *n == 0.0)
+                || matches!(b, super::Cell::Text(s) if &**s == "0")
+            {
+                return a.number() / b.number();
+            }
+            if decimal_a.0.is_zero() {
+                return 0.0;
+            }
+            if decimal_b.0.is_zero() {
+                return a.number() / b.number();
+            }
         }
         calculate(operation(op), decimal_a, decimal_b)
     } else {
@@ -22,6 +35,39 @@ pub(super) fn cells(op: super::Binary, a: &super::Cell, b: &super::Cell) -> f64 
             _ => unreachable!(),
         }
     }
+}
+
+pub(super) fn change(
+    previous: &super::Cell,
+    value: &super::Cell,
+    decrease: bool,
+) -> Option<super::Cell> {
+    use super::Cell;
+    if matches!(
+        previous,
+        Cell::List(_) | Cell::Costume(_) | Cell::Midi(_) | Cell::Null
+    ) {
+        return None;
+    }
+    Some(
+        if !decrease
+            && (matches!(previous, Cell::Text(_))
+                || matches!(
+                    value,
+                    Cell::Text(_) | Cell::List(_) | Cell::Costume(_) | Cell::Midi(_)
+                ))
+        {
+            Cell::concat(previous, value)
+        } else {
+            Cell::Number(if decrease {
+                cells(super::Binary::K4Sub, previous, value)
+            } else if let (Cell::Number(a), Cell::Number(b)) = (previous, value) {
+                apply(Operation::Add, *a, *b)
+            } else {
+                previous.number() + value.number()
+            })
+        },
+    )
 }
 
 fn operation(op: super::Binary) -> Operation {

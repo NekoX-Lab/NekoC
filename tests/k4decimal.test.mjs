@@ -28,6 +28,19 @@ test("k4decimal original fixtures match pinned official evidence", async () => {
   assert.equal(hot.accumulate, 120);
   assert.equal(evidence.cases.values.variables[0].result[66], 1);
   assert.deepEqual(evidence.cases.nonfinite.variables[0].result.slice(-2), ["-Infinity", "Infinity"]);
+  const privateValues = evidence.cases.private.variables[0];
+  assert.equal(privateValues.add, .3);
+  assert.equal(privateValues.sub, .2);
+  assert.equal(privateValues.accumulate, 120);
+  assert.equal(privateValues.count, 1200);
+  assert.equal(privateValues.result[0], "x0.2");
+  // Rows are Number +0/-0, exact "0", decimal zero strings, invalid string.
+  const zero = evidence.cases.zero.variables[0].result;
+  assert.deepEqual(zero.slice(0, 6), ["NaN", "NaN", "NaN", "Infinity", "-Infinity", "NaN"]);
+  for (const start of [18, 24, 30]) {
+    assert.deepEqual(zero.slice(start, start + 6), ["0", "0", "0",
+      start === 24 ? "-Infinity" : "Infinity", start === 24 ? "Infinity" : "-Infinity", "NaN"]);
+  }
 });
 
 test("k4decimal reproduces the offline official kernel", { skip: !process.env.K4_ORACLE_INTEGRATION }, async () => {

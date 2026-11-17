@@ -67,11 +67,21 @@ fn official_decimal_values_and_hot_typed_control_state() {
                 if budget != 37 {
                     assert!(!result.budget_yield, "{name}");
                     let snapshot = vm.oracle_snapshot(frame + 1);
+                    // The official harness includes original-entity private
+                    // variables here; our oracle snapshot exposes globals only.
+                    // Private cells remain in the typed snapshot below, and the
+                    // probe copies their numeric results to observed globals.
+                    let mut expected = case["variables"][frame as usize].clone();
+                    for (id, variable) in source["variables"].as_object().unwrap() {
+                        if variable["is_global"] == false {
+                            expected.as_object_mut().unwrap().remove(id);
+                        }
+                    }
                     assert!(
-                        same(&snapshot["variables"], &case["variables"][frame as usize]),
+                        same(&snapshot["variables"], &expected),
                         "{name}: {} != {}",
                         snapshot["variables"],
-                        case["variables"][frame as usize]
+                        expected
                     );
                 }
                 states.push(serde_json::json!([
@@ -80,7 +90,8 @@ fn official_decimal_values_and_hot_typed_control_state() {
                     vm.jit_debug_snapshot()
                 ]));
             }
-            if budget != 37 && !interpreter && ["hot", "error"].contains(&name.as_str()) {
+            if budget != 37 && !interpreter && ["hot", "error", "private"].contains(&name.as_str())
+            {
                 assert!(
                     vm.jit_profile()["native_ops"].as_u64().unwrap() > 0,
                     "{name}: {}",
@@ -169,4 +180,84 @@ fn deep_decimal_arithmetic_keeps_heap_evaluation_and_native_state_equal() {
         states.push(vm.jit_debug_snapshot());
     }
     assert_eq!(states[0], states[1]);
+}
+
+#[test]
+fn private_changes_follow_clone_tell_context_and_kn_keeps_binary_addition() {
+    use serde_json::json;
+    const ACTOR: &str = "20000000-0000-4000-8000-000000000001";
+    const OTHER: &str = "20000000-0000-4000-8000-000000000002";
+    const PRIVATE: &str = "30000000-0000-4000-8000-000000000001";
+    const OTHER_PRIVATE: &str = "30000000-0000-4000-8000-000000000002";
+    let source =
+        nekoc::json::from_str(include_str!("fixtures/kitten4/actor-variables.bcm")).unwrap();
+    let imported = kitten4::to_neko(&source).unwrap();
+    let get = |id| json!({"type":"variables_get","fields":{"variable":id}});
+    let set = |id, value| json!({"type":"variables_set","fields":{"variable":id},"inputs":{"value":value}});
+    let change = |id| {
+        json!({"type":"change_variables","fields":{"variable":id,"method":"increase"},
+        "inputs":{"value":{"type":"math_number","fields":{"NUM":0.2}}}})
+    };
+    let hot = |id, out| {
+        let mut increment = change(id);
+        increment["next"] = set(out, get(id));
+        json!({"type":"warp","statements":{"DO":{
+            "type":"repeat_n_times","inputs":{"times":{"type":"math_number","fields":{"NUM":1200}}},
+            "statements":{"DO":{
+                "type":"variables_set","fields":{"variable":id},
+                "inputs":{"value":{"type":"math_number","fields":{"NUM":0.1}}},
+                "next":increment
+            }}
+        }}})
+    };
+    for k4 in [true, false] {
+        let mut project = imported.clone();
+        if !k4 {
+            project.as_object_mut().unwrap().remove("_nekocKitten4");
+        }
+        project["variables"]["variablesDict"][PRIVATE]["value"] = json!(0.1);
+        project["variables"]["variablesDict"][OTHER_PRIVATE]["value"] = json!(0.1);
+        project["actors"]["actorsDict"][OTHER]["nekoBlockJsonList"] = json!([]);
+        let mut tell = json!({"type":"sync_tell","fields":{"sprite":OTHER},"statements":{"DO":hot(OTHER_PRIVATE,"otherRead")}});
+        tell["next"] = json!({"type":"mirror","fields":{"sprite":"--self"}});
+        project["actors"]["actorsDict"][ACTOR]["nekoBlockJsonList"] = json!([
+            {"type":"on_running_group_activated","next":tell},
+            {"type":"start_as_a_mirror","statements":{"DO":hot(PRIVATE,"cloneChanged")}}
+        ]);
+        let mut states = vec![];
+        for interpreter in [false, true] {
+            let mut vm = Engine::new(Program::compile(&project).unwrap());
+            vm.use_virtual_clock();
+            vm.set_random_seed(1);
+            vm.enable_jit_profile();
+            if interpreter {
+                vm.disable_jit();
+            }
+            vm.start();
+            let mut frames = vec![];
+            for _ in 0..8 {
+                let result = vm.advance(1.0 / 60.0, 2_000_000, Duration::ZERO).unwrap();
+                frames.push(json!([
+                    result.instructions,
+                    result.budget_yield,
+                    vm.jit_debug_snapshot()
+                ]));
+            }
+            for id in ["otherRead", "cloneChanged"] {
+                assert!(
+                    matches!(vm.variable_value(id), nekoc::engine::Cell::Number(n)
+                    if n == if k4 { 0.3 } else { 0.1 + 0.2 }),
+                    "{id}, k4={k4}"
+                );
+            }
+            if !interpreter {
+                assert!(vm.jit_profile()["native_ops"].as_u64().unwrap() > 0);
+            }
+            states.push(frames);
+        }
+        assert_eq!(
+            states[0], states[1],
+            "clone/tell typed/PC/budget/errors, k4={k4}"
+        );
+    }
 }

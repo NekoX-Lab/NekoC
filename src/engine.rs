@@ -329,6 +329,7 @@ enum Op {
     ChangeLocal(usize, Expr, f64),
     Change(usize, Expr, f64),
     Kitten4Change(Target, usize, bool),
+    Kitten4ChangeActor(usize, usize, bool),
     /// Code-view compound assignment; always interpreted (including hot loops).
     AssignLocal(usize, Option<usize>, Binary),
     Move(Expr),
@@ -3800,6 +3801,19 @@ impl Compiler {
                     }
                     "change_variables" | "change_script_variables" => {
                         if let Some(&slot) = self.actor_variables.get(field(b, "variable")) {
+                            if self.program.semantics == RuntimeSemantics::Kitten4 {
+                                let value = self.value(input(b, "value")?)?;
+                                self.emit(
+                                    Op::Kitten4ChangeActor(
+                                        slot,
+                                        value,
+                                        field(b, "method") == "decrease",
+                                    ),
+                                    b,
+                                );
+                                block = b.get("next");
+                                continue;
+                            }
                             let expr = self.arg(b, "value")?;
                             let sign = if field(b, "method") == "decrease" {
                                 -1.0
@@ -8943,28 +8957,21 @@ impl Engine {
                         .clone()
                         .unwrap_or(Cell::Number(self.tasks[index].locals[i])),
                 };
-                if !matches!(
-                    previous,
-                    Cell::List(_) | Cell::Costume(_) | Cell::Midi(_) | Cell::Null
-                ) && self.value_error.is_none()
+                if self.value_error.is_none()
+                    && let Some(result) = k4decimal::change(&previous, &value, decrease)
                 {
-                    let result = if !decrease
-                        && (matches!(previous, Cell::Text(_))
-                            || matches!(
-                                value,
-                                Cell::Text(_) | Cell::List(_) | Cell::Costume(_) | Cell::Midi(_)
-                            )) {
-                        Cell::concat(&previous, &value)
-                    } else {
-                        Cell::Number(if decrease {
-                            k4decimal::cells(Binary::K4Sub, &previous, &value)
-                        } else if let (Cell::Number(a), Cell::Number(b)) = (&previous, &value) {
-                            k4decimal::apply(k4decimal::Operation::Add, *a, *b)
-                        } else {
-                            previous.number() + value.number()
-                        })
-                    };
                     self.assign(target, result);
+                }
+            }
+            Op::Kitten4ChangeActor(slot, value, decrease) => {
+                let value = self.eval_value(value, actor);
+                if self.value_error.is_none() {
+                    let previous = self.read_actor_variable(actor, slot);
+                    if self.value_error.is_none()
+                        && let Some(result) = k4decimal::change(&previous, &value, decrease)
+                    {
+                        self.write_actor_variable(actor, slot, result);
+                    }
                 }
             }
             Op::WarpIteration => {

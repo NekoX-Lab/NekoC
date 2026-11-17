@@ -48,6 +48,10 @@ export async function decimalFixtures() {
     [1.0000000000000002, 1], [.9999999999999999, 1], [1e16, 1],
     [1.2345678901234567, 9.876543210987654], [1, 3], [2, 7],
     [1e308, 1e308], [5e-324, 2], [-5e-324, 2], [1e-300, 1e300]];
+  const zeroDivisions = [0, -0, "0", "0.00", "-0", "0e1", "invalid"].flatMap(denominator =>
+    [0, "0", "-0", 1, -1, "invalid"].map(numerator => append(convert("string", math("DIVIDE",
+      typeof numerator === "string" ? text(numerator) : num(numerator),
+      typeof denominator === "string" ? text(denominator) : num(denominator))))));
   const cases = {
     hot: chain(b("start_on_click"), loop()),
     values: chain(b("start_on_click"),
@@ -79,6 +83,16 @@ export async function decimalFixtures() {
       append(convert("string", math("DIVIDE", num(1), get("change"))))),
     error: chain(b("start_on_click"), loop(),
       set("unwritten", math("ADD", b("lists_get_value", {}, { VAR: list(), INDEX: num(2) }), num(.1)))),
+    private: chain(b("start_on_click"), b("warp", {}, {}, { DO:
+      b("repeat_n_times", {}, { times: num(1200) }, { DO: chain(
+        set("private", num(.1)), change("private", .2), set("add", get("private")),
+        change("private", .1, "decrease"), set("sub", get("private")),
+        change("privateAccumulate", .1), change("count", 1)) }) }),
+      set("accumulate", get("privateAccumulate")),
+      set("private", text("x")), change("private", .2), append(get("private")),
+      set("private", list()), change("private", .2), append(convert("string", get("private")))),
+    zero: chain(b("start_on_click"), ...Array.from({ length: Math.ceil(zeroDivisions.length / 14) },
+      (_, i) => b("warp", {}, {}, { DO: chain(...zeroDivisions.slice(i * 14, (i + 1) * 14)) }))),
   };
   return Object.fromEntries(Object.entries(cases).map(([name, root]) => {
     const project = structuredClone(base);
@@ -88,6 +102,12 @@ export async function decimalFixtures() {
       .map(id => [id, { id, name: id, value: 0, type: "any", is_global: true, visible: false }]));
     for (const n of [.1, .2, .3]) project.variables[String(n)] = { id: String(n), name: String(n), value: n, type: "any", is_global: true, visible: false };
     for (const [id, n] of numberInputs) project.variables[id] = { id, name: id, value: n, type: "any", is_global: true, visible: false };
+    if (name === "private") {
+      for (const id of ["private", "privateAccumulate"]) project.variables[id] = {
+        id, name: id, value: 0, type: "any", is_global: false,
+        current_entity: Object.keys(project.theatre.actors)[0], visible: false,
+      };
+    }
     project.variables.result = { ...base.variables.result, value: [] };
     project.variable_order = Object.keys(project.variables);
     for (const scene of Object.values(project.theatre.scenes)) scene.block_data_json = workspace([], schema);
