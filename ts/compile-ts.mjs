@@ -659,6 +659,11 @@ class WorkspaceCompiler {
         return param.name.text;
       }),
       defaults: params.map((param) => param.initializer ?? null),
+      // String/resource names and function-valued DSL arguments can be
+      // compile-time bindings, not runtime custom-block inputs. Keep their
+      // existing lowering; the first budget applies to numeric static calls.
+      budgetEligible: params.every(param => param.type?.kind === ts.SyntaxKind.NumberKeyword
+        && (!param.initializer || !ts.isStringLiteral(stripParens(param.initializer)))),
       optional: params.map((param) => Boolean(param.questionToken)),
       arrayParams: params.filter(param => param.type && (ts.isArrayTypeNode(param.type)
         || ts.isTupleTypeNode(param.type)
@@ -668,9 +673,194 @@ class WorkspaceCompiler {
     });
   }
 
-  // Decide which functions become custom blocks instead of being inlined:
-  // recursive ones (directly or through other functions), and ones whose
-  // body is not "local declarations, then one final return".
+  // Keep small functions inline, but bound substitution on the static call
+  // graph. These are syntax-cost limits, not block counts or timing heuristics.
+  // Sharing is per named function, never per structurally equal expression.
+  planInlineBudget(required) {
+    const perCallBudget = 256;
+    const repeatedBudget = 512;
+    const limit = repeatedBudget + 1;
+    const cap = value => Math.min(limit, value);
+    const counts = new Map();
+    const controlBodies = new Set(["warp", "forever", "repeat", "repeatTimes", "repeatUntil", "forRange",
+      "ifThen", "ifElse", "tell", "tellAndWait", "onStart", "onClick", "onKey", "onMessage", "when", "onBumpActor"]);
+    const inlineControlBody = node => {
+      const parent = node.parent;
+      const name = parent && ts.isCallExpression(parent) ? calleeName(parent.expression).replace(/^self\./, "") : "";
+      return controlBodies.has(name) ? node.body : undefined;
+    };
+    const visitInlineBody = (node, visit) => {
+      visit(node);
+      if (ts.isFunctionLike(node)) {
+        const body = inlineControlBody(node);
+        if (body) visitInlineBody(body, visit);
+      } else {
+        ts.forEachChild(node, child => visitInlineBody(child, visit));
+      }
+    };
+    // Numeric RGB is still an editor field, not a runtime socket. Wrappers
+    // reaching it must retain compile-time argument substitution too.
+    const inlineOnly = new Set();
+    const fieldCall = name => name === "setPenColor" || name === "self.setPenColor";
+    const calls = new Map();
+    for (const [name, fn] of this.inlineFunctions) {
+      const targets = new Set();
+      visitInlineBody(fn.body, node => {
+        if (!ts.isCallExpression(node)) return;
+        const target = calleeName(node.expression);
+        if (fieldCall(target)) inlineOnly.add(name);
+        if (this.inlineFunctions.has(target)) targets.add(target);
+      });
+      calls.set(name, targets);
+    }
+    for (let changed = true; changed;) {
+      changed = false;
+      for (const [name, targets] of calls) {
+        if (!inlineOnly.has(name) && [...targets].some(target => inlineOnly.has(target))) {
+          inlineOnly.add(name);
+          changed = true;
+        }
+      }
+      // A field wrapper can receive another numeric function's constant
+      // result (e.g. color(rgb(...))). Keep that argument's dependency graph
+      // inline as well; a shared reporter would prevent field folding.
+      const preserve = node => {
+        if (ts.isCallExpression(node)) {
+          const target = calleeName(node.expression);
+          if (this.inlineFunctions.has(target) && !inlineOnly.has(target)) {
+            inlineOnly.add(target);
+            changed = true;
+          }
+        }
+        ts.forEachChild(node, preserve);
+      };
+      const scan = node => {
+        if (ts.isCallExpression(node) && (fieldCall(calleeName(node.expression)) || inlineOnly.has(calleeName(node.expression)))) {
+          for (const arg of node.arguments) preserve(arg);
+        }
+        ts.forEachChild(node, scan);
+      };
+      for (const file of this.objectSourceFiles) scan(file);
+      for (const fn of this.inlineFunctions.values()) scan(fn.body);
+      for (const name of inlineOnly) {
+        for (const target of calls.get(name) ?? []) {
+          if (!inlineOnly.has(target)) { inlineOnly.add(target); changed = true; }
+        }
+      }
+    }
+    const seen = new Set();
+    const count = node => {
+      if (seen.has(node)) return;
+      seen.add(node);
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+        const name = node.expression.text;
+        if (this.inlineFunctions.has(name)) counts.set(name, cap((counts.get(name) ?? 0) + 1));
+      }
+      ts.forEachChild(node, count);
+    };
+    for (const file of this.objectSourceFiles) count(file);
+    for (const fn of this.inlineFunctions.values()) {
+      count(fn.body);
+      for (const value of fn.defaults) if (value) count(value);
+    }
+
+    // A summary is affine in the costs of its parameters. Counting just AST
+    // nodes misses f(x) = x+x called with another expanded expression, and
+    // counting call edges once misses f(g(x), g(x+1)). Saturation prevents the
+    // estimator itself from building an exponentially large expansion.
+    const constant = base => ({ base: cap(base), uses: new Map() });
+    const add = (a, b, scale = 1) => {
+      const result = { base: cap(a.base + b.base * scale), uses: new Map(a.uses) };
+      for (const [name, uses] of b.uses) result.uses.set(name, cap((result.uses.get(name) ?? 0) + uses * scale));
+      return result;
+    };
+    const size = summary => [...summary.uses.values()].reduce((a, b) => cap(a + b), summary.base);
+    const eligible = name => {
+      const fn = this.inlineFunctions.get(name);
+      return fn.budgetEligible && !inlineOnly.has(name) && !functionSourceFile(fn).fileName.startsWith("__nekoc_");
+    };
+    // New boundaries can invalidate previously memoized callers. Recompute
+    // until no boundary is added; required only grows, so this terminates in
+    // at most the number of eligible functions plus one passes.
+    for (let changed = true; changed;) {
+      changed = false;
+      const share = name => {
+        if (!required.has(name) && eligible(name)) { required.add(name); changed = true; }
+      };
+      const summaries = new Map();
+      const planning = new Set();
+      const estimator = bindings => {
+        const estimate = node => {
+          if (!node || ts.isTypeNode(node)) return constant(0);
+          if (ts.isIdentifier(node)) return bindings.get(node.text) ?? constant(1);
+          if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer) {
+            const value = estimate(node.initializer);
+            bindings.set(node.name.text, value);
+            return value; // also charge unused initializers
+          }
+          if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+            && this.inlineFunctions.has(node.expression.text)) {
+            const target = this.inlineFunctions.get(node.expression.text);
+            const summary = summarize(target.name);
+            const args = Array.from(node.arguments);
+            for (let i = args.length; i < target.params.length; i++) args.push(target.defaults[i]);
+            const costs = args.map(estimate);
+            let result = constant(summary ? summary.base : 1);
+            costs.forEach((cost, i) => {
+              result = add(result, cost, summary ? Math.max(1, summary.uses.get(target.params[i]) ?? 0) : 1);
+            });
+            // Include actual argument expansion, even outside function bodies.
+            // A named shared call freezes its arguments once; no CSE is used.
+            if (summary && size(result) > perCallBudget && eligible(target.name)) {
+              share(target.name);
+              return costs.reduce((total, cost) => add(total, cost), constant(1));
+            }
+            return result;
+          }
+          if (ts.isFunctionLike(node)) {
+            // Control/event bodies really expand inline. Array callbacks retain
+            // their own helper/frame planning. Field dependency traversal must
+            // use the same boundary, or it can lose outer constant bindings.
+            return estimate(inlineControlBody(node));
+          }
+          let result = constant(1);
+          ts.forEachChild(node, child => { result = add(result, estimate(child)); });
+          return result;
+        };
+        return estimate;
+      };
+      const summarize = name => {
+        if (summaries.has(name)) return summaries.get(name);
+        if (required.has(name) || planning.has(name)) return null;
+        planning.add(name);
+        const fn = this.inlineFunctions.get(name);
+        const bindings = new Map(fn.params.map(param => [param, { base: 0, uses: new Map([[param, 1]]) }]));
+        const estimate = estimator(bindings);
+        let summary = estimate(fn.body);
+        const cost = size(summary);
+        if (eligible(name)
+          && (cost > perCallBudget || cost * Math.max(0, (counts.get(name) ?? 0) - 1) > repeatedBudget)) {
+          share(name);
+          summary = null;
+        }
+        planning.delete(name);
+        summaries.set(name, summary);
+        return summary;
+      };
+      for (const name of this.inlineFunctions.keys()) summarize(name);
+      // Inspect every static call site, not just fn.body: roots, sprites,
+      // events, initializers and arguments can all contain nested expansion.
+      const inspect = node => {
+        if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)
+          && this.inlineFunctions.has(node.expression.text)) estimator(new Map())(node);
+        ts.forEachChild(node, inspect);
+      };
+      for (const file of this.objectSourceFiles) inspect(file);
+    }
+  }
+
+  // Recursion and non-inlineable shapes require procedures independently of
+  // the budget. Resolve those first, then plan acyclic callees before callers.
   planFunctionProcedures() {
     const calls = new Map();
     for (const [name, fn] of this.inlineFunctions) {
@@ -712,6 +902,8 @@ class WorkspaceCompiler {
         if (mutableObjectState) this.unsupported(fn.body, `Recursive function ${name} with object allocation/mutation or locals is not supported; rewrite it as an iterative loop with explicit state`);
       }
     }
+    const required = new Set();
+    const returnValues = new Map();
     for (const [name, fn] of this.inlineFunctions) {
       let returnsValue = false;
       let hasReturn = false;
@@ -732,10 +924,17 @@ class WorkspaceCompiler {
       // Array helpers and their callbacks must freeze reference arguments and
       // keep mutable loop state in the invocation frame, even for simple bodies.
       const arrayHelper = name.startsWith("__arr") || name.startsWith("__str_") || /^__(cb|map|filter|forEach|reduce|find|findIndex|some|every)\d+$/.test(name);
+      returnValues.set(name, returnsValue);
       if (!this.objectSlots.size && !fn.classGenerated && !arrayHelper
         && !reaches(name, name) && (simpleExpression || simpleStatement)) {
         continue;
       }
+      required.add(name);
+    }
+    this.planInlineBudget(required);
+    for (const [name, fn] of this.inlineFunctions) {
+      if (!required.has(name)) continue;
+      const returnsValue = returnValues.get(name);
       if (this.procedureSpecs.has(name)) {
         this.unsupported(fn.body, `Function ${name} clashes with a procedure of the same name`);
       }
@@ -749,7 +948,8 @@ class WorkspaceCompiler {
           ...fn.params.map((param, index) => ({
             id: `kn-param-fn-${part}-${index + 1}-${sanitizeIdPart(param)}`,
             type: "String",
-            name: param,
+            name: param.replace(/__nekoc_ts_\d+_/g, ""),
+            bindingName: param,
           })),
         ],
       };
@@ -1857,7 +2057,7 @@ class WorkspaceCompiler {
     return this.addBlock({
       type: "procedures_2_parameter",
       parent_id: parentId,
-      fields: { param_name: name },
+      fields: { param_name: this.currentProcedureParams.displayNames?.get(name) ?? name },
       mutation: `<mutation xmlns="http://www.w3.org/1999/xhtml" id="${paramId}"></mutation>`,
       is_output: true,
     });
@@ -5526,6 +5726,13 @@ class WorkspaceCompiler {
       && this.expressionType?.(call.arguments[1]) !== "number") {
       this.unsupported(call.arguments[1], `Array.${method} fromIndex must be a number; omit undefined or convert the value before this call`);
     }
+    if (method === "slice") {
+      for (const arg of call.arguments) {
+        if (this.expressionType?.(arg) !== "number") {
+          this.unsupported(arg, "Array.slice boundaries must be numbers; omit optional arguments or convert the value to a number before this call");
+        }
+      }
+    }
   }
 
   checkStringMethodArguments(call) {
@@ -5688,7 +5895,6 @@ class WorkspaceCompiler {
     if (this.isArrayExpression(target)) this.checkArrayMethodArguments(call);
     else this.checkStringMethodArguments(call);
     const literal = (value) => (typeof value === "number" ? ts.factory.createNumericLiteral(value) : ts.factory.createStringLiteral(value));
-    const lengthOf = () => ts.factory.createPropertyAccessExpression(target, "length");
     const helper = (name, ...extra) => this.compileHelperCall(name, target, extra, parentId);
     const synthesized = this.helperCalls.get(call);
     if (synthesized) {
@@ -5703,10 +5909,11 @@ class WorkspaceCompiler {
         case "join": return helper("__arr_join", args[0] ?? literal(","));
         case "concat": this.unsupported(call, "Array.concat requires statically known argument types; annotate arrays and pass each argument explicitly");
         case "slice":
-          if (args.some((arg) => { const v = constantNumber(arg); return v !== null && v < 0; })) {
-            this.unsupported(call, "slice with negative indices is not supported");
-          }
-          return helper("__arr_slice", args[0] ?? literal(0), args[1] ?? lengthOf());
+          // The helper receives saved inputs before it reads length. Numeric
+          // 1 / 0 supplies the omitted end without a second receiver evaluation
+          // or a generated identifier that a user's Infinity binding can capture.
+          return helper("__arr_slice", args[0] ?? literal(0), args[1] ?? ts.factory.createBinaryExpression(
+            literal(1), ts.SyntaxKind.SlashToken, literal(0)));
         case "reverse": return helper("__arr_reverse");
         case "at":
           if (args.length !== 1) this.unsupported(call, "Array.at expects one index");
@@ -6310,7 +6517,20 @@ function sortHelper(name, greater, n) {
 
 const SHARED_HELPERS = {
   __arr_join: { source: `function __arr_join(__arrL, __sep) { let __jS = ""; let __jK = 0; for (const __jX of __arrL) { if (__jK > 0) { __jS = join(__jS, __sep); } __jS = join(__jS, __jX); __jK++; } return __jS; }` },
-  __arr_slice: { source: `function __arr_slice(__arrL, __sFrom, __sTo) { const __sO = []; for (let __sK = __sFrom; __sK < __sTo; __sK++) { __sO.push(__arrL[__sK]); } return __sO; }` },
+  __arr_slice: { source: `function __arr_slice(__arrL, __sFrom, __sTo) {
+    const __sSize = __arrL.length;
+    let __sStart = Math.trunc(__sFrom);
+    let __sEnd = Math.trunc(__sTo);
+    if (!(__sStart >= 0) && !(__sStart < 0)) __sStart = 0;
+    if (!(__sEnd >= 0) && !(__sEnd < 0)) __sEnd = 0;
+    if (__sStart < 0) __sStart = Math.max(0, __sSize + __sStart);
+    else __sStart = Math.min(__sStart, __sSize);
+    if (__sEnd < 0) __sEnd = Math.max(0, __sSize + __sEnd);
+    else __sEnd = Math.min(__sEnd, __sSize);
+    const __sO = [];
+    for (let __sK = __sStart; __sK < __sEnd; __sK++) { __sO.push(__arrL[__sK]); }
+    return __sO;
+  }` },
   __arr_reverse: { source: `function __arr_reverse(__arrL) { let __rK = 0; while (__rK < Math.floor(__arrL.length / 2)) { const __rV = __arrL[__rK]; __arrL[__rK] = __arrL[__arrL.length - 1 - __rK]; __arrL[__arrL.length - 1 - __rK] = __rV; __rK++; } return __arrL; }` },
   __arr_at: { source: `function __arr_at(__arrL, __atIndex) { let __atI = Math.trunc(__atIndex); if (!(__atI >= 0) && !(__atI < 0)) { __atI = 0; } if (__atI < 0) { __atI = __arrL.length + __atI; } return __arrL[__atI]; }` },
   __arr_flat: { source: `function __arr_flat(__arrL) { const __flatOut = []; let __flatI = 0; while (__flatI < __arrL.length) { const __arrFlatItem = __arrL[__flatI]; let __flatJ = 0; while (__flatJ < __arrFlatItem.length) { __flatOut.push(__arrFlatItem[__flatJ]); __flatJ++; } __flatI++; } return __flatOut; }` },
@@ -6782,7 +7002,10 @@ function optionalBooleanOption(options, name, defaultValue, compiler, node) {
 }
 
 function procedureParamIds(spec) {
-  return new Map(spec.params.filter((param) => param.type === "String").map((param) => [param.name, param.id]));
+  const params = spec.params.filter(param => param.type === "String");
+  const ids = new Map(params.map(param => [param.bindingName ?? param.name, param.id]));
+  ids.displayNames = new Map(params.map(param => [param.bindingName ?? param.name, param.name]));
+  return ids;
 }
 
 // Visits a function body without descending into nested functions.

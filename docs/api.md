@@ -134,6 +134,17 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   elements into a new list. Nested/default destructuring is rejected.
 - `a.at(index)` supports negative indices and truncates fractional indices.
   The ES2020 declaration set includes this frontend-supported method.
+- Array `slice(start?, end?)` evaluates its receiver once, then each explicit
+  numeric boundary once from left to right, before reading the saved receiver's
+  length. Fractions truncate toward zero, NaN becomes zero, negative bounds
+  count from the end, and both bounds clamp to `[0, length]` (including
+  infinities). Omitted start/end mean zero/length, even when a module shadows
+  the global `Infinity` binding; reversed or empty ranges
+  produce an empty list. The new dense list is a shallow copy: source structure
+  is unchanged, object/instance/nested-list elements retain reference identity.
+  Non-numeric or explicit null/undefined bounds are rejected with a location
+  and a conversion/omission hint. This does not add sparse arrays or change
+  ordinary out-of-bounds element reads or native list indexing.
 - Statement calls to `push`, `unshift` and `splice` evaluate the receiver once,
   then every argument once from left to right, before changing the list. Saved
   references and values are invocation-local, including recursive argument calls.
