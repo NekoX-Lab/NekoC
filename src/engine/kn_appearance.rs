@@ -27,6 +27,10 @@ enum CloneAttribute {
     Property(Property),
     Variable(usize),
     Missing,
+    /// The sprite option names an actor deleted from the work. Official
+    /// getCloneIndexProperty records MISSING_OPTION/CLONE_NOT_FOUND and
+    /// returns NaN after its inputs were evaluated; the script keeps running.
+    MissingSprite,
 }
 impl Property {
     pub(super) fn appearance(name: &str) -> Result<Self> {
@@ -66,8 +70,12 @@ impl Compiler {
                     .unwrap_or(CloneAttribute::Missing),
             }
         };
+        let (target, attribute) = match self.actor_target(field(block, "sprite")) {
+            Ok(target) => (target, attribute),
+            Err(_) => (usize::MAX, CloneAttribute::MissingSprite),
+        };
         let property = CloneProperty {
-            target: self.actor_target(field(block, "sprite"))?,
+            target,
             // Preserve the Cell: the official domain rejects string/bool
             // indices instead of applying numeric coercion.
             index: self.value(input(block, "index")?)?,
@@ -148,6 +156,9 @@ pub(super) fn set_axis(sprite: &mut Sprite, height: bool, value: f64, add: bool)
 impl Engine {
     pub(super) fn eval_kn_clone_property(&mut self, property: CloneProperty, actor: usize) -> Cell {
         let index = self.eval_value(property.index, actor);
+        if matches!(property.attribute, CloneAttribute::MissingSprite) {
+            return Cell::Number(f64::NAN);
+        }
         let target = if property.target == usize::MAX {
             actor
         } else {
@@ -178,7 +189,7 @@ impl Engine {
                     value
                 }
             }
-            CloneAttribute::Missing => Cell::Number(f64::NAN),
+            CloneAttribute::Missing | CloneAttribute::MissingSprite => Cell::Number(f64::NAN),
         }
     }
 

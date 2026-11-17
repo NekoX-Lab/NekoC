@@ -2961,6 +2961,19 @@ impl Compiler {
             "get_sprite_property" if self.program.semantics == RuntimeSemantics::KnCurrent => {
                 self.kn_sprite_property(b)?
             }
+            // A sprite option naming an actor deleted from the work: official
+            // isSameScene (ET) fails for the missing scene, records
+            // NOT_SAME_SCENE and the reporter returns NaN.
+            "coordinate_of_sprite"
+            | "appearance_of_sprite"
+            | "effect_of_sprite"
+            | "style_of_sprite"
+                if self.program.semantics == RuntimeSemantics::KnCurrent
+                    && !field(b, "sprite").starts_with("--")
+                    && self.actor_target(field(b, "sprite")).is_err() =>
+            {
+                ExprOp::Constant(f64::NAN)
+            }
             "coordinate_of_sprite" => {
                 ensure!(
                     matches!(field(b, "coordinate"), "x" | "y"),
@@ -4014,6 +4027,19 @@ impl Compiler {
                     "kitten4_set_effect" | "kitten4_change_effect" => Op::K4Effect(
                         k4_effects::K4Effect::compile(self, b, kind == "kitten4_change_effect")?,
                     ),
+                    "self_set_effect" | "self_change_effect"
+                        if self.program.semantics == RuntimeSemantics::KnCurrent
+                            && effect_scope(field(b, "scope")).is_none() =>
+                    {
+                        // Official setTargetEffects falls to its default case,
+                        // logs "cant find effect type_" and leaves the actor
+                        // unchanged; the value input was already evaluated.
+                        let value = ["value", "val", "steps"]
+                            .into_iter()
+                            .find_map(|key| b.get("inputs").and_then(|m| m.get(key)))
+                            .with_context(|| format!("{kind}: missing input value"))?;
+                        Op::Execute(self.value(value)?)
+                    }
                     "self_set_effect" | "self_change_effect" => {
                         let scope = effect_scope(field(b, "scope")).with_context(|| {
                             format!(
