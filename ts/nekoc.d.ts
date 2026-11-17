@@ -39,6 +39,17 @@ interface ReadonlyArray<T> {
   at(index: number): T | undefined;
 }
 
+// String methods use standard ES2020 signatures. charAt/substring normalize JS
+// numeric bounds; search methods preserve optional positions and split uses a
+// uint32 limit. Receivers/arguments evaluate once in order. Omit undefined;
+// regex, spread and extra arguments are rejected by the compatibility checker.
+// repeat/padStart/padEnd support dynamic inputs with runtime growth caps
+// (65536 target/result units); see docs/api.md#typescript-strings. String
+// lengths use UTF-16; isolated surrogate results cannot be represented.
+// Runtime code-unit selecting/searching paths guard unknown text for BMP safety;
+// safe native includes(search) and split(nonemptySeparator, limit?) also accept
+// complete emoji variables/parameters. See the API's conservative proof boundary.
+
 // Native ES2020 Map/Set declarations provide the public signatures (including
 // Map.get: V | undefined). NekoC lowers concrete string/number keys to heap
 // references; values may be scalars or initialized object/class/collection
@@ -221,6 +232,7 @@ interface NekoSpriteSelf {
   // --- Clones ---
   clone(sprite?: string): void;
   createClone(): void;
+  /** Kitten N: must end its block stack (no next socket); enclosing containers may continue. */
   deleteClone(): void;
 
   // --- Timer ---
@@ -250,6 +262,7 @@ interface NekoSpriteSelf {
   forRange(variable: string, from: NekoValue, to: NekoValue, by: NekoValue, body: NekoStatementBody): void;
   breakLoop(): void;
   stop(option?: string): void;
+  /** Kitten N: must end its block stack (no next socket). Restarts the work. */
   restart(): void;
   warp(body: NekoStatementBody): void;
   tell(target: string, body: NekoStatementBody): void;
@@ -374,6 +387,7 @@ declare function mathFunc(type: string, value: NekoValue): number;
 declare function trig(type: "sin" | "cos" | "tan", degrees: NekoValue): number;
 declare function askChoice(question: NekoValue, ...choices: NekoValue[]): void;
 declare function clone(sprite?: string): void;
+/** Kitten N: must end its block stack (no next socket); enclosing containers may continue. */
 declare function deleteClone(): void;
 declare function timerStart(): void;
 declare function showTimer(): void;
@@ -391,6 +405,7 @@ declare function repeatUntil(condition: NekoValue, body: NekoStatementBody): voi
 declare function forRange(variable: string, from: NekoValue, to: NekoValue, by: NekoValue, body: NekoStatementBody): void;
 declare function breakLoop(): void;
 declare function stop(option?: string): void;
+/** Kitten N: must end its block stack (no next socket). Restarts the work. */
 declare function restart(): void;
 declare function warp(body: NekoStatementBody): void;
 declare function tell(target: string, body: NekoStatementBody): void;
