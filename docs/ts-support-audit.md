@@ -10,11 +10,12 @@
 
 ### 变量
 
-- 顶层 `let` / `const`：常量初始值（数字、字符串、布尔）写入变量表；数组、对象、函数调用等非常量初始值和普通顶层语句按源码顺序放入隐式开始脚本。
+- 顶层 `let` / `const`：可无损 JSON 序列化的常量初始值（有限数字、字符串、布尔）写入变量表；产生 `NaN` / `±Infinity` 的数值常量表达式（如 `0/0`、`1/0`、`-1/0`）与数组、对象、函数调用等非常量初始值及普通顶层语句一样，按源码顺序放入隐式开始脚本，用原算术表达式求值，不把非有限数字存成 `null` 或文本。文本 `"Infinity"` 仍是字符串。
+  - 溢出的数字字面量（如 `1e999`、`-1e999`）同样用除零算术构造无穷值，避免编辑器重写非有限数字字段。回归见 `tests/tsnonfiniteinit.test.mjs`、`tests/tsnonfiniteinit.rs`；打包后执行 `node tests/tsnonfiniteinit-package.mjs` 验证 Node/web WASM 入口的 JSON 边界。
   - 有隐式脚本时，显式 `onStart` 仍是各自独立、并发运行的开始脚本，只是开头先等待顶层初始化完成（生成的 `__nekoc_ready` 标志）；初始化含 `wait` 时也会等它完成。没有隐式脚本时与原来完全一样。角色工作区的独立开始事件不在此屏障内。
-  - 常量仍在所有脚本运行前存在，不实现 JS 的暂时性死区；不要依赖声明前读取变量。
+  - 初值表中的有限数值、字符串及布尔常量仍在所有脚本运行前存在，不实现 JS 的暂时性死区；不要依赖声明前读取变量。
 - 回调里的局部 `let` / `const`，以及 `=`、`+=`、`-=`、`*=`、`/=`、`%=`、`++`、`--`。字符串变量用 `+=` 是拼接。
-- `const [a, b] = [1, 2]` 数组解构。
+- `const [a, b] = [1, 2]` 数组解构：顶层绑定先注册，在源码位置放入隐式开始脚本，RHS 只求值一次；支持省略项、rest 和同声明其他变量。rest 是新列表但保留数组/对象/实例元素的浅引用。函数与事件局部路径不变；不支持对象解构、嵌套 pattern、默认元素，不扩展稀疏/缺失项语义。
 - `enum`：成员会直接编译成常量，支持数字和字符串成员以及显式赋值（`A = 5`）。
 
 ### 函数
@@ -61,11 +62,12 @@
 - 常量 `toFixed`、进制 `toString`、`isNaN` / `Number.isNaN`、`charCodeAt` / `String.fromCharCode`、字符串 `at` / `slice` 按 JS 折叠；动态十进制 `toString()` 和常量边界的字符串 `slice` 也支持，其他动态变体明确报错。
 - `JSON.stringify` 只支持常量折叠（包括嵌套数组字面量和 JS 转义）；非常量以及 replacer/spacing 参数明确报错。分享播放器不支持 JSON 报告器，不生成该积木。
 - `Math.floor / ceil / round / trunc / abs / sqrt / exp / log / log10 / pow / max / min / random`、`Math.sin / cos / tan / asin / acos / atan`（弧度）、`Math.PI`、`Math.E` 等常量。
-  - `Math.max` / `Math.min` / `Math.trunc` 的每个参数只计算一次，按从左到右的顺序。
+  - `Math.max` / `Math.min` / `Math.trunc` 的每个参数只计算一次，按从左到右的顺序。数字 max/min 任一位置的 NaN 均传播为数值 NaN，后续实参仍完整求值；支持单参数、多参数、±Infinity 及嵌套/递归调用。trunc 保留 NaN 和 ±Infinity；不保证负零模型，也不扩展 any/文本强制转换。
   - 标准三角函数在弧度和角度间换算，使用分享播放器支持的 `math_trig` / `math_arc_trig`，不生成缺失的 `math_trig_rad`；实参只计算一次。
 - `Number()`、`parseFloat()`、`parseInt()`（取整数部分）、`String()`。
-- 新增 `Math.sign / cbrt / log2 / hypot / atan2`。`sign / cbrt / log2 / atan2` 通过辅助自制积木保存实参，避免重复执行实参表达式；`hypot` 内联为 `Math.sqrt(Math.pow(a, 2) + …)`，每个实参只计算一次。以有限数字为支持范围；`atan2` 不保留负零象限，`hypot` 不承诺 Infinity/NaN 特殊组合的 JS 语义。
-- `Number.isInteger` 支持数字输入；直接文本、布尔字面量返回 false。Kitten N 比较会做类型转换，动态混合类型输入和非有限数不保证 JS 语义。
+- 新增 `Math.sign / cbrt / log2 / hypot / atan2`。`sign / cbrt / log2 / atan2` 通过辅助自制积木保存实参，避免重复执行实参表达式；`hypot` 通过辅助自制积木先找最大绝对分量，再计算缩放后的平方和，避免有限大数平方溢出和有限小数平方下溢，每个实参只计算一次。以有限数字为支持范围；`atan2` 不保留负零象限，`hypot` 不承诺 Infinity/NaN 特殊组合的 JS 语义。
+  - `hypot` 接受零个、单个和多个有限数字实参，空调用/全零向量返回 0；实参从左到右保存到每次调用自己的过程参数，嵌套/递归调用不会覆盖彼此。使用分享播放器支持的算术与过程积木，不传递分量数组。最终范数超出浮点范围时仍可为 Infinity；不逐位复制 V8 的补偿求和。确定性回归采用相对误差 ≤ `2e-14`，另检查有限性、非零和布尔结果，不用绝对 epsilon 掩盖小数下溢。
+- `Number.isInteger` 支持数字输入，包括函数参数/返回值；新增保证 NaN 和 ±Infinity 返回 false，有限整数为 true、小数为 false。静态类型为文本/布尔的实参返回 false，副作用仍求值一次。动态混合类型输入不保证 JS 语义。
 
 ### 字符串
 

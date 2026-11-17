@@ -190,6 +190,7 @@ class WorkspaceCompiler {
     this.moduleExports = new Map();
     this.registeredImports = new Set();
     this.globalVariables = new Set();
+    this.globalArrayBindings = new WeakSet();
     // Constant initial values of top-level let/const, written into the
     // project's variable table (they hold before any script runs).
     this.initialValues = {};
@@ -396,8 +397,15 @@ class WorkspaceCompiler {
       if (this.isGlobalVariableDeclaration(statement)) {
         for (const declaration of statement.declarationList.declarations) {
           if (this.runtimeInitializers.has(declaration)) {
-            startup.push(ts.factory.createExpressionStatement(ts.factory.createBinaryExpression(
-              declaration.name, ts.SyntaxKind.EqualsToken, declaration.initializer)));
+            if (ts.isArrayBindingPattern(declaration.name)) {
+              // Keep the declaration so the ordinary destructuring path saves
+              // the RHS once; a binding pattern is not an assignment target.
+              startup.push(ts.factory.createVariableStatement(undefined,
+                ts.factory.createVariableDeclarationList([declaration], statement.declarationList.flags)));
+            } else {
+              startup.push(ts.factory.createExpressionStatement(ts.factory.createBinaryExpression(
+                declaration.name, ts.SyntaxKind.EqualsToken, declaration.initializer)));
+            }
           }
         }
         return;
@@ -638,6 +646,18 @@ class WorkspaceCompiler {
 
   registerGlobalVariableDeclaration(statement) {
     statement.declarationList.declarations.forEach((declaration) => {
+      if (ts.isArrayBindingPattern(declaration.name)) {
+        for (const { elem, varName } of this.arrayDestructuringBindings(declaration)) {
+          if (this.globalVariables.has(varName)) {
+            this.unsupported(elem, `Duplicate variable declaration: ${varName}`);
+          }
+          this.globalVariables.add(varName);
+          this.globalArrayBindings.add(elem);
+          if (elem.dotDotDotToken) this.arrayVariables.add(varName);
+        }
+        this.runtimeInitializers.add(declaration);
+        return;
+      }
       if (!ts.isIdentifier(declaration.name)) {
         this.unsupported(declaration.name, "Only simple variable names are supported");
       }
@@ -646,7 +666,8 @@ class WorkspaceCompiler {
       }
       this.globalVariables.add(declaration.name.text);
       if (declaration.initializer) {
-        // Non-constant initializers run at startup (see compile()).
+        // Initializers not representable in the JSON value table run at startup
+        // (see compile()), including constant NaN and infinities.
         const value = constantInitialValue(declaration.initializer);
         if (value === null) this.runtimeInitializers.add(declaration);
         else this.initialValues[declaration.name.text] = value;
@@ -1410,7 +1431,7 @@ class WorkspaceCompiler {
       "Math.sign": "function __jsSign(__jsSignX) { if (__jsSignX === 0) return __jsSignX; if (__jsSignX > 0) return 1; if (__jsSignX < 0) return -1; return __jsSignX; }",
       "Math.cbrt": "function __jsCbrt(__jsCbrtX) { if (__jsCbrtX < 0) return -Math.pow(-__jsCbrtX, 1 / 3); return Math.pow(__jsCbrtX, 1 / 3); }",
       "Math.log2": "function __jsLog2(__jsLog2X) { return Math.log(__jsLog2X) / Math.LN2; }",
-      "Number.isInteger": "function __jsIsInteger(__jsIntegerX) { return __jsIntegerX === Math.trunc(__jsIntegerX); }",
+      "Number.isInteger": "function __jsIsInteger(__jsIntegerX) { return String(__jsIntegerX) !== \"NaN\" && String(__jsIntegerX) !== \"Infinity\" && String(__jsIntegerX) !== \"-Infinity\" && __jsIntegerX === Math.trunc(__jsIntegerX); }",
       "Math.atan2": "function __jsAtan2(__jsAtanY, __jsAtanX) { if (__jsAtanX > 0) return Math.atan(__jsAtanY / __jsAtanX); if (__jsAtanX < 0) { if (__jsAtanY < 0) return Math.atan(__jsAtanY / __jsAtanX) - Math.PI; return Math.atan(__jsAtanY / __jsAtanX) + Math.PI; } if (__jsAtanY > 0) return Math.PI / 2; if (__jsAtanY < 0) return -Math.PI / 2; return 0; }",
     };
     const globalNames = { "Math.sign": "__jsSign", "Math.cbrt": "__jsCbrt", "Math.log2": "__jsLog2", "Math.atan2": "__jsAtan2", "Number.isInteger": "__jsIsInteger" };
@@ -2513,6 +2534,9 @@ class WorkspaceCompiler {
   }
 
   registerBlockVariable(node, variableName) {
+    // Top-level patterns are registered before compiling procedures/events;
+    // their startup declaration only initializes those same bindings.
+    if (this.globalArrayBindings.has(node)) return;
     const capturedDeclaration = this.callbackCaptures.get(variableName)?.name === node;
     if (this.lookupRangeBinding(variableName) || (this.globalVariables.has(variableName) && !capturedDeclaration)) {
       this.unsupported(node, `Variable shadowing is not supported: ${variableName}`);
@@ -2522,12 +2546,9 @@ class WorkspaceCompiler {
     this.invocationLocals?.add(variableName);
   }
 
-  compileArrayDestructuring(declaration, parentId) {
+  arrayDestructuringBindings(declaration) {
     if (!declaration.initializer) this.unsupported(declaration, "Array destructuring needs an initializer");
-    const f = ts.factory;
-    const target = f.createIdentifier(`__arrDestructure${this.nextId}`);
-    const firstId = this.compileAssignmentExpression(f.createBinaryExpression(target, ts.SyntaxKind.EqualsToken, declaration.initializer), parentId);
-    let previousId = firstId;
+    const bindings = [];
     const elements = declaration.name.elements;
     for (let i = 0; i < elements.length; i++) {
       const elem = elements[i];
@@ -2538,9 +2559,21 @@ class WorkspaceCompiler {
       } else if (ts.isIdentifier(elem)) {
         varName = elem.text;
       } else {
-        this.unsupported(elem, "Nested array destructuring is not supported");
+        this.unsupported(elem, "Nested array destructuring is not supported; bind the element to a variable, then read its elements explicitly");
       }
-      if (elem.initializer) this.unsupported(elem, "Array destructuring defaults are not supported");
+      if (elem.initializer) this.unsupported(elem, "Array destructuring defaults are not supported; use an explicit initialized element instead");
+      bindings.push({ elem, varName, index: i });
+    }
+    return bindings;
+  }
+
+  compileArrayDestructuring(declaration, parentId) {
+    const bindings = this.arrayDestructuringBindings(declaration);
+    const f = ts.factory;
+    const target = f.createIdentifier(`__arrDestructure${this.nextId}`);
+    const firstId = this.compileAssignmentExpression(f.createBinaryExpression(target, ts.SyntaxKind.EqualsToken, declaration.initializer), parentId);
+    let previousId = firstId;
+    for (const { elem, varName, index: i } of bindings) {
       this.registerBlockVariable(elem, varName);
       const id = this.addBlock({
         type: "variables_set",
@@ -4484,6 +4517,13 @@ class WorkspaceCompiler {
       this.unsupported(expression, `Unknown identifier: ${expression.text}`);
     }
     if (ts.isNumericLiteral(expression)) {
+      if (!Number.isFinite(Number(expression.text))) {
+        // Overflowing literals (e.g. 1e999) also need runtime arithmetic:
+        // an Infinity number field can be normalized by the editor.
+        return this.compileExpression(ts.factory.createBinaryExpression(
+          ts.factory.createNumericLiteral(1), ts.SyntaxKind.SlashToken,
+          ts.factory.createNumericLiteral(0)), parentId);
+      }
       return this.addBlock({
         type: "math_number",
         parent_id: parentId,
@@ -4494,7 +4534,8 @@ class WorkspaceCompiler {
     if (
       ts.isPrefixUnaryExpression(expression) &&
       expression.operator === ts.SyntaxKind.MinusToken &&
-      ts.isNumericLiteral(expression.operand)
+      ts.isNumericLiteral(expression.operand) &&
+      Number.isFinite(Number(expression.operand.text))
     ) {
       return this.addBlock({
         type: "math_number",
@@ -4663,14 +4704,32 @@ class WorkspaceCompiler {
     if (factory?.factoryArgs) return this.compileExpressionCall(ts.factory.createCallExpression(
       ts.factory.createIdentifier(factory.name), undefined, factory.factoryArgs), parentId);
     if (name === "Math.hypot") {
-      // Inline sqrt(a² + b² + …) so no list is passed to a custom block (the
-      // editor drops list reporters plugged into procedure arguments).
       const f = ts.factory;
-      const square = arg => f.createCallExpression(f.createPropertyAccessExpression(f.createIdentifier("Math"), "pow"), undefined, [arg, f.createNumericLiteral(2)]);
+      const math = (method, args) => f.createCallExpression(
+        f.createPropertyAccessExpression(f.createIdentifier("Math"), method), undefined, args);
+      const binary = (a, op, b) => f.createBinaryExpression(a, op, b);
       if (!call.arguments.length) return this.compileExpression(f.createNumericLiteral(0), parentId);
-      const sum = call.arguments.map(square).reduce((a, b) => f.createBinaryExpression(a, ts.SyntaxKind.PlusToken, b));
-      const replacement = f.createCallExpression(f.createPropertyAccessExpression(f.createIdentifier("Math"), "sqrt"), undefined, [sum]);
-      return this.compileExpression(replacement, parentId);
+      // Save every input before finding the scale: later arguments may mutate
+      // earlier ones or recursively enter this call site. Procedure parameters,
+      // not shared scratch variables/list arguments, keep each invocation isolated.
+      return evaluatedChoice(this, [...call.arguments], parentId, (args, definition) => {
+        const ret = this.addReturnValueBlock(definition);
+        const maximum = math("max", args.map(arg => math("abs", [arg])));
+        const scaled = evaluatedChoice(this, [maximum], ret, ([scale], inner) =>
+          returnChoice(this, inner,
+            parent => this.compileExpression(binary(scale, ts.SyntaxKind.EqualsEqualsEqualsToken, f.createNumericLiteral(0)), parent),
+            parent => this.compileExpression(f.createNumericLiteral(0), parent),
+            parent => {
+              // Divide before squaring. At least one normalized component is 1,
+              // so tiny vectors cannot vanish and large ones cannot overflow
+              // until the final rescale (when the true norm may be infinite).
+              const squares = args.map(arg => math("pow", [binary(arg, ts.SyntaxKind.SlashToken, scale), f.createNumericLiteral(2)]));
+              const sum = squares.reduce((a, b) => binary(a, ts.SyntaxKind.PlusToken, b));
+              return this.compileExpression(binary(scale, ts.SyntaxKind.AsteriskToken, math("sqrt", [sum])), parent);
+            }));
+        this.connectInput(ret, scaled, "VALUE", "value");
+        return ret;
+      });
     }
     if (this.globalHelpers?.has(name)) {
       const arity = name === "Math.atan2" ? 2 : 1;
@@ -5165,12 +5224,31 @@ class WorkspaceCompiler {
         // Every argument is evaluated once, left to right, then compared:
         // max(a, b, c) is max2(a, max(b, c)) with a evaluated first.
         const rest = args.length === 2 ? args[1] : ts.factory.createCallExpression(call.expression, undefined, args.slice(1));
+        // Parsed numeric types and synthesized numeric helpers use KN's verified
+        // String(number) representation (docs/kn-conversion-evidence.json).
+        // Do not use x === x: KN equality does not follow JS NaN equality.
+        // Keep legacy nonnumeric call forms; this adds no coercion or rejection.
+        const numeric = args.every(arg => {
+          const kind = this.expressionType?.(arg);
+          return kind === "number" || (kind == null && !this.isStringExpression(arg));
+        });
         return evaluatedChoice(this, [args[0], rest], parentId, ([a, b], definition) =>
           returnChoice(this, definition, parent => {
-            const cmp = this.addBlock({ type: "logic_compare", parent_id: parent, fields: { OP: method === "max" ? "GT" : "LT" }, is_output: true });
+            const choice = numeric ? this.addBlock({ type: "logic_operation", parent_id: parent, fields: { type: "or" }, is_output: true }) : null;
+            const cmp = this.addBlock({ type: "logic_compare", parent_id: choice ?? parent, fields: { OP: method === "max" ? "GT" : "LT" }, is_output: true });
             this.connectInput(cmp, this.compileExpression(a, cmp), "A", "value");
             this.connectInput(cmp, this.compileExpression(b, cmp), "B", "value");
-            return cmp;
+            if (!choice) return cmp;
+            const nan = this.addBlock({ type: "logic_compare", parent_id: choice, fields: { OP: "EQ" }, is_output: true });
+            const text = ts.factory.createCallExpression(ts.factory.createIdentifier("String"), undefined, [a]);
+            this.connectInput(nan, this.compileExpression(text, nan), "A", "value");
+            this.connectInput(nan, this.compileExpression(ts.factory.createStringLiteral("NaN"), nan), "B", "value");
+            this.connectInput(choice, nan, "A", "value");
+            this.connectInput(choice, cmp, "B", "value");
+            // All original arguments have already run before this branch, even
+            // when a is NaN. Return the original numeric NaN, never text "NaN".
+            // A NaN b already wins because GT/LT with NaN is false.
+            return choice;
           }, parent => this.compileExpression(a, parent), parent => this.compileExpression(b, parent)));
       }
       case "random": {
@@ -6828,7 +6906,9 @@ function constantInitialValue(node) {
   if (inner.kind === ts.SyntaxKind.TrueKeyword) return true;
   if (inner.kind === ts.SyntaxKind.FalseKeyword) return false;
   const value = constantNumber(inner);
-  return value;
+  // JSON turns non-finite numbers into null. Keep their original expressions
+  // in the startup script instead, just like non-constant initializers.
+  return Number.isFinite(value) ? value : null;
 }
 
 function isValueMethodCall(call) {

@@ -363,9 +363,16 @@ const items = [1, 2, 3];
 
 ```ts
 const [a, b] = [1, 2];
+const [head, , ...tail] = [3, 4, 5, 6], next = head + tail[0];
 ```
 
-Object destructuring is not supported (Kitten N has no object values).
+Top-level array destructuring runs at its source position in the implicit
+startup script: the RHS is evaluated once, and root `onStart` handlers wait for
+initialization. Rest produces a new shallow list; reference elements still alias
+their originals. Existing function/event-local destructuring is unchanged.
+Object destructuring, nested patterns and default elements are not supported;
+read properties/elements explicitly instead. Sparse/missing elements do not gain
+JavaScript `undefined` semantics through destructuring.
 
 ### Import/Export (Project Files)
 
