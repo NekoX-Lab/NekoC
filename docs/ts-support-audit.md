@@ -63,7 +63,8 @@
   - `Math.max` / `Math.min` / `Math.trunc` 的每个参数只计算一次，按从左到右的顺序。
   - 标准三角函数在弧度和角度间换算，使用分享播放器支持的 `math_trig` / `math_arc_trig`，不生成缺失的 `math_trig_rad`；实参只计算一次。
 - `Number()`、`parseFloat()`、`parseInt()`（取整数部分）、`String()`。
-- 新增 `Math.sign / cbrt / log2 / hypot / atan2`。`sign / cbrt / log2 / atan2` 通过辅助自制积木保存实参，避免重复执行实参表达式；`hypot` 内联为 `Math.sqrt(Math.pow(a, 2) + …)`，每个实参只计算一次。以有限数字为支持范围；`atan2` 不保留负零象限，`hypot` 不承诺 Infinity/NaN 特殊组合的 JS 语义。
+- 新增 `Math.sign / cbrt / log2 / hypot / atan2`。`sign / cbrt / log2 / atan2` 通过辅助自制积木保存实参，避免重复执行实参表达式；`hypot` 通过辅助自制积木先找最大绝对分量，再计算缩放后的平方和，避免有限大数平方溢出和有限小数平方下溢，每个实参只计算一次。以有限数字为支持范围；`atan2` 不保留负零象限，`hypot` 不承诺 Infinity/NaN 特殊组合的 JS 语义。
+  - `hypot` 接受零个、单个和多个有限数字实参，空调用/全零向量返回 0；实参从左到右保存到每次调用自己的过程参数，嵌套/递归调用不会覆盖彼此。使用分享播放器支持的算术与过程积木，不传递分量数组。最终范数超出浮点范围时仍可为 Infinity；不逐位复制 V8 的补偿求和。确定性回归采用相对误差 ≤ `2e-14`，另检查有限性、非零和布尔结果，不用绝对 epsilon 掩盖小数下溢。
 - `Number.isInteger` 支持数字输入；直接文本、布尔字面量返回 false。Kitten N 比较会做类型转换，动态混合类型输入和非有限数不保证 JS 语义。
 
 ### 字符串

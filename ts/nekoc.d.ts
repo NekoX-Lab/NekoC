@@ -3,6 +3,11 @@
 // Matches compiler capabilities exactly. Use native if/while/for for control flow.
 // ---------------------------------------------------------------------------
 
+// Native Math.hypot uses the TypeScript standard-library signature. The frontend
+// supports finite numeric components with max-absolute scaling and once-only,
+// left-to-right argument evaluation, including nested/recursive calls. Empty or
+// all-zero vectors return 0; non-finite input combinations are not guaranteed.
+
 type NekoPrimitive = string | number | boolean;
 /**
  * Block values are plain values at the type level. Addition needs statically

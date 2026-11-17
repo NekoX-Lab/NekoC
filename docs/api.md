@@ -2,6 +2,18 @@
 
 Complete reference for all functions and APIs available in NekoC TypeScript projects.
 
+## TypeScript vector length
+
+`Math.hypot(...components)` supports any fixed number of finite numeric arguments,
+including variables, function results and loop values. It saves each argument
+once, left to right, in invocation-local procedure parameters. It finds the
+maximum absolute component, sums squares of normalized components, then rescales
+the square root. Empty and all-zero vectors return 0 without division by zero.
+This avoids premature overflow/underflow for large/small finite components and
+works with nested and recursive calls using share-player-supported blocks.
+Actual result overflow can still produce Infinity. Infinity/NaN input combinations
+and bit-identical V8 compensated summation remain outside the documented guarantee.
+
 ## TypeScript classes
 
 Class declarations, fields, constructors (including parameter properties), `new`,
