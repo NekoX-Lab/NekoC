@@ -77,6 +77,7 @@
 - `indexOf`、`lastIndexOf`、`startsWith`、`endsWith`、`replace`、`replaceAll`、`trim`、`trimStart`、`trimEnd`、`repeat`、`padStart`、`padEnd`、`toUpperCase`、`toLowerCase`（只转换英文字母）、`concat`。
   - 这些方法没有对应积木，编译器会生成用循环实现的辅助自制积木，用到哪个才加哪个。
   - 比较字符时用的是积木的"等于"，和积木本身的规则一致（例如数字形式的文本 `"1.0"` 和 `"1"` 视为相等）。
+- UTF-16 安全子集：运行时 charAt/substring/indexOf/lastIndexOf/endsWith、显式 position 的 includes/startsWith 需证明接收者仅含 BMP；分析按词法符号检查初始化/全部赋值、函数返回和直接调用实参，未知形参、数组元素、class 字段等保守定位拒绝。常量仍按 JS 折叠；不以 string 注解假定没有 emoji。无 position 的 includes/startsWith 和确定非空 separator 的 split 使用原生积木，不扫描出孤立代理项，支持变量/形参中的完整 emoji，split limit 通过分割后复制限制。空或未知 separator 须证明接收者 BMP，否则明确拒绝。普通名为 self 的变量/形参及 any/as 不豁免增长校验；真实 sprite callback 参数按绑定识别，最终 lowering 对未验证增长失败关闭。
 - `join()`、`selectText()`、`length(x)`。
 
 ### 数组（列表值）

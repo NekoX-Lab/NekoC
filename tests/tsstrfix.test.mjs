@@ -63,6 +63,49 @@ test("tsstrfix complete emoji boundaries, safe growth and existing negative slic
   assert.throws(() => compile('function n() { return 2; } n = () => Infinity; console.log("x".repeat(n()));'), /bounded/);
 });
 
+test("tsstrfix review: lexical self bindings never bypass bounded growth validation", () => {
+  const expressions = ['repeat(-1)', 'repeat(Infinity)', 'repeat(65537)', 'padEnd(Infinity)', 'padEnd(2, "😀")'];
+  for (const expression of expressions) {
+    for (const source of [
+      `let self: any = "x";\nconsole.log(self.${expression});`,
+      `function p(self: any): string {\nreturn self.${expression}; } console.log(p("x"));`,
+      `let self: any = "x";\nconsole.log((self as string).${expression});`,
+      `sprite("cat", {}, self => { let other: any = "x";\nconsole.log((other as any).${expression}); });`,
+    ]) {
+      for (const types of [false, true]) {
+        const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
+        assert.equal(checked.ok, false, source);
+        assert.ok(checked.diagnostics.some(d => d.line === 2 && /bounded|UTF-16|surrogate/i.test(d.message)), JSON.stringify(checked));
+      }
+      assert.throws(() => compile(source), /bounded|UTF-16|surrogate/i, source);
+    }
+  }
+  compile('sprite("cat", {}, self => { self.onStart(() => { self.repeat(3, () => { self.move(1); }); }); });');
+  assert.throws(() => compile('sprite("cat", {}, (self: any) => { self = "x"; console.log(self.repeat(Infinity)); });'), /bounded/);
+});
+
+test("tsstrfix review: unprovable UTF-16 selections fail at source rather than in the VM", () => {
+  for (const method of ['charAt(0)', 'substring(0, 1)', 'split("", 1)', 'includes("a", 0)', 'startsWith("a", 1)', 'endsWith("a")', 'lastIndexOf("a")']) {
+    for (const source of [
+      `let s = "😀abc";\nconsole.log(s.${method});`,
+      `function p(s: string) {\nconsole.log(s.${method}); } p("😀abc");`,
+      `let values = ["😀abc"];\nconsole.log(values[0].${method});`,
+      `class Text { value = "😀abc"; } const text = new Text();\nconsole.log(text.value.${method});`,
+      `let self: any = "😀abc";\nconsole.log((self as any).${method});`,
+    ]) {
+      for (const types of [false, true]) {
+        const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
+        assert.equal(checked.ok, false, source);
+        assert.ok(checked.diagnostics.some(d => d.line === 2 && /UTF-16.*alternative/i.test(d.message)), JSON.stringify(checked));
+      }
+      assert.throws(() => compile(source), /UTF-16.*alternative/i, source);
+    }
+  }
+  compile('function p(s: string) { return s.charAt(0); } console.log(p("abc"));');
+  compile('let s = "😀abc"; console.log(s.includes("a"), s.split(",", 1).join("|"));');
+  assert.throws(() => compile('let s = "abc"; [s] = ["😀"]; console.log(s.charAt(0));'), /UTF-16|Assignment|assignment/);
+});
+
 test("tsstrfix CLI and shared npm/browser wrapper preserve options and compatibility diagnostics", async () => {
   const wrapper = fs.readFileSync("packages/nekoc/api.mjs", "utf8")
     .replace('"./dist/frontend/compile-ts.mjs"', JSON.stringify(new URL("../ts/compile-ts.mjs", import.meta.url).href))

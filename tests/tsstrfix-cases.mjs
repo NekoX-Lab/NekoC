@@ -87,6 +87,20 @@ order = ""; console.log(padReceiver().repeat(noPadding())); console.log(order);
 function emojiFill(): string { return "😀"; }
 console.log(padReceiver().padStart(3, emojiFill()));
 console.log(short().padEnd(6, "中文"));
+// Native search/split never materialize an isolated code unit while scanning.
+let unicode = "😀,abc,🙂";
+console.log(unicode.includes("a")); console.log(unicode.includes("😀"));
+console.log(unicode.startsWith("a"));
+console.log(unicode.split(",").join("|"));
+console.log(unicode.split(",", 1).join("|"));
+console.log(unicode.split(",", 2).join("|"));
+console.log(unicode.split("🙂", 10).join("|"));
+function unicodeSearch(value: string) {
+  console.log(value.includes("a"));
+  console.log(value.startsWith("😀")); console.log(value.split(",", 2).join("|"));
+}
+unicodeSearch(unicode);
+unicode = "🙂,xyz"; unicodeSearch(unicode);
 // Hot procedure paths, without wall-clock assertions.
 for (let hot = 0; hot < 700; hot++) console.log(s.substring(0, 1));
 `;

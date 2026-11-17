@@ -69,6 +69,27 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   receiver/length bounds proving complete characters. Complete Chinese/emoji
   strings and whole-character padding/repeat are supported; arbitrary isolated
   UTF-16 surrogates and `s[i]` returning `undefined` are not represented.
+- Runtime `charAt`/`substring`, `indexOf`/`lastIndexOf`/`endsWith`, and
+  `includes`/`startsWith` with an explicit position require a provably BMP-only
+  receiver. The proof follows lexical initializers, all assignments, visible
+  function returns and direct call arguments, not just a `string` annotation.
+  Unknown parameters, array elements and class fields are conservatively
+  rejected for these paths, with a source location and alternative. This avoids
+  constructing isolated surrogate temporaries even when a search's final result
+  would be boolean/numeric. Constants still fold with exact JS semantics.
+- `includes(search)` without position and `startsWith(search)` without position
+  use native containment/splitting rather than code-unit scanning, so full emoji
+  receivers (including variables and parameters) are safe. `split` uses native
+  splitting followed by a fresh limited copy; a provably nonempty separator is
+  safe with full emoji and with a limit. An empty or unknown separator requires a
+  provably BMP-only receiver, since splitting an astral character into code units
+  would itself produce unrepresentable strings. Use a nonempty literal separator
+  or keep complete characters instead.
+- Only the actual symbol bound by a `sprite` callback is a DSL receiver; naming
+  an ordinary variable/parameter `self`, or asserting `any`, does not exempt it
+  from growth validation. Validated dynamic growth is lowered immediately into
+  a bounded helper; any remaining string repeat/padding at final lowering fails
+  closed instead of generating an unchecked loop.
 - String methods reject extra/spread arguments instead of silently discarding
   them. Existing string `slice` keeps its constant-index subset, negative-index
   normalization and half-open empty ranges; it does not swap bounds.

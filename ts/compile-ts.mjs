@@ -5729,7 +5729,7 @@ class WorkspaceCompiler {
       return null;
     }
     switch (method) {
-      case "includes": return helper("__str_includes", args[0], args[1] ?? literal(0));
+      case "includes": return helper(args.length > 1 ? "__str_includes" : "__str_contains", args[0], ...(args.length > 1 ? [args[1]] : []));
       case "charAt": return helper("__str_charAt", args[0] ?? literal(0));
       case "substring": return helper("__str_substring", args[0] ?? literal(0), args[1] ?? literal(0), literal(args.length > 1 ? 1 : 0));
       case "slice": {
@@ -5750,14 +5750,14 @@ class WorkspaceCompiler {
       }
       case "indexOf": return helper("__str_indexOf", args[0], args[1] ?? literal(0));
       case "lastIndexOf": return helper("__str_lastIndexOf", args[0], args[1] ?? literal(0), literal(args.length > 1 ? 1 : 0));
-      case "startsWith": return helper("__str_startsWith", args[0], args[1] ?? literal(0));
+      case "startsWith": return args.length > 1 ? helper("__str_startsWith", args[0], args[1]) : helper("__str_starts", args[0]);
       case "endsWith": return helper("__str_endsWith", args[0], args[1] ?? literal(0), literal(args.length > 1 ? 1 : 0));
       case "replace": return helper("__str_replace", args[0], args[1]);
       case "replaceAll": return helper("__str_replaceAll", args[0], args[1]);
       case "trim": case "trimStart": case "trimEnd": case "toUpperCase": case "toLowerCase":
         return helper(`__str_${method}`);
-      case "repeat": return helper("__str_repeat", args[0]);
-      case "padStart": case "padEnd": return helper(`__str_${method}`, args[0], args[1] ?? literal(" "));
+      case "repeat": case "padStart": case "padEnd":
+        this.unsupported(call, `String.${method} requires validated bounded growth; use a constant receiver/count or a function returning bounded literals instead of an unknown receiver`);
       case "concat": return this.compileTextJoin([{ expression: target }, ...Array.from(args, (arg) => ({ expression: arg }))], parentId);
       case "split": return helper("__str_split", args[0] ?? literal(""), args[1] ?? literal(4294967295), literal(args.length > 0 ? 1 : 0));
       default:
@@ -6328,19 +6328,18 @@ const SHARED_HELPERS = {
   __str_substring: { needs: ["__str_position", "__str_range"], source: `function __str_substring(__s, __start, __end, __given) { const __size = length(__s); const __lo = __str_position(__start, __size); let __hi = __size; if (__given) __hi = __str_position(__end, __size); return __str_range(__s, Math.min(__lo, __hi), Math.max(__lo, __hi)); }` },
   __str_indexOf: { needs: ["__str_position", "__str_range"], source: `function __str_indexOf(__s, __t, __from) { const __start = __str_position(__from, length(__s)); if (length(__t) === 0) return __start; for (let __iK = __start; __iK <= length(__s) - length(__t); __iK++) { if (__str_range(__s, __iK, __iK + length(__t)) === __t) return __iK; } return -1; }` },
   __str_includes: { needs: ["__str_indexOf"], source: `function __str_includes(__s, __t, __from) { return __str_indexOf(__s, __t, __from) >= 0; }` },
+  __str_contains: { source: `function __str_contains(__s, __t) { return contains(__s, __t); }` },
+  __str_firstIndex: { source: `function __str_firstIndex(__s, __t) { if (length(__t) === 0) return 0; const __parts = splitText(__s, __t); if (__parts.length < 2) return -1; return length(__parts[0]); }` },
+  __str_starts: { needs: ["__str_firstIndex"], source: `function __str_starts(__s, __t) { return __str_firstIndex(__s, __t) === 0; }` },
   __str_lastIndexOf: { needs: ["__str_position", "__str_range"], source: `function __str_lastIndexOf(__s, __t, __from, __given) { let __start = length(__s); if (__given && String(__from) !== "NaN") __start = __str_position(__from, length(__s)); if (length(__t) === 0) return __start; for (let __lK = Math.min(__start, length(__s) - length(__t)); __lK >= 0; __lK--) { if (__str_range(__s, __lK, __lK + length(__t)) === __t) return __lK; } return -1; }` },
   __str_startsWith: { needs: ["__str_position", "__str_range"], source: `function __str_startsWith(__s, __t, __from) { const __start = __str_position(__from, length(__s)); if (length(__t) === 0) return true; if (__start + length(__t) > length(__s)) return false; return __str_range(__s, __start, __start + length(__t)) === __t; }` },
   __str_endsWith: { needs: ["__str_position", "__str_range"], source: `function __str_endsWith(__s, __t, __from, __given) { let __end = length(__s); if (__given) __end = __str_position(__from, length(__s)); if (length(__t) === 0) return true; if (length(__t) > __end) return false; return __str_range(__s, __end - length(__t), __end) === __t; }` },
-  __str_split: { needs: ["__str_indexOf", "__str_range"], source: `function __str_split(__s, __separator, __inputLimit, __given) { const __out = []; let __limit = __inputLimit; if (String(__limit) === "NaN" || String(__limit) === "Infinity" || String(__limit) === "-Infinity") __limit = 0; __limit = Math.trunc(__limit) % 4294967296; if (__limit < 0) __limit += 4294967296; if (__limit === 0) return __out; if (!__given) { __out.push(__s); return __out; } let __cursor = 0; if (length(__separator) === 0) { while (__cursor < length(__s) && __out.length < __limit) { __out.push(__str_range(__s, __cursor, __cursor + 1)); __cursor++; } return __out; } let __match = __str_indexOf(__s, __separator, __cursor); while (__match >= 0 && __out.length < __limit) { __out.push(__str_range(__s, __cursor, __match)); __cursor = __match + length(__separator); __match = __str_indexOf(__s, __separator, __cursor); } if (__out.length < __limit) __out.push(__str_range(__s, __cursor, length(__s))); return __out; }` },
+  __str_split: { source: `function __str_split(__s, __separator, __inputLimit, __given) { const __out = []; let __limit = __inputLimit; if (String(__limit) === "NaN" || String(__limit) === "Infinity" || String(__limit) === "-Infinity") __limit = 0; __limit = Math.trunc(__limit) % 4294967296; if (__limit < 0) __limit += 4294967296; if (__limit === 0) return __out; if (!__given) { __out.push(__s); return __out; } const __parts = splitText(__s, __separator); let __cursor = 0; while (__cursor < __parts.length && __out.length < __limit) { __out.push(__parts[__cursor]); __cursor++; } return __out; }` },
   __str_replace: { needs: ["__str_indexOf"], source: `function __str_replace(__s, __a, __b) { const __rI = __str_indexOf(__s, __a, 0); if (__rI < 0) { return __s; } return join(selectText(__s, 1, __rI), __b, selectText(__s, __rI + length(__a) + 1, length(__s))); }` },
   __str_replaceAll: { needs: ["__str_indexOf"], source: `function __str_replaceAll(__s, __a, __b) { let __aO = ""; let __aP = 0; let __aI = __str_indexOf(__s, __a, 0); while (__aI >= 0 && length(__a) > 0) { __aO = join(__aO, selectText(__s, __aP + 1, __aI), __b); __aP = __aI + length(__a); __aI = __str_indexOf(__s, __a, __aP); } return join(__aO, selectText(__s, __aP + 1, length(__s))); }` },
   __str_trimStart: { source: `function __str_trimStart(__s) { let __tA = 1; while (__tA <= length(__s) && contains(" \\t\\n\\r", selectText(__s, __tA, __tA))) { __tA = __tA + 1; } return selectText(__s, __tA, length(__s)); }` },
   __str_trimEnd: { source: `function __str_trimEnd(__s) { let __tB = length(__s); while (__tB >= 1 && contains(" \\t\\n\\r", selectText(__s, __tB, __tB))) { __tB = __tB - 1; } return selectText(__s, 1, __tB); }` },
   __str_trim: { needs: ["__str_trimStart", "__str_trimEnd"], source: `function __str_trim(__s) { return __str_trimEnd(__str_trimStart(__s)); }` },
-  __str_repeat: { source: `function __str_repeat(__s, __n) { let __pO = ""; const __count = Math.trunc(__n); for (let __pK = 0; __pK < __count; __pK++) { __pO = join(__pO, __s); } return __pO; }` },
-  __str_padding: { needs: ["__str_range"], source: `function __str_padding(__s, __n, __f) { const __needed = Math.max(0, Math.trunc(__n) - length(__s)); if (__needed === 0 || length(__f) === 0) return ""; let __padding = ""; while (length(__padding) < __needed) __padding = join(__padding, __f); return __str_range(__padding, 0, __needed); }` },
-  __str_padStart: { needs: ["__str_padding"], source: `function __str_padStart(__s, __n, __f) { return join(__str_padding(__s, __n, __f), __s); }` },
-  __str_padEnd: { needs: ["__str_padding"], source: `function __str_padEnd(__s, __n, __f) { return join(__s, __str_padding(__s, __n, __f)); }` },
   __str_toUpperCase: { needs: ["__str_indexOf"], source: `function __str_toUpperCase(__s) { let __uO = ""; for (let __uK = 1; __uK <= length(__s); __uK++) { const __uC = selectText(__s, __uK, __uK); const __uI = __str_indexOf("abcdefghijklmnopqrstuvwxyz", __uC, 0); if (__uI >= 0) { __uO = join(__uO, selectText("ABCDEFGHIJKLMNOPQRSTUVWXYZ", __uI + 1, __uI + 1)); } else { __uO = join(__uO, __uC); } } return __uO; }` },
   __str_toLowerCase: { needs: ["__str_indexOf"], source: `function __str_toLowerCase(__s) { let __wO = ""; for (let __wK = 1; __wK <= length(__s); __wK++) { const __wC = selectText(__s, __wK, __wK); const __wI = __str_indexOf("ABCDEFGHIJKLMNOPQRSTUVWXYZ", __wC, 0); if (__wI >= 0) { __wO = join(__wO, selectText("abcdefghijklmnopqrstuvwxyz", __wI + 1, __wI + 1)); } else { __wO = join(__wO, __wC); } } return __wO; }` },
 };
@@ -6350,10 +6349,10 @@ const METHOD_HELPERS = {
   join: ["__arr_join"], slice: ["__arr_slice"], reverse: ["__arr_reverse"],
   at: ["__arr_at"], flat: ["__arr_flat"],
   lastIndexOf: ["__arr_lastIndexOf", "__str_lastIndexOf"], pop: ["__arr_pop"], shift: ["__arr_shift"],
-  sort: ["__arr_sort"], includes: ["__arr_includes", "__str_includes"], indexOf: ["__arr_indexOf", "__str_indexOf"], startsWith: ["__str_startsWith"], endsWith: ["__str_endsWith"],
+  sort: ["__arr_sort"], includes: ["__arr_includes", "__str_includes", "__str_contains"], indexOf: ["__arr_indexOf", "__str_indexOf"], startsWith: ["__str_startsWith", "__str_starts"], endsWith: ["__str_endsWith"],
   charAt: ["__str_charAt"], substring: ["__str_substring"], split: ["__str_split"],
   replace: ["__str_replace"], replaceAll: ["__str_replaceAll"], trim: ["__str_trim"], trimStart: ["__str_trimStart"],
-  trimEnd: ["__str_trimEnd"], repeat: ["__str_repeat"], padStart: ["__str_padStart"], padEnd: ["__str_padEnd"],
+  trimEnd: ["__str_trimEnd"],
   toUpperCase: ["__str_toUpperCase"], toLowerCase: ["__str_toLowerCase"],
 };
 

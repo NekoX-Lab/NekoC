@@ -466,6 +466,13 @@ fill prefix; `repeat` truncates counts. Growth is deliberately restricted to
 provably bounded inputs (65536 code units/count/target), with diagnostics for
 unknown unsafe inputs and isolated-surrogate results. See [API](api.md#typescript-strings).
 
+Runtime code-unit selection/search requires a provably BMP-only receiver (not
+merely a `string` type); unknown container/parameter paths fail with alternatives.
+For complete emoji in runtime strings, `includes(search)` without position and
+`split(nonemptySeparator, limit?)` use safe native blocks. Empty/unknown split
+separators require the BMP proof. Ordinary identifiers named `self` are not DSL
+exemptions and cannot bypass bounded repeat/padding checks.
+
 ### Default Parameters and try/catch
 
 `function f(x, y = 10)` fills omitted arguments. A `throw` written directly in a `try` block jumps to `catch (e)`; `e` receives the thrown value (the message for `new Error(...)`).
