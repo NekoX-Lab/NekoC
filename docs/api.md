@@ -161,7 +161,9 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   Multiple inserted references retain their order and identity. Non-numeric or
   explicit undefined bounds are diagnosed with conversion/omission hints.
   Numeric type parameter constraints (including constraint chains such as
-  `T extends number, U extends T`) are accepted for start and deleteCount;
+  `T extends number, U extends T`) and numeric intersections such as
+  `number & { readonly brand?: "index" }` are accepted for start and deleteCount,
+  both directly and through generic constraints;
   unconstrained or mixed number/string parameters still require narrowing.
   This does not add the deleted-items return value, sparse arrays or coercion.
 - Array `includes`, `indexOf` and `lastIndexOf` accept a numeric `fromIndex`.

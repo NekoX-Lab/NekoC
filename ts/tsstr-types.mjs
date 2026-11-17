@@ -116,6 +116,10 @@ export function createExpressionTypes(files, declarations = "", path = portableP
       const kinds = new Set(type.types.map(classify));
       return kinds.size === 1 ? [...kinds][0] : "unknown";
     }
+    // Every inhabitant of an intersection satisfies each constituent. A
+    // numeric constituent therefore proves the numeric domain even when other
+    // constituents only add type-level brands. Do not broaden text/bool paths.
+    if (type.isIntersection() && type.types.some(part => classify(part) === "number")) return "number";
     if (type.flags & ts.TypeFlags.StringLike) return "string";
     if (type.flags & (ts.TypeFlags.NumberLike | ts.TypeFlags.EnumLike)) return "number";
     if (type.flags & ts.TypeFlags.BooleanLike) return "boolean";
