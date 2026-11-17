@@ -168,7 +168,22 @@ export function createExpressionTypes(files, declarations = "", path = portableP
   // Classify every parsed expression once, under its parsed parents.
   const kinds = new WeakMap();
   const arrays = new WeakSet();
+  const objects = new WeakSet();
   const concatKinds = new WeakMap();
+  const stringConstants = new WeakMap();
+  const stringConstant = (node, seen = new Set()) => {
+    if (!node || seen.has(node)) return null;
+    seen.add(node);
+    if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)
+      || ts.isNonNullExpression(node) || ts.isSatisfiesExpression(node)) return stringConstant(node.expression, seen);
+    if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) return node.text;
+    if (ts.isIdentifier(node)) {
+      const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration;
+      if (declaration && ts.isVariableDeclaration(declaration)
+        && declaration.parent.flags & ts.NodeFlags.Const) return stringConstant(declaration.initializer, seen);
+    }
+    return null;
+  };
   const concatKind = type => {
     if (type.isUnion()) {
       const values = new Set(type.types.map(concatKind));
@@ -184,7 +199,9 @@ export function createExpressionTypes(files, declarations = "", path = portableP
         kinds.set(node, expressionKind(node));
         const type = checker.getTypeAtLocation(node);
         if (checker.isArrayType(type) || checker.isTupleType(type)) arrays.add(node);
+        if (type.flags & ts.TypeFlags.Object) objects.add(node);
         concatKinds.set(node, concatKind(declaredReadType(node) ?? type));
+        stringConstants.set(node, stringConstant(node));
       }
       ts.forEachChild(node, visit);
     };
@@ -195,7 +212,9 @@ export function createExpressionTypes(files, declarations = "", path = portableP
     return kinds.has(original) ? kinds.get(original) : null;
   };
   result.array = node => arrays.has(node && ts.getOriginalNode(node));
+  result.object = node => objects.has(node && ts.getOriginalNode(node));
   result.concatKind = node => concatKinds.get(node && ts.getOriginalNode(node));
+  result.stringConstant = node => stringConstants.get(node && ts.getOriginalNode(node)) ?? null;
   return result;
 }
 

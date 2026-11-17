@@ -72,8 +72,10 @@
 - 模板字符串 `` `n=${x}` ``。
 - `.length`、`s[i]`、`s.charAt(i)`、`s.slice(a, b)`、`s.substring(a, b)`（不支持负数下标）、`s.includes(x)`、`s.split(sep)`。
 - `indexOf`、`lastIndexOf`、`startsWith`、`endsWith`、`replace`、`replaceAll`、`trim`、`trimStart`、`trimEnd`、`repeat`、`padStart`、`padEnd`、`toUpperCase`、`toLowerCase`（只转换英文字母）、`concat`。
+  - `replace/replaceAll` 仅接受两个 string 实参，接收者与实参从左到右各求值一次。修正首尾、整串、未命中与空片段；支持动态替换串的 `$$`、`$&`、前缀 `` $` `` 和后缀 `$'`，无捕获组时 `$1/$01/$<name>` 保留字面文本，与 Node 一致。replaceAll 非重叠扫描原串，插入内容不重新搜索。完整 Unicode 字符（含 emoji）匹配、数字文本 `007` 不失真。
+  - 空 search 的 replace 在开头插入一次；replaceAll 在每个 UTF-16 单元边界插入并保证推进。VM 无法保存孤立代理项，因此 replaceAll 必须能证明 search 是非空常量（含不可变 const 别名），或接收者是 BMP-only 常量；其他可能为空的模式定位报错，并提示使用非空常量 search 或 BMP-only 常量接收者。正则、函数替换、隐式转换、spread、多余/缺失参数定位拒绝。ES2020 类型声明补齐同一 replaceAll string 重载，CLI/npm/browser 一致。详见 [API](api.md#typescript-string-replacement)。
   - 这些方法没有对应积木，编译器会生成用循环实现的辅助自制积木，用到哪个才加哪个。
-  - 比较字符时用的是积木的"等于"，和积木本身的规则一致（例如数字形式的文本 `"1.0"` 和 `"1"` 视为相等）。
+  - 除 replace/replaceAll 使用精确字符串分割查找外，其他辅助方法比较字符时用的是积木的"等于"，和积木本身的规则一致（例如数字形式的文本 `"1.0"` 和 `"1"` 视为相等）。
 - `join()`、`selectText()`、`length(x)`。
 
 ### 数组（列表值）

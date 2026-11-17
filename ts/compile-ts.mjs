@@ -237,6 +237,31 @@ class WorkspaceCompiler {
       if (ts.isBinaryExpression(node) && [ts.SyntaxKind.PlusToken, ts.SyntaxKind.PlusEqualsToken].includes(node.operatorToken.kind)) {
         this.additionIsString(node.left, node.right);
       }
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+        && ["replace", "replaceAll"].includes(node.expression.name.text)
+        && !selfListHandleCall(node)
+        && !this.expressionType.object(node.expression.expression)) {
+        const method = node.expression.name.text;
+        const values = [node.expression.expression, ...node.arguments];
+        if (node.arguments.length !== 2 || node.arguments.some(ts.isSpreadElement)
+          || values.some(value => this.expressionType(value) !== "string")) {
+          this.unsupported(node, `String.${method} supports exactly two string arguments; use a string search and string replacement instead of RegExp, a replacer function, coercion or spread`);
+        }
+        for (const value of values) {
+          const text = this.expressionType.stringConstant(value);
+          if (text !== null && /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(text)) {
+            this.unsupported(value, `String.${method} cannot preserve isolated UTF-16 surrogates; use complete Unicode characters in the receiver, search and replacement`);
+          }
+        }
+        if (method === "replaceAll") {
+          const search = this.expressionType.stringConstant(node.arguments[0]);
+          const receiver = this.expressionType.stringConstant(node.expression.expression);
+          if (!(search !== null && search.length > 0)
+            && (receiver === null || /[\uD800-\uDFFF]/.test(receiver))) {
+            this.unsupported(node, "String.replaceAll with a possibly empty search requires a constant BMP-only receiver: empty matches advance by UTF-16 code unit and may split surrogate pairs; use a nonempty constant string search or a constant BMP-only receiver");
+          }
+        }
+      }
       ts.forEachChild(node, validateAddition);
     };
     for (const file of this.typeSourceFiles.values()) validateAddition(file);
@@ -729,10 +754,10 @@ class WorkspaceCompiler {
         && statements.slice(0, -1).every((statement) => ts.isVariableStatement(statement))
       );
       const simpleStatement = ts.isBlock(fn.body) && !hasReturn;
-      // Array helpers and their callbacks must freeze reference arguments and
-      // keep mutable loop state in the invocation frame, even for simple bodies.
-      const arrayHelper = name.startsWith("__arr") || /^__(cb|map|filter|forEach|reduce|find|findIndex|some|every)\d+$/.test(name);
-      if (!this.objectSlots.size && !fn.classGenerated && !arrayHelper
+      // Array/callback and replacement helpers freeze arguments and keep loop
+      // state in the invocation frame, even for simple bodies.
+      const framedHelper = name.startsWith("__arr") || name.startsWith("__str_replace") || /^__(cb|map|filter|forEach|reduce|find|findIndex|some|every)\d+$/.test(name);
+      if (!this.objectSlots.size && !fn.classGenerated && !framedHelper
         && !reaches(name, name) && (simpleExpression || simpleStatement)) {
         continue;
       }
@@ -6326,8 +6351,59 @@ const SHARED_HELPERS = {
   __str_lastIndexOf: { source: `function __str_lastIndexOf(__s, __t) { for (let __lK = length(__s) - length(__t); __lK >= 0; __lK--) { if (selectText(__s, __lK + 1, __lK + length(__t)) === __t) { return __lK; } } return -1; }` },
   __str_startsWith: { source: `function __str_startsWith(__s, __t) { return selectText(__s, 1, length(__t)) === __t; }` },
   __str_endsWith: { source: `function __str_endsWith(__s, __t) { return selectText(__s, length(__s) - length(__t) + 1, length(__s)) === __t; }` },
-  __str_replace: { needs: ["__str_indexOf"], source: `function __str_replace(__s, __a, __b) { const __rI = __str_indexOf(__s, __a, 0); if (__rI < 0) { return __s; } return join(selectText(__s, 1, __rI), __b, selectText(__s, __rI + length(__a) + 1, length(__s))); }` },
-  __str_replaceAll: { needs: ["__str_indexOf"], source: `function __str_replaceAll(__s, __a, __b) { let __aO = ""; let __aP = 0; let __aI = __str_indexOf(__s, __a, 0); while (__aI >= 0 && length(__a) > 0) { __aO = join(__aO, selectText(__s, __aP + 1, __aI), __b); __aP = __aI + length(__a); __aI = __str_indexOf(__s, __a, __aP); } return join(__aO, selectText(__s, __aP + 1, length(__s))); }` },
+  // KN selection reverses an empty interval. Guard it before using zero-based,
+  // half-open JS ranges. Keep all replacement helpers invocation-local.
+  __str_replaceSlice: { source: `function __str_replaceSlice(__s, __start, __end) { if (__start >= __end) return ""; return selectText(__s, __start + 1, __end); }` },
+  // Split finds whole string matches without probing isolated surrogate units.
+  // A nonnumeric guard preserves e.g. "007" against KN split's Number coercion.
+  // Pick a guard different from the search's first character so it cannot match
+  // across the guard/input boundary (including searches containing both guards).
+  __str_replaceIndex: { source: `function __str_replaceIndex(__s, __a) {
+    if (length(__a) === 0) return 0;
+    const __guardParts = __a.split("~"); let __guard = "~";
+    if (String(__guardParts[0]) === "") __guard = "!";
+    const __parts = join(__guard, __s).split(__a);
+    if (__parts.length < 2) return -1;
+    return length(String(__parts[0])) - 1;
+  }` },
+  __str_replaceSubstitution: { needs: ["__str_replaceSlice", "__str_replaceIndex"], source: `function __str_replaceSubstitution(__s, __a, __b, __position) {
+    let __rest = __b; let __out = "";
+    while (length(__rest) > 0) {
+      const __dollar = __str_replaceIndex(__rest, "$");
+      if (__dollar < 0) return join(__out, __rest);
+      __out = join(__out, __str_replaceSlice(__rest, 0, __dollar));
+      __rest = __str_replaceSlice(__rest, __dollar, length(__rest));
+      let __take = 2;
+      if (__str_replaceIndex(__rest, "$$") === 0) __out = join(__out, "$");
+      else if (__str_replaceIndex(__rest, "$&") === 0) __out = join(__out, __a);
+      else if (__str_replaceIndex(__rest, "$\u0060") === 0) __out = join(__out, __str_replaceSlice(__s, 0, __position));
+      else if (__str_replaceIndex(__rest, "$'") === 0) __out = join(__out, __str_replaceSlice(__s, __position + length(__a), length(__s)));
+      else { __out = join(__out, "$"); __take = 1; }
+      __rest = __str_replaceSlice(__rest, __take, length(__rest));
+    }
+    return __out;
+  }` },
+  __str_replace: { needs: ["__str_replaceIndex", "__str_replaceSlice", "__str_replaceSubstitution"], source: `function __str_replace(__s, __a, __b) {
+    const __position = __str_replaceIndex(__s, __a);
+    if (__position < 0) return __s;
+    return join(__str_replaceSlice(__s, 0, __position), __str_replaceSubstitution(__s, __a, __b, __position), __str_replaceSlice(__s, __position + length(__a), length(__s)));
+  }` },
+  __str_replaceAll: { needs: ["__str_replaceIndex", "__str_replaceSlice", "__str_replaceSubstitution"], source: `function __str_replaceAll(__s, __a, __b) {
+    let __out = ""; let __position = 0; let __tail = __s;
+    while (__position <= length(__s)) {
+      const __offset = __str_replaceIndex(__tail, __a);
+      if (__offset < 0) return join(__out, __tail);
+      __position = __position + __offset;
+      __out = join(__out, __str_replaceSlice(__tail, 0, __offset), __str_replaceSubstitution(__s, __a, __b, __position));
+      if (length(__a) === 0) {
+        if (__position === length(__s)) return __out;
+        __out = join(__out, __str_replaceSlice(__s, __position, __position + 1));
+        __position++;
+      } else __position = __position + length(__a);
+      __tail = __str_replaceSlice(__s, __position, length(__s));
+    }
+    return __out;
+  }` },
   __str_trimStart: { source: `function __str_trimStart(__s) { let __tA = 1; while (__tA <= length(__s) && contains(" \\t\\n\\r", selectText(__s, __tA, __tA))) { __tA = __tA + 1; } return selectText(__s, __tA, length(__s)); }` },
   __str_trimEnd: { source: `function __str_trimEnd(__s) { let __tB = length(__s); while (__tB >= 1 && contains(" \\t\\n\\r", selectText(__s, __tB, __tB))) { __tB = __tB - 1; } return selectText(__s, 1, __tB); }` },
   __str_trim: { needs: ["__str_trimStart", "__str_trimEnd"], source: `function __str_trim(__s) { return __str_trimEnd(__str_trimStart(__s)); }` },

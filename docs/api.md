@@ -33,6 +33,36 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
 `Map`. Programs without null/undefined compile exactly as before. See
 [null / undefined](ts-nullable.md).
 
+## TypeScript string replacement
+
+`s.replace(search, replacement)` and `s.replaceAll(search, replacement)` accept
+exactly two string arguments. The receiver, search and replacement evaluate once,
+left to right. `replace` changes the first match; `replaceAll` scans the original
+input for nonoverlapping matches and never searches text inserted by replacement.
+Empty prefixes/suffixes and empty replacements are supported; a missing match
+returns the original string. Matching is case-sensitive and preserves numeric
+text such as `007`, combining sequences and complete astral characters.
+
+Replacement strings follow JavaScript: `$$` inserts `$`, `$&` the matched text,
+`` $` `` the original input prefix, and `$'` the original input suffix. Substituted
+text is not expanded again. Without regex captures, `$1`, `$01` and `$<name>` stay
+literal, as do unrecognized dollar tokens and a trailing `$`. Dynamic replacement
+strings support the same rules.
+
+`replace("", replacement)` inserts once at the beginning, including empty input.
+`replaceAll("", replacement)` inserts at every UTF-16 boundary, including both
+ends. Since the VM cannot preserve isolated UTF-16 surrogate units, `replaceAll`
+requires either a provably nonempty constant search (a literal or immutable const
+alias), or a constant BMP-only receiver. A possibly empty search on a dynamic or
+astral receiver produces a located compile error: use a nonempty constant search,
+or a constant BMP-only receiver. This conservative rule also applies when the
+replacement is empty. RegExp searches, callback replacers, coercion, spread,
+missing arguments and extra arguments produce located diagnostics; use the two
+string arguments instead. Isolated surrogate literals in the receiver, search
+or replacement are rejected with a hint to use complete Unicode characters.
+The ES2020 declarations include the implemented
+`replaceAll` overload for CLI, npm and browser checking.
+
 ## TypeScript arrays
 
 - `a[i]` reads the zero-based element with the share-player `list_item` block.

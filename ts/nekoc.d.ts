@@ -39,6 +39,18 @@ interface ReadonlyArray<T> {
   at(index: number): T | undefined;
 }
 
+interface String {
+  /** String search/replacement only. Supports $$, $&, $` and $' substitutions.
+   * RegExp, callback replacers and implicit coercion are rejected by the compiler.
+   */
+  replace(searchValue: string, replaceValue: string): string;
+  /** Nonoverlapping replacement, including empty search on constant BMP strings.
+   * A possibly empty dynamic search needs a constant BMP-only receiver; use a
+   * nonempty constant search for dynamic/astral receivers (UTF-16 model limit).
+   */
+  replaceAll(searchValue: string, replaceValue: string): string;
+}
+
 // Native ES2020 Map/Set declarations provide the public signatures (including
 // Map.get: V | undefined). NekoC lowers concrete string/number keys to heap
 // references; values may be scalars or initialized object/class/collection
