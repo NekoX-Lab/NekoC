@@ -89,17 +89,49 @@ onStart(() => {
         .unwrap();
     let p = project::load_project(output).unwrap().value;
     assert_eq!(validate::build_report(&p).unwrap()["ok"], true);
-    let snapshot = runtime::run_project(&p, 1).unwrap();
-    let strokes = &snapshot.actors["nekoc-default-actor"].pen.strokes;
-    assert!(strokes.len() > 2);
-    assert_eq!(strokes[0].color, "#ff0000");
-    assert_eq!(strokes[1].color, "#0000ff");
-    assert!(strokes[2..].iter().any(|s| s.color == "#00ff00"));
-    assert_eq!(strokes.last().unwrap().color, "#080c18");
-    assert_eq!(strokes[0].size, 2.0);
-    let state = serde_json::to_value(snapshot).unwrap();
-    assert_eq!(state["variables"]["kn-list-__pf_commands"], json!([]));
-    assert_eq!(state["variables"]["kn-var-__pd_frames"], 3.0);
+    // Inline budgeting can preserve displayPresentFast as a shared function
+    // with mutable list-backed locals. The legacy runtime copies List values;
+    // exercise the production Engine's reference frames in both execution tiers.
+    for jit in [false, true] {
+        let mut engine = nekoc::engine::Engine::new(nekoc::engine::Program::compile(&p).unwrap());
+        if !jit {
+            engine.disable_jit();
+        }
+        engine.use_virtual_clock();
+        engine.start();
+        let mut lines = Vec::new();
+        for _ in 0..120 {
+            lines.extend(
+                engine
+                    .advance(1.0 / 60.0, 2_000_000, std::time::Duration::from_secs(10))
+                    .unwrap()
+                    .lines,
+            );
+            if engine.active_tasks() == 0 {
+                break;
+            }
+        }
+        assert_eq!(engine.active_tasks(), 0);
+        let (strokes, _) = lines.as_chunks::<9>();
+        assert!(strokes.len() > 2);
+        let color = |stroke: &[f32; 9]| {
+            format!(
+                "#{:02x}{:02x}{:02x}",
+                (stroke[5] * 255.0).round() as u8,
+                (stroke[6] * 255.0).round() as u8,
+                (stroke[7] * 255.0).round() as u8
+            )
+        };
+        // Engine emits both pen-down dot capsules and movement capsules; the
+        // legacy renderer stored only movements. Compare ordered color runs.
+        let mut colors: Vec<_> = strokes.iter().map(color).collect();
+        colors.dedup();
+        assert_eq!(colors, ["#ff0000", "#0000ff", "#00ff00", "#080c18"]);
+        assert_eq!(strokes[0][4], 2.0);
+        let state = engine.oracle_snapshot(1);
+        assert_eq!(state["variables"]["kn-list-__pf_commands"], json!([]));
+        assert_eq!(state["variables"]["kn-var-__pd_frames"], 3.0);
+    }
 }
 
 #[test]
