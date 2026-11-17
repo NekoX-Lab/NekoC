@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { createNullableReadAnalysis } from "./nullable-reads.mjs";
 
 // null / undefined as runtime values (docs/ts-nullable.md).
 //
@@ -170,7 +171,15 @@ export function lowerTsNullable(input) {
     }
     if (ts.isPropertyAccessExpression(node)) {
       const symbol = checker.getSymbolAtLocation(node.name);
-      if (symbol && symbol.flags & ts.SymbolFlags.Property) return checker.getTypeOfSymbolAtLocation(symbol, node);
+      if (symbol && symbol.flags & ts.SymbolFlags.Property) return checker.getTypeOfSymbolAtLocation(symbol, symbol.valueDeclaration ?? node);
+    }
+    if (ts.isElementAccessExpression(node)) {
+      const target = checker.getNonNullableType(declaredType(node.expression));
+      const key = unparen(node.argumentExpression);
+      const property = (ts.isStringLiteral(key) || ts.isNumericLiteral(key)) && checker.getPropertyOfType(target, key.text);
+      if (property) return checker.getTypeOfSymbolAtLocation(property, property.valueDeclaration ?? node);
+      const index = checker.getIndexTypeOfType(target, flowType(key).flags & ts.TypeFlags.NumberLike ? ts.IndexKind.Number : ts.IndexKind.String);
+      if (index) return index;
     }
     return flowType(node);
   };
@@ -191,6 +200,8 @@ export function lowerTsNullable(input) {
   // Declared nullable, even where TS has narrowed this read to non-null.
   const nilDeclared = node => !legacyOptionalParameter(node) && (mayHoldNil(node) || maybeNil(declaredType(node)))
     && domain(declaredType(node)) !== null;
+  const nullableReads = createNullableReadAnalysis(checker, declaredType,
+    node => isStringType(node) ? "string" : "unknown");
 
   // Do not erase nullish slice boundaries into numeric-typed sentinels: the
   // array helper intentionally accepts numbers only, not JS ToNumber coercion.
@@ -558,6 +569,55 @@ export function lowerTsNullable(input) {
   }
 
   function specificRule(node) {
+    if (ts.isCallExpression(node) && calleeText(node) === "String" && node.arguments.length === 1) {
+      if (nullableReads.unsafeCapture(node.arguments[0])) {
+        fail(node, "String conversion cannot trust a captured nullable value after intervening side effects",
+          "convert at capture time with String(value), or use ?? with a string fallback before storing the value");
+      }
+      // TS may keep a stale string flow type across earlier calls. Decode at
+      // each selected value's origin, preserving branches and single evaluation.
+      const nullableSource = part => ts.isExpression(part) && valuePosition(part) && nilDeclared(part)
+        || !!ts.forEachChild(part, nullableSource);
+      const unsupportedSelection = value => fail(value, "String conversion cannot preserve nullable value selection in this expression",
+        "use explicit if/else branches and String(value), or ?? on a nullable variable with a string fallback");
+      const convert = value => {
+        if (ts.isParenthesizedExpression(value) || ts.isAsExpression(value)
+          || ts.isSatisfiesExpression(value)) return `(${convert(value.expression)})`;
+        if (ts.isConditionalExpression(value)) {
+          // The condition must keep raw truthiness, not truthiness of decoded
+          // "null"/"undefined" strings. Reject unproven nullable conditions.
+          if (nullableSource(value.condition)) unsupportedSelection(value.condition);
+          return `(${out(value.condition)} ? ${convert(value.whenTrue)} : ${convert(value.whenFalse)})`;
+        }
+        if (ts.isBinaryExpression(value) && value.operatorToken.kind === ts.SyntaxKind.CommaToken) {
+          return `(${out(value.left)}, ${convert(value.right)})`;
+        }
+        if (ts.isBinaryExpression(value) && (isLogical(value.operatorToken.kind)
+          || value.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)) {
+          // Converting operands first would change truthiness / coalescing.
+          // Keep the existing proven ?? lowering; reject other nullable
+          // selections until their raw result domain can be preserved reliably.
+          if (nullableSource(value) && (isLogical(value.operatorToken.kind)
+            || !nilDeclared(value.left) || nullableSource(value.right))) {
+            unsupportedSelection(value);
+          }
+        }
+        if (isNilLiteral(value)) return JSON.stringify(literalText(value));
+        if (untrusted(value)) fail(value, "String conversion cannot decode this library result's null/undefined value",
+          "check the length or findIndex result first, then convert the selected element");
+        if (nilDeclared(value) && !legacyOptionalParameter(value)) {
+          const t = declaredType(value);
+          if (domain(t) === "R") fail(value, "Objects cannot be converted to text", "convert a scalar property instead");
+          return `__nekocNilText_${keyFor(t, value)}(${specificRule(value) ?? splice(value)})`;
+        }
+        if (nullableSource(value) && !(ts.isCallExpression(value) && calleeText(value) === "String")
+          && !(ts.isBinaryExpression(value) && value.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken)) {
+          unsupportedSelection(value);
+        }
+        return `String(${out(value)})`;
+      };
+      return convert(node.arguments[0]);
+    }
     if (ts.isPropertySignature(node) && node.questionToken) return splice(node, new Map([[node.questionToken, ""]]));
     // Statement forms
     if (ts.isExpressionStatement(node)) {
