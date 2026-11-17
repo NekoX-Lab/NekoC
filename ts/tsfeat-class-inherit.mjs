@@ -660,7 +660,7 @@ export function lowerClassInheritance(input) {
   }
   const dispatches = new Map();
   const implementation = (r, name, kind) => kind === "method" ? findMethod(r, name) : findAccessor(r, name)?.[kind];
-  const target = (r, name, kind, direct = false, arity = undefined) => {
+  const target = (r, name, kind, direct = false, arity = undefined, missing = []) => {
     const m = implementation(r, name, kind);
     if (!m) fail(r.node, "Missing " + kind + " implementation for " + name);
     if (direct && m.abstract) fail(m.node, "super cannot call an abstract member without an implementation", "call a concrete ancestor implementation or use a virtual this call after construction");
@@ -668,8 +668,8 @@ export function lowerClassInheritance(input) {
     const choices = concrete.map(c => ({ c, m: implementation(c, name, kind) }));
     if (direct || !m.abstract && choices.every(choice => choice.m === m)) return m.helper;
     arity ??= m.node.parameters.length;
-    const k = r.name + ":" + kind + ":" + name + ":" + arity;
-    if (!dispatches.has(k)) dispatches.set(k, { name: fresh(r.name + "_dispatch_" + kind + "_" + name), r, m, choices, arity });
+    const k = r.name + ":" + kind + ":" + name + ":" + arity + ":" + missing.join(",");
+    if (!dispatches.has(k)) dispatches.set(k, { name: fresh(r.name + "_dispatch_" + kind + "_" + name), r, m, choices, arity, missing });
     return dispatches.get(k).name;
   };
   const context = ts.nullTransformationContext;
@@ -708,8 +708,14 @@ export function lowerClassInheritance(input) {
         return f.createImmediatelyInvokedArrowFunction([f.createExpressionStatement(construction), f.createExpressionStatement(initialize), ...params]);
       }
       const a = access(node.expression);
-      if (a?.method) return call(a.static ? a.method.helper : target(a.r, a.name, "method", a.super, node.arguments.length),
-        [...a.static ? [] : [a.super ? id(self) : transformed(unwrap(node.expression).expression, self, owner)], ...node.arguments.map(arg => transformed(arg, self, owner))]);
+      if (a?.method) {
+        const missing = node.arguments.flatMap((arg, i) => ts.isIdentifier(unwrap(arg)) && unwrap(arg).text === "undefined"
+          && !checker.getSymbolAtLocation(unwrap(arg))?.declarations?.length ? [i] : []);
+        const name = a.static ? a.method.helper : target(a.r, a.name, "method", a.super, node.arguments.length, missing);
+        const dispatch = [...dispatches.values()].some(d => d.name === name);
+        return call(name, [...a.static ? [] : [a.super ? id(self) : transformed(unwrap(node.expression).expression, self, owner)],
+          ...node.arguments.map((arg, i) => dispatch && missing.includes(i) ? number(0) : transformed(arg, self, owner))]);
+      }
     }
     if (ts.isNewExpression(node)) {
       const r = staticClass(node.expression);
@@ -851,7 +857,7 @@ export function lowerClassInheritance(input) {
       // Keep an uninhabited recursive continuation rather than inventing a
       // result (in particular an invalid object zero) for abstract-only trees.
       const body = groups.length ? groups.map((g, i) => {
-        const forwarded = names.slice(0, g.m.node.parameters.length);
+        const forwarded = names.slice(0, g.m.node.parameters.length).map((name, i) => d.missing.includes(i) ? "undefined" : name);
         return `${i === groups.length - 1 ? "" : `if (${classId} >= ${g.start} && ${classId} <= ${g.end}) `}{ return ${g.m.helper}(${receiver}${forwarded.length ? ", " + forwarded.join(", ") : ""}); }`;
       }).join("\n")
         : `return ${d.name}(${receiver}${names.length ? ", " + names.join(", ") : ""});`;
