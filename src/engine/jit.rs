@@ -134,6 +134,7 @@ enum Numeric {
     Actor(usize, usize),
     Parameter(usize),
     Add(usize, usize),
+    Arithmetic(usize, usize, Binary),
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -799,6 +800,18 @@ unsafe extern "C" fn h_error(c: *mut NativeContext, pc: u64, next: u64) -> u64 {
 extern "C" fn h_mod(a: f64, b: f64) -> f64 {
     Binary::Mod.apply(a, b)
 }
+extern "C" fn h_k4_add(a: f64, b: f64) -> f64 {
+    super::k4decimal::apply(super::k4decimal::Operation::Add, a, b)
+}
+extern "C" fn h_k4_sub(a: f64, b: f64) -> f64 {
+    Binary::K4Sub.apply(a, b)
+}
+extern "C" fn h_k4_mul(a: f64, b: f64) -> f64 {
+    Binary::K4Mul.apply(a, b)
+}
+extern "C" fn h_k4_div(a: f64, b: f64) -> f64 {
+    Binary::K4Div.apply(a, b)
+}
 extern "C" fn h_pow(a: f64, b: f64) -> f64 {
     Binary::Pow.apply(a, b)
 }
@@ -1317,6 +1330,11 @@ impl Gen<'_, '_> {
                 self.numeric(b, guards)?;
                 Some(Numeric::Add(a, b))
             }
+            ValueExpr::Kitten4Arithmetic(a, b, op) => {
+                self.numeric(a, guards)?;
+                self.numeric(b, guards)?;
+                Some(Numeric::Arithmetic(a, b, op))
+            }
             _ => None,
         }
     }
@@ -1350,6 +1368,13 @@ impl Gen<'_, '_> {
 
     fn numeric_value(&mut self, value: Numeric) -> Value {
         match value {
+            Numeric::Arithmetic(a, b, op) => {
+                let a = self.numeric(a, &mut Vec::new()).unwrap();
+                let b = self.numeric(b, &mut Vec::new()).unwrap();
+                let a = self.numeric_value(a);
+                let b = self.numeric_value(b);
+                self.binary(op, a, b)
+            }
             Numeric::Expr(pc) => self.expr(pc),
             Numeric::Constant(n) => self.b.ins().f64const(n),
             Numeric::Global(s) => self.load(self.slots, s),
@@ -1374,7 +1399,7 @@ impl Gen<'_, '_> {
                 let b = self.numeric(b, &mut Vec::new()).unwrap();
                 let a = self.numeric_value(a);
                 let b = self.numeric_value(b);
-                self.b.ins().fadd(a, b)
+                self.call2(h_k4_add as *const () as usize, a, b)
             }
         }
     }
@@ -1548,6 +1573,9 @@ impl Gen<'_, '_> {
             Binary::Sub => self.b.ins().fsub(a, b),
             Binary::Mul => self.b.ins().fmul(a, b),
             Binary::Div => self.b.ins().fdiv(a, b),
+            Binary::K4Sub => self.call2(h_k4_sub as *const () as usize, a, b),
+            Binary::K4Mul => self.call2(h_k4_mul as *const () as usize, a, b),
+            Binary::K4Div => self.call2(h_k4_div as *const () as usize, a, b),
             Binary::Mod => self.call2(h_mod as *const () as usize, a, b),
             Binary::Pow => self.call2(h_pow as *const () as usize, a, b),
             Binary::Divisible => self.call2(h_divisible as *const () as usize, a, b),
@@ -1756,9 +1784,9 @@ impl Gen<'_, '_> {
             let base = if local { self.locals } else { self.slots };
             let old = self.load(base, slot);
             let number = if decrease {
-                self.b.ins().fsub(old, delta)
+                self.call2(h_k4_sub as *const () as usize, old, delta)
             } else {
-                self.b.ins().fadd(old, delta)
+                self.call2(h_k4_add as *const () as usize, old, delta)
             };
             self.store(base, slot, number);
             self.check_error(pc, remaining);

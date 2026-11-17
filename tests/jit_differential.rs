@@ -1274,9 +1274,11 @@ fn hot_k4_change_guards_keep_text_add_decrease_nan_and_negative_zero() {
     assert_eq!(vm.variable_text("typed_compared"), "x1201");
     assert!(matches!(vm.variable_value("nan"),Cell::Number(n) if n.is_nan()));
     assert!(
-        matches!(vm.variable_value("negative_zero"),Cell::Number(n) if n == 0.0 && n.is_sign_negative())
+        // Official Decimal change_variable normalizes -0 - 0 to +0;
+        // see the original nonfinite probe in docs/k4decimal-evidence.json.
+        matches!(vm.variable_value("negative_zero"),Cell::Number(n) if n == 0.0 && n.is_sign_positive())
     );
-    assert!(matches!(vm.variable_value("reciprocal"),Cell::Number(n) if n == f64::NEG_INFINITY));
+    assert!(matches!(vm.variable_value("reciprocal"),Cell::Number(n) if n == f64::INFINITY));
     assert_native_helper(&vm, "op/Kitten4Change");
     // This is the new guarded path itself, not merely the surrounding loop.
     let profile = vm.jit_profile();
