@@ -79,6 +79,7 @@
   - 比较字符时用的是积木的"等于"，和积木本身的规则一致（例如数字形式的文本 `"1.0"` 和 `"1"` 视为相等）。
 - UTF-16 安全子集：运行时 charAt/substring/indexOf/lastIndexOf/endsWith、显式 position 的 includes/startsWith 需证明接收者仅含 BMP；分析按词法符号检查初始化/全部赋值、函数返回和直接调用实参，未知形参、数组元素、class 字段等保守定位拒绝。常量仍按 JS 折叠；不以 string 注解假定没有 emoji。无 position 的 includes/startsWith 和确定非空 separator 的 split 使用原生积木，不扫描出孤立代理项，支持变量/形参中的完整 emoji，split limit 通过分割后复制限制。空或未知 separator 须证明接收者 BMP，否则明确拒绝。普通名为 self 的变量/形参及 any/as 不豁免增长校验；真实 sprite callback 参数按绑定识别，最终 lowering 对未验证增长失败关闭。
 - BMP、增长函数来源和 DSL 豁免共用按符号收集的写入事实，涵盖普通/复合赋值、++/--、非声明 for-of/for-in initializer，以及括号、as、非空断言、解构目标。循环/解构/更新写入保守取消变量和形参的 BMP 证明（即使来源看似 BMP）；只对可证明 BMP 的简单 =/+= 保留变量证明。所有这些写入也取消函数来源的增长边界证明和被改写 DSL 参数/隐式 self 的豁免，不依赖后续编译器偶然拒绝解构。
+- 声明式写入同样纳入证明：重复/合并 var（含 C-style for initializer、形参与 var 合并）、解构声明和声明式 for-of/for-in 目标保守取消证明，而不是仅读取 symbol.valueDeclaration 的第一次初始化。检查全部 declarations，并按读取位置解析到的实际符号处理函数/var 冲突；新简单声明仍以首次 initializer 为来源，不污染不同词法作用域的同名绑定。
 - `join()`、`selectText()`、`length(x)`。
 
 ### 数组（列表值）

@@ -78,6 +78,11 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   Loop, destructuring and update writes conservatively invalidate the proof for
   variables and parameters, even for BMP-looking loop sources; simple `=`/`+=`
   writes can preserve a variable's proof when their values are provably BMP.
+  Declaration writes are included: merged/repeated `var` declarations (including
+  C-style `for` initializers and parameter/`var` merges), destructuring declarations,
+  and declaration-style `for-of`/`for-in` targets invalidate these safety proofs.
+  A fresh simple declaration keeps its first initializer as its producer; a
+  same-spelled binding in another lexical scope does not invalidate it.
   Unknown parameters, array elements and class fields are conservatively
   rejected for these paths, with a source location and alternative. This avoids
   constructing isolated surrogate temporaries even when a search's final result

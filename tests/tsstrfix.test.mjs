@@ -180,6 +180,52 @@ test("tsstrfix re-review: shared write facts also invalidate bounded producers a
   }
 });
 
+test("tsstrfix third review: merged declaration and declaration-loop writes invalidate safety proofs", () => {
+  const reject = (source, expression, message = /UTF-16.*alternative/i) => {
+    const prefix = source.slice(0, source.lastIndexOf(expression)).split("\n");
+    const line = prefix.length, column = prefix.at(-1).length + 1;
+    for (const types of [false, true]) {
+      const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
+      assert.equal(checked.ok, false, source);
+      assert.ok(checked.diagnostics.some(d => d.line === line && d.column === column
+        && message.test(d.message)), JSON.stringify({ source, checked }));
+    }
+    assert.throws(() => compile(source), error => error.location.line === line
+      && error.location.column === column && message.test(error.message), source);
+  };
+  for (const method of ['includes("a", 0)', 'charAt(0)', 'substring(0, 1)', 'split("", 1)']) {
+    const expression = `s.${method}`;
+    // C-style for redeclarations are accepted by later lowering, unlike some
+    // other duplicate declarations. Require the safety diagnostic in all forms.
+    for (const write of ['for (var s = "😀abc"; s.length > 0;) {',
+      'for (var s = "😀abc";;) {', 'for (var s = "abc", s = "😀abc";;) {']) {
+      reject(`var s = "abc";\n${write}\nconsole.log(${expression}); break; }`, expression);
+    }
+    reject(`var s = "abc";\nfor (var s = "😀abc"; false;) {}\nconsole.log(${expression});`, expression);
+    reject(`function p(s: string) {\nfor (var s = "😀abc";;) {\nconsole.log(${expression}); break; } } p("abc");`, expression);
+    reject(`function p(): string { var s = "abc";\nfor (var s = "😀abc";;) { break; } return s; }\nconsole.log(p().${method});`, `p().${method}`);
+  }
+  for (const write of ['var s = "😀abc";', 'var s;', 'var s = "abc";',
+    'var {value: s} = {value: "😀abc"};', 'var [s] = ["😀abc"];',
+    'for (var s of ["😀abc"]) {}', 'for (var s in {a: 1}) {}',
+    'for (var [s] of [["😀abc"]]) {}', 'for (var {value: s} of [{value: "😀abc"}]) {}']) {
+    reject(`var s = "abc";\n${write}\nconsole.log(s.charAt(0));`, "s.charAt(0)");
+    reject(`function p(s: string) {\n${write}\nconsole.log(s.charAt(0)); } p("abc");`, "s.charAt(0)");
+  }
+  // Even a fresh declaration-loop target is unknown, not its (absent or
+  // syntactically supplied) initializer. Ordinary first declarations stay safe.
+  reject('for (var s of ["😀abc"]) {\nconsole.log(s.charAt(0)); }', "s.charAt(0)");
+  reject('for (var s = "abc" in {a: 1}) {\nconsole.log(s.charAt(0)); }', "s.charAt(0)");
+  // Bounded-producer and DSL proofs must consume the same declaration writes.
+  reject('function n(): number { return 2; }\nfor (var n = 0;;) {\nconsole.log("x".repeat(n())); break; }',
+    'n()', /bounded.*alternative/i);
+  reject('sprite("cat", {}, (self: any) => {\nfor (var self = "x";;) {\nconsole.log(self.repeat(Infinity)); break; } });',
+    'self.repeat(Infinity)', /bounded.*alternative/i);
+  compile('for (let s = "abc"; s.length > 0;) { console.log(s.charAt(0)); break; }');
+  compile('var s = "abc"; function p() { var s = "😀"; } console.log(s.charAt(0));');
+  compile('function p(s: string) { console.log(s.charAt(0)); } p("abc");');
+});
+
 test("tsstrfix CLI and shared npm/browser wrapper preserve options and compatibility diagnostics", async () => {
   const wrapper = fs.readFileSync("packages/nekoc/api.mjs", "utf8")
     .replace('"./dist/frontend/compile-ts.mjs"', JSON.stringify(new URL("../ts/compile-ts.mjs", import.meta.url).href))

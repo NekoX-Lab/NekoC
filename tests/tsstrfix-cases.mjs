@@ -119,6 +119,16 @@ function loopReturn(): string {
 console.log(loopReturn().includes("a")); console.log(loopReturn().split(",").join("|"));
 let bmpWrites = "abc"; bmpWrites = "中文"; bmpWrites += "字";
 console.log(bmpWrites.charAt(0)); console.log(bmpWrites.includes("字", 1));
+// Declaration-style var reinitialization must keep native Unicode paths safe;
+// a fresh lexical for binding retains its first-initializer BMP proof.
+var redeclaredText = "abc";
+for (var redeclaredText = "😀,abc"; redeclaredText.length > 0;) {
+  console.log(redeclaredText.includes("a")); console.log(redeclaredText.startsWith("😀"));
+  console.log(redeclaredText.split(",", 1).join("|")); break;
+}
+for (let freshText = "中文"; freshText.length > 0;) {
+  console.log(freshText.charAt(0)); break;
+}
 // Hot procedure paths, without wall-clock assertions.
 for (let hot = 0; hot < 700; hot++) console.log(s.substring(0, 1));
 `;

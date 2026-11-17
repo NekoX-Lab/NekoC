@@ -48,7 +48,10 @@ export function lowerTsMethods(sourceFile) {
   // in no-types mode (notably the implicit DSL self); do not collapse them to an
   // undefined symbol shared by unrelated identifiers.
   const bindingKey = node => (ts.isShorthandPropertyAssignment(node.parent)
-    ? checker.getShorthandAssignmentValueSymbol(node.parent) : checker.getSymbolAtLocation(node)) ?? node.text;
+    ? checker.getShorthandAssignmentValueSymbol(node.parent)
+    : (ts.isVariableDeclaration(node.parent) || ts.isBindingElement(node.parent))
+      ? checker.resolveName(node.text, node, ts.SymbolFlags.Value, false) ?? checker.getSymbolAtLocation(node)
+      : checker.getSymbolAtLocation(node)) ?? node.text;
   const writes = new Map();
   const writeTarget = (target, fact) => {
     target = unwrap(target);
@@ -85,6 +88,21 @@ export function lowerTsMethods(sourceFile) {
     } else if ((ts.isForOfStatement(node) || ts.isForInStatement(node))
       && !ts.isVariableDeclarationList(node.initializer)) {
       writeTarget(node.initializer, null); // loop/destructured sources stay unknown
+    } else if (ts.isVariableDeclaration(node)) {
+      const list = node.parent;
+      const loop = ts.isVariableDeclarationList(list) && list.parent;
+      const loopTarget = loop && (ts.isForOfStatement(loop) || ts.isForInStatement(loop))
+        && loop.initializer === list;
+      const symbol = ts.isIdentifier(node.name) && checker.getSymbolAtLocation(node.name);
+      // A first, simple initializer is the binding's producer, not a later
+      // write. All declarations must be considered: var redeclarations can
+      // share a symbol with each other, a parameter or a function declaration.
+      // Conservatively invalidate merged declarations even without an explicit
+      // initializer; a declaration-style loop target is an implicit write too.
+      if (loopTarget || !ts.isIdentifier(node.name) || symbol?.declarations?.length > 1
+        || bindingKey(node.name) !== symbol) {
+        writeTarget(node.name, null);
+      }
     }
     ts.forEachChild(node, findWrites);
   };
