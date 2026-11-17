@@ -3,6 +3,11 @@
 // Matches compiler capabilities exactly. Use native if/while/for for control flow.
 // ---------------------------------------------------------------------------
 
+// Native Math.hypot uses the TypeScript standard-library signature. The frontend
+// supports finite numeric components with max-absolute scaling and once-only,
+// left-to-right argument evaluation, including nested/recursive calls. Empty or
+// all-zero vectors return 0; non-finite input combinations are not guaranteed.
+
 type NekoPrimitive = string | number | boolean;
 /**
  * Block values are plain values at the type level. Addition needs statically
@@ -11,6 +16,12 @@ type NekoPrimitive = string | number | boolean;
  */
 type NekoExpression<T = any> = T;
 type NekoValue = any;
+
+// Math.max/min save numeric arguments once, left to right, and propagate NaN
+// in any position without skipping later arguments. Math.trunc preserves
+// NaN/+/-Infinity. Number.isInteger additionally guarantees false for these
+// nonfinite numeric inputs; mixed any/text coercion and signed zero are outside
+// this contract. Standard ES2020 declarations provide the public signatures.
 
 // Native JS array syntax supported by the frontend: element reads (including
 // Kitten N NaN for out-of-bounds), compound element assignments, length = 0,
