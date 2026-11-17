@@ -4672,14 +4672,32 @@ class WorkspaceCompiler {
     if (factory?.factoryArgs) return this.compileExpressionCall(ts.factory.createCallExpression(
       ts.factory.createIdentifier(factory.name), undefined, factory.factoryArgs), parentId);
     if (name === "Math.hypot") {
-      // Inline sqrt(a² + b² + …) so no list is passed to a custom block (the
-      // editor drops list reporters plugged into procedure arguments).
       const f = ts.factory;
-      const square = arg => f.createCallExpression(f.createPropertyAccessExpression(f.createIdentifier("Math"), "pow"), undefined, [arg, f.createNumericLiteral(2)]);
+      const math = (method, args) => f.createCallExpression(
+        f.createPropertyAccessExpression(f.createIdentifier("Math"), method), undefined, args);
+      const binary = (a, op, b) => f.createBinaryExpression(a, op, b);
       if (!call.arguments.length) return this.compileExpression(f.createNumericLiteral(0), parentId);
-      const sum = call.arguments.map(square).reduce((a, b) => f.createBinaryExpression(a, ts.SyntaxKind.PlusToken, b));
-      const replacement = f.createCallExpression(f.createPropertyAccessExpression(f.createIdentifier("Math"), "sqrt"), undefined, [sum]);
-      return this.compileExpression(replacement, parentId);
+      // Save every input before finding the scale: later arguments may mutate
+      // earlier ones or recursively enter this call site. Procedure parameters,
+      // not shared scratch variables/list arguments, keep each invocation isolated.
+      return evaluatedChoice(this, [...call.arguments], parentId, (args, definition) => {
+        const ret = this.addReturnValueBlock(definition);
+        const maximum = math("max", args.map(arg => math("abs", [arg])));
+        const scaled = evaluatedChoice(this, [maximum], ret, ([scale], inner) =>
+          returnChoice(this, inner,
+            parent => this.compileExpression(binary(scale, ts.SyntaxKind.EqualsEqualsEqualsToken, f.createNumericLiteral(0)), parent),
+            parent => this.compileExpression(f.createNumericLiteral(0), parent),
+            parent => {
+              // Divide before squaring. At least one normalized component is 1,
+              // so tiny vectors cannot vanish and large ones cannot overflow
+              // until the final rescale (when the true norm may be infinite).
+              const squares = args.map(arg => math("pow", [binary(arg, ts.SyntaxKind.SlashToken, scale), f.createNumericLiteral(2)]));
+              const sum = squares.reduce((a, b) => binary(a, ts.SyntaxKind.PlusToken, b));
+              return this.compileExpression(binary(scale, ts.SyntaxKind.AsteriskToken, math("sqrt", [sum])), parent);
+            }));
+        this.connectInput(ret, scaled, "VALUE", "value");
+        return ret;
+      });
     }
     if (this.globalHelpers?.has(name)) {
       const arity = name === "Math.atan2" ? 2 : 1;

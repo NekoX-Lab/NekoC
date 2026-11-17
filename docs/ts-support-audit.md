@@ -65,7 +65,8 @@
   - `Math.max` / `Math.min` / `Math.trunc` 的每个参数只计算一次，按从左到右的顺序。数字 max/min 任一位置的 NaN 均传播为数值 NaN，后续实参仍完整求值；支持单参数、多参数、±Infinity 及嵌套/递归调用。trunc 保留 NaN 和 ±Infinity；不保证负零模型，也不扩展 any/文本强制转换。
   - 标准三角函数在弧度和角度间换算，使用分享播放器支持的 `math_trig` / `math_arc_trig`，不生成缺失的 `math_trig_rad`；实参只计算一次。
 - `Number()`、`parseFloat()`、`parseInt()`（取整数部分）、`String()`。
-- 新增 `Math.sign / cbrt / log2 / hypot / atan2`。`sign / cbrt / log2 / atan2` 通过辅助自制积木保存实参，避免重复执行实参表达式；`hypot` 内联为 `Math.sqrt(Math.pow(a, 2) + …)`，每个实参只计算一次。以有限数字为支持范围；`atan2` 不保留负零象限，`hypot` 不承诺 Infinity/NaN 特殊组合的 JS 语义。
+- 新增 `Math.sign / cbrt / log2 / hypot / atan2`。`sign / cbrt / log2 / atan2` 通过辅助自制积木保存实参，避免重复执行实参表达式；`hypot` 通过辅助自制积木先找最大绝对分量，再计算缩放后的平方和，避免有限大数平方溢出和有限小数平方下溢，每个实参只计算一次。以有限数字为支持范围；`atan2` 不保留负零象限，`hypot` 不承诺 Infinity/NaN 特殊组合的 JS 语义。
+  - `hypot` 接受零个、单个和多个有限数字实参，空调用/全零向量返回 0；实参从左到右保存到每次调用自己的过程参数，嵌套/递归调用不会覆盖彼此。使用分享播放器支持的算术与过程积木，不传递分量数组。最终范数超出浮点范围时仍可为 Infinity；不逐位复制 V8 的补偿求和。确定性回归采用相对误差 ≤ `2e-14`，另检查有限性、非零和布尔结果，不用绝对 epsilon 掩盖小数下溢。
 - `Number.isInteger` 支持数字输入，包括函数参数/返回值；新增保证 NaN 和 ±Infinity 返回 false，有限整数为 true、小数为 false。静态类型为文本/布尔的实参返回 false，副作用仍求值一次。动态混合类型输入不保证 JS 语义。
 
 ### 字符串
