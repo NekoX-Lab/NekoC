@@ -577,7 +577,8 @@ class WorkspaceCompiler {
       }
       this.globalVariables.add(declaration.name.text);
       if (declaration.initializer) {
-        // Non-constant initializers run at startup (see compile()).
+        // Initializers not representable in the JSON value table run at startup
+        // (see compile()), including constant NaN and infinities.
         const value = constantInitialValue(declaration.initializer);
         if (value === null) this.runtimeInitializers.add(declaration);
         else this.initialValues[declaration.name.text] = value;
@@ -4157,6 +4158,13 @@ class WorkspaceCompiler {
       this.unsupported(expression, `Unknown identifier: ${expression.text}`);
     }
     if (ts.isNumericLiteral(expression)) {
+      if (!Number.isFinite(Number(expression.text))) {
+        // Overflowing literals (e.g. 1e999) also need runtime arithmetic:
+        // an Infinity number field can be normalized by the editor.
+        return this.compileExpression(ts.factory.createBinaryExpression(
+          ts.factory.createNumericLiteral(1), ts.SyntaxKind.SlashToken,
+          ts.factory.createNumericLiteral(0)), parentId);
+      }
       return this.addBlock({
         type: "math_number",
         parent_id: parentId,
@@ -4167,7 +4175,8 @@ class WorkspaceCompiler {
     if (
       ts.isPrefixUnaryExpression(expression) &&
       expression.operator === ts.SyntaxKind.MinusToken &&
-      ts.isNumericLiteral(expression.operand)
+      ts.isNumericLiteral(expression.operand) &&
+      Number.isFinite(Number(expression.operand.text))
     ) {
       return this.addBlock({
         type: "math_number",
@@ -6485,7 +6494,9 @@ function constantInitialValue(node) {
   if (inner.kind === ts.SyntaxKind.TrueKeyword) return true;
   if (inner.kind === ts.SyntaxKind.FalseKeyword) return false;
   const value = constantNumber(inner);
-  return value;
+  // JSON turns non-finite numbers into null. Keep their original expressions
+  // in the startup script instead, just like non-constant initializers.
+  return Number.isFinite(value) ? value : null;
 }
 
 function isValueMethodCall(call) {
