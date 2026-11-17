@@ -522,10 +522,12 @@ export function lowerTsMethods(sourceFile) {
         if (isString || !userMethod && ["charAt", "substring", "split", "includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "repeat", "padStart", "padEnd"].includes(method)) {
           optional();
           arity(node, ...stringLimits[method], `String.${method}`);
-          if (args.some(arg => arg.kind === ts.SyntaxKind.RegularExpressionLiteral)) {
+          if (!["replace", "replaceAll"].includes(method) && args.some(arg => arg.kind === ts.SyntaxKind.RegularExpressionLiteral)) {
             fail(node, `String.${method} regular-expression overload is not supported`, "use a string search/separator instead");
           }
-          if (["includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "split", "replace", "replaceAll"].includes(method)
+          // replace/replaceAll arguments are validated with the TS checker in
+          // compile-ts (narrowed nullable reads, String(...) conversions).
+          if (["includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "split"].includes(method)
             && args[0] && kind(args[0]) !== "string" && !possible(args[0])?.every(v => typeof v === "string")) {
             fail(args[0], `String.${method} requires a string search/separator`, "use an explicit string instead of a regular expression or coercing overload");
           }

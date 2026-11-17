@@ -16,6 +16,8 @@ const list = name => {
   return lists.get(name);
 };
 const api = {
+  // Cooperative delays affect timing, not this oracle's ordered log values.
+  wait: () => {},
   onStart: body => body(),
   defineProc: (name, params, body) => procedures.set(name, body),
   defineReporter: (name, params, body) => procedures.set(name, body),

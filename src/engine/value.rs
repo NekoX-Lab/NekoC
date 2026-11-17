@@ -493,6 +493,7 @@ pub(super) enum ValueExpr {
     /// Official no-device LED query, after evaluating x and y once each.
     OfflineMicrobitLed([usize; 2]),
     Kitten4Add(usize, usize),
+    Kitten4Arithmetic(usize, usize, super::Binary),
     Ranking(bool),
     Calculate(usize),
     Whole(usize),
