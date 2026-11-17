@@ -44,7 +44,7 @@ cargo test --test kitten4_runerr2
 
 官方过滤追踪（seed 1，`--random-source nekoc` 仅替换 random 积木输入）实测该比较第一次发生在第 4 帧：`A=[1,1]`、`B=[1,1]`、`OP=EQ`，输出 **true**；105 帧无错误且未截断，原始轨迹为 `dist/runerr2/compare-official.json`。另一次过滤 240 帧官方运行也无错误。双方调度速度仍有差异，不能用第 4 帧对齐本地所有状态，也未证明这是整个作品最早的状态分歧。
 
-完整作品最早的所有值级分歧、Decimal 算术、同步 reporter 的中途挂起和每解释器 50000 procedure step 上限仍**未验证/未实现**；不能声称完整逐帧状态与官方相同。第三方追踪只留在 ignored `dist/runerr2/`，不携带作品或内核源码。没有使用/移植 HateNeko。
+完整作品最早的所有值级分歧、同步 reporter 的中途挂起和每解释器 50000 procedure step 上限仍**未验证/未实现**；不能声称完整逐帧状态与官方相同。普通四则 Decimal 数值分支后来由 [k4decimal](k4decimal.md) 的原创官方探针单独取证并实现；POWER 等不在其兼容结论内。第三方追踪只留在 ignored `dist/runerr2/`，不携带作品或内核源码。没有使用/移植 HateNeko。
 
 ## 全语料复现
 
