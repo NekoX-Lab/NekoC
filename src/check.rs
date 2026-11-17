@@ -110,11 +110,31 @@ pub fn check_file(input: &Path, options: &CheckOptions) -> Result<CheckReport> {
                     }
                     None => crate::bcmkn_compiler::default_template(),
                 };
-                Some(crate::bcmkn_compiler::assemble_workspace_bcmkn(
+                match crate::bcmkn_compiler::assemble_workspace_bcmkn(
                     &report,
                     &crate::bcmkn_compiler::project_name(input),
                     template,
-                )?)
+                ) {
+                    Ok(project) => Some(project),
+                    Err(error) => {
+                        if let Some(errors) =
+                            error.downcast_ref::<crate::bcmkn_compiler::ActorTargetErrors>()
+                        {
+                            diagnostics.extend(errors.0.iter().map(|issue| Diagnostic {
+                                severity: "error".into(),
+                                source: "compat".into(),
+                                code: "invalid_actor_menu_target".into(),
+                                message: issue["message"].as_str().unwrap_or("").to_owned(),
+                                file: issue["source"]["file"].as_str().map(str::to_owned),
+                                line: issue["source"]["line"].as_u64(),
+                                column: issue["source"]["column"].as_u64(),
+                            }));
+                            None
+                        } else {
+                            return Err(error);
+                        }
+                    }
+                }
             }
             None => None,
         }
