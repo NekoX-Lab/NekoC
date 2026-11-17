@@ -260,6 +260,12 @@ Creates a clone.
 
 Deletes current clone.
 
+Must end its Kitten N block stack: `dispose_clone` has no next socket. Direct
+following code, including a continuation after an inline helper ending in
+deletion, is a source-located compile error. An enclosing branch/loop/procedure
+can still continue on the original actor; deleting a clone cancels its tasks.
+See [the global API](api.md#deleteclone).
+
 ## Screen
 
 ### `self.switchScreen(name)`
@@ -315,6 +321,9 @@ Exits loop.
 ### `self.stop()` / `self.restart()`
 
 Script controls.
+
+`self.restart()` must end its Kitten N block stack, just like the global
+`restart()`. `self.stop()` retains its physical next socket and dynamic scope.
 
 ### `self.warp(body)` / `self.tell(target, body)` / `self.tellAndWait(target, body)`
 

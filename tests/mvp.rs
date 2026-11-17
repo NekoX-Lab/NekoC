@@ -6588,7 +6588,7 @@ fn cli_compile_ts_supports_sensing_input_time_statement_blocks() {
 onStart(() => {
   askChoice("1+1=?", "1", "2");
   clone("--self");
-  deleteClone();
+  if (true) { deleteClone(); }
   timerStart();
   timerStop();
   timerReset();

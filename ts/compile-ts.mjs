@@ -40,6 +40,7 @@ function fail(message, location = null, code = "NEKOC") {
 }
 
 const helperOrigins = new WeakMap();
+const blockSourceNodes = new WeakMap();
 
 function nodeLocation(node) {
   const origin = node && (helperOrigins.get(node) ?? helperOrigins.get(ts.getOriginalNode(node)));
@@ -6360,6 +6361,7 @@ class WorkspaceCompiler {
     this.nextId += 1;
     this.blocks[id] = { id, ...block };
     const node = sourceNode || this.currentStatementNode;
+    if (node) blockSourceNodes.set(this.blocks[id], node);
     if (node && this.sourceFile && node.pos >= 0 && node.getSourceFile?.() === this.sourceFile) {
       const start = node.getStart(this.sourceFile);
       const { line, character } = this.sourceFile.getLineAndCharacterOfPosition(start);
@@ -6375,6 +6377,17 @@ class WorkspaceCompiler {
   }
 
   connectNext(parentId, childId) {
+    // These two KN blocks have no physical next socket (editor 0.27.4).
+    // This is not a control-flow proof: dispose_clone on an original actor can
+    // return to an enclosing branch/loop/procedure, and stop has a next socket.
+    const type = this.blocks[parentId]?.type;
+    if (this.target.name === "kitten-n" && ["dispose_clone", "restart"].includes(type)) {
+      fail(`${type} has no next socket in Kitten N; cannot connect following code. `
+        + "Make deleteClone()/restart() the last statement in its block stack, or put it at the end of an explicit if/loop/procedure body. "
+        + "Continuation outside that body is preserved; deleting an original actor may continue there.",
+        nodeLocation(blockSourceNodes.get(this.blocks[parentId]))
+          ?? nodeLocation(this.currentStatementNode), "NEKOC_TERMINAL_NEXT");
+    }
     this.addConnection(parentId, childId, { type: "next" });
   }
 
