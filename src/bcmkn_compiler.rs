@@ -424,9 +424,7 @@ fn build_nested_block(
             };
             if connection_type == "next" {
                 ensure!(
-                    !crate::validate::has_no_next_socket(
-                        block["type"].as_str().unwrap_or_default()
-                    ),
+                    !crate::validate::block_has_no_next_socket(block),
                     "Kitten N block {} ({id}) has no next socket; cannot connect {child_id}",
                     block["type"]
                 );
