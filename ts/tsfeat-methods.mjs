@@ -38,6 +38,15 @@ export function lowerTsMethods(sourceFile) {
   };
   collect(sourceFile);
   const helpers = [];
+  const reassigned = new Set();
+  const findWrites = node => {
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
+      && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment && ts.isIdentifier(node.left)) {
+      reassigned.add(checker.getSymbolAtLocation(node.left));
+    }
+    ts.forEachChild(node, findWrites);
+  };
+  findWrites(sourceFile);
   const edits = [];
   const printer = ts.createPrinter();
   const replace = (node, replacement) => {
@@ -186,6 +195,71 @@ export function lowerTsMethods(sourceFile) {
       fail(call, `${error.name}: ${error.message}`, "use arguments in the JavaScript method's valid range");
     }
   };
+  // A deliberately conservative bound, not JavaScript's maximum string size.
+  // Inspect return expressions without evaluating calls (and without erasing
+  // their effects). Mutable bindings, parameters and recursive calls are unknown.
+  const possible = (node, seen = new Set()) => {
+    node = unwrap(node);
+    const value = constant(node);
+    if (value !== UNKNOWN) return [value];
+    if (!node || seen.has(node)) return null;
+    const next = new Set(seen).add(node);
+    if (ts.isConditionalExpression(node)) {
+      const a = possible(node.whenTrue, next), b = possible(node.whenFalse, next);
+      return a && b ? [...a, ...b] : null;
+    }
+    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
+      if (reassigned.has(checker.getSymbolAtLocation(node.expression))) return null;
+      const declaration = checker.getSymbolAtLocation(node.expression)?.valueDeclaration;
+      if (ts.isVariableDeclaration(declaration ?? {}) && !(declaration.parent.flags & ts.NodeFlags.Const)) return null;
+      const fn = ts.isVariableDeclaration(declaration ?? {}) ? unwrap(declaration.initializer) : declaration;
+      if (!fn || next.has(fn) || !ts.isFunctionLike(fn) || !fn.body) return null;
+      next.add(fn);
+      if (!ts.isBlock(fn.body)) return possible(fn.body, next);
+      // Require a final unconditional return; branch returns alone do not prove
+      // that every path returns a bounded value.
+      if (!ts.isReturnStatement(fn.body.statements.at(-1) ?? {})) return null;
+      const values = [];
+      let unknown = false;
+      const visit = part => {
+        if (ts.isFunctionLike(part)) return;
+        if (ts.isReturnStatement(part)) {
+          const result = possible(part.expression, next);
+          if (result) values.push(...result); else unknown = true;
+        } else ts.forEachChild(part, visit);
+      };
+      visit(fn.body);
+      return unknown ? null : values;
+    }
+    return null;
+  };
+  const stringLimits = { charAt: [0, 1], substring: [0, 2], includes: [1, 2],
+    indexOf: [1, 2], lastIndexOf: [1, 2], startsWith: [1, 2], endsWith: [1, 2],
+    split: [0, 2], repeat: [1, 1], padStart: [1, 2], padEnd: [1, 2],
+    concat: [0, Infinity], replace: [2, 2], replaceAll: [2, 2], trim: [0, 0],
+    trimStart: [0, 0], trimEnd: [0, 0], toUpperCase: [0, 0], toLowerCase: [0, 0] };
+  const checkGrowth = (node, receiver, method, args) => {
+    const counts = possible(args[0]);
+    const texts = possible(receiver);
+    const fills = args.length > 1 ? possible(args[1]) : [" "];
+    if (!counts || counts.some(n => typeof n !== "number" || !Number.isFinite(n)
+      || method === "repeat" && Math.trunc(n) < 0 || Math.trunc(n) > 65536)) {
+      fail(args[0], `${method} requires a provably finite bounded ${method === "repeat" ? "nonnegative count" : "target length"} (at most 65536)`, "use a numeric constant or a function with bounded literal returns; validate dynamic input before choosing a bounded literal");
+    }
+    if (method === "repeat") {
+      if (!texts || texts.some(s => typeof s !== "string" || counts.some(n => s.length * Math.trunc(n) > 65536))) {
+        fail(node, "repeat requires a provably bounded result (at most 65536 UTF-16 code units)", "use a constant string or a function returning bounded literal strings, and a bounded count");
+      }
+    } else {
+      if (!fills || fills.some(s => typeof s !== "string")) fail(node, "padding requires a statically known fill alphabet", "use a literal fill string or a function returning literal strings");
+      if (fills.some(s => /[\uD800-\uDFFF]/.test(s))) {
+        if (!texts || texts.some(s => typeof s !== "string")) fail(node, "padding cannot prove a complete UTF-16 character boundary", "use a BMP fill string or a constant receiver and target length");
+        for (const s of texts) for (const n of counts) for (const fill of fills) {
+          literal(s[method](n, fill), node); // validates, does not replace effects
+        }
+      }
+    }
+  };
   // Emit a procedure rather than duplicating the receiver expression. Its
   // explicit empty-range guard avoids text_select's reverse-selection behavior.
   const sliceHelper = (call, receiver, start, end, context) => {
@@ -201,9 +275,9 @@ export function lowerTsMethods(sourceFile) {
       return value < 0 ? `Math.max(${len} + (${value}), 0)` : `Math.min(${value}, ${len})`;
     };
     const code = `function ${name}(${text}: string): string {
-      const ${len} = length(${text});
-      const ${lo} = ${bound(start)};
-      const ${hi} = ${end === undefined ? len : bound(end)};
+      const ${len}: number = length(${text});
+      const ${lo}: number = ${bound(start)};
+      const ${hi}: number = ${end === undefined ? len : bound(end)};
       if (${lo} >= ${hi}) return "";
       return selectText(${text}, ${lo} + 1, ${hi});
     }`;
@@ -246,6 +320,36 @@ export function lowerTsMethods(sourceFile) {
       }
       if (!ts.isPropertyAccessExpression(callee)) return ts.visitEachChild(node, visit, context);
       const receiver = callee.expression, method = callee.name.text;
+      const dslReceiver = ts.isIdentifier(receiver) && receiver.text === "self" && kind(receiver) !== "string"
+        || receiver.kind === ts.SyntaxKind.ThisKeyword;
+      if (Object.hasOwn(stringLimits, method) && kind(receiver) !== "array" && !dslReceiver) {
+        // Unknown receivers (including imported/class methods) belong to the
+        // later type-aware compiler, not to this string-only pass.
+        const isString = kind(receiver) === "string" || possible(receiver)?.every(v => typeof v === "string");
+        const userMethod = checker.getSymbolAtLocation(callee.name)?.declarations?.some(ts.isMethodDeclaration);
+        if (isString || !userMethod && ["repeat", "padStart", "padEnd"].includes(method)) {
+          optional();
+          arity(node, ...stringLimits[method], `String.${method}`);
+          if (args.some(arg => arg.kind === ts.SyntaxKind.RegularExpressionLiteral)) {
+            fail(node, `String.${method} regular-expression overload is not supported`, "use a string search/separator instead");
+          }
+          if (["includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "split", "replace", "replaceAll"].includes(method)
+            && args[0] && kind(args[0]) !== "string" && !possible(args[0])?.every(v => typeof v === "string")) {
+            fail(args[0], `String.${method} requires a string search/separator`, "use an explicit string instead of a regular expression or coercing overload");
+          }
+          const values = args.map(arg => constant(arg));
+          const text = constant(receiver);
+          if (["repeat", "padStart", "padEnd"].includes(method)) checkGrowth(node, receiver, method, args);
+          if (["charAt", "substring", "includes", "indexOf", "lastIndexOf", "startsWith", "endsWith", "split", "repeat", "padStart", "padEnd"].includes(method)
+            && typeof text === "string" && values.every(v => v !== UNKNOWN && (typeof v === "string" || typeof v === "number"))) {
+            const output = fold(node, () => text[method](...values));
+            return replace(node, Array.isArray(output) ? f.createArrayLiteralExpression(output.map(v => literal(v, node))) : literal(output, node));
+          }
+          if (["charAt", "substring"].includes(method) && possible(receiver)?.some(s => /[\uD800-\uDFFF]/.test(s))) {
+            fail(node, `${method} cannot prove a complete UTF-16 character boundary`, "use constant text and indices, or keep complete Unicode characters");
+          }
+        }
+      }
       if (!["toFixed", "toString", "charCodeAt", "at", "slice"].includes(method)) return ts.visitEachChild(node, visit, context);
       const receiverKind = kind(receiver);
       // Array and object methods are handled by other lowering passes.

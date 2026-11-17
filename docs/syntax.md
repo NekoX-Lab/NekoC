@@ -458,6 +458,14 @@ Trigonometric calls convert radians to/from the share player's degree-based
 
 Methods without a Kitten N block compile to helper custom blocks built from loops (added only when used): arrays support `map`, `filter`, `forEach`, `reduce`, `find`, `findIndex`, `some`, `every`, `sort`, `indexOf`, `lastIndexOf`, `join`, `concat`, `slice`, `reverse`, `pop`, `shift`, `unshift` and `splice`; strings support `indexOf`, `lastIndexOf`, `startsWith`, `endsWith`, `replace`, `replaceAll`, `trim*`, `repeat`, `padStart`, `padEnd`, `toUpperCase`, `toLowerCase` and `concat`.
 
+String `charAt`/`substring` preserve single evaluation and JS normalized half-open
+ranges; `substring` swaps reversed bounds, unlike `slice`. String search methods
+accept their numeric position/endPosition arguments and `split` accepts a uint32
+limit, preserving all argument effects. `padStart`/`padEnd` use only the required
+fill prefix; `repeat` truncates counts. Growth is deliberately restricted to
+provably bounded inputs (65536 code units/count/target), with diagnostics for
+unknown unsafe inputs and isolated-surrogate results. See [API](api.md#typescript-strings).
+
 ### Default Parameters and try/catch
 
 `function f(x, y = 10)` fills omitted arguments. A `throw` written directly in a `try` block jumps to `catch (e)`; `e` receives the thrown value (the message for `new Error(...)`).

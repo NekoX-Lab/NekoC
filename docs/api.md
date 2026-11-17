@@ -33,6 +33,46 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
 `Map`. Programs without null/undefined compile exactly as before. See
 [null / undefined](ts-nullable.md).
 
+## TypeScript strings
+
+- `charAt(index = 0)` truncates numeric indices toward zero and returns `""`
+  outside the string. `substring(start = 0, end = length)` clamps both indices,
+  swaps reversed bounds and returns `""` for equal bounds. Receivers and arguments
+  are evaluated once, left to right; helper state is invocation-local, including
+  nested/recursive calls. NaN means zero; infinities clamp (or are out of range
+  for `charAt`). Native `selectText` retains its 1-based inclusive/reversing rules.
+- `startsWith(search, position = 0)`, `includes(search, position = 0)` and
+  `indexOf(search, position = 0)` clamp/truncate numeric positions.
+  `endsWith(search, endPosition = length)` and
+  `lastIndexOf(search, position = length)` use their different JavaScript defaults;
+  NaN means the end for `lastIndexOf`, zero for the other methods. Empty searches
+  respect these normalized boundaries. Search arguments must be strings; regex
+  and coercing overloads are not supported. Existing KN text-comparison rules
+  (notably numeric-looking strings) are unchanged.
+- `split(separator?, limit?)` returns a fresh array without changing its receiver.
+  An omitted separator returns `[text]`; `""` splits code units. Numeric `limit`
+  uses JavaScript uint32 conversion (truncate, modulo 2^32; NaN/infinities become
+  zero), defaults to 2^32−1, and stops output at that many items. Regex separators
+  are not supported. Omit optional arguments rather than passing `undefined`.
+- `padStart`/`padEnd` truncate target length, never truncate the source, and take
+  exactly the required prefix of repeated fill (default `" "`, empty fill is a
+  no-op). `repeat` truncates its count toward zero. For safe generation, counts
+  and target lengths must be provably finite constants or functions returning
+  bounded literal values, at most 65536; repeat counts must truncate to a
+  nonnegative number, and receiver/count must prove a result of at most 65536
+  UTF-16 code units. Padding accepts a literal fill or a function returning
+  literal fills. Unknown dynamic inputs, negative repeat counts, non-finites and
+  excessive growth produce located diagnostics with alternatives. This is a
+  deliberate supported subset, not JavaScript's maximum string size or RangeError.
+- Lengths/indices count UTF-16 code units. Constant results containing isolated
+  surrogates are rejected. Padding with astral fills additionally requires known
+  receiver/length bounds proving complete characters. Complete Chinese/emoji
+  strings and whole-character padding/repeat are supported; arbitrary isolated
+  UTF-16 surrogates and `s[i]` returning `undefined` are not represented.
+- String methods reject extra/spread arguments instead of silently discarding
+  them. Existing string `slice` keeps its constant-index subset, negative-index
+  normalization and half-open empty ranges; it does not swap bounds.
+
 ## TypeScript arrays
 
 - `a[i]` reads the zero-based element with the share-player `list_item` block.
