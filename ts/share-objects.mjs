@@ -189,7 +189,10 @@ export function validateObjectOperations(file, types, reject) {
     // initializer. These inaccessible slots have been checked by the class
     // pass; a user cast must still pass the ordinary reference-shape rules.
     if (classAllocationPlaceholders.has(node)) return;
-    if (types.dataObjects && types.unsafeLocals.has(node)) reject(node, "Functions with local state cannot yield or call yielding functions in object programs; rewrite as a state machine or pass explicit per-event state parameters");
+    const invocationCallback = node.parent && ts.isCallExpression(node.parent)
+      && ["onStart", "onClick", "onKey", "onMessage", "when", "onBumpActor", "setTimeout", "setInterval"]
+        .includes(node.parent.expression.name?.text ?? node.parent.expression.text);
+    if (types.dataObjects && types.unsafeLocals.has(node) && !invocationCallback) reject(node, "Functions with local state cannot yield or call yielding functions in object programs; rewrite as a state machine or pass explicit per-event state parameters");
     if (types.dataObjects && ts.isThrowStatement(node)) reject(node, "Throw across object allocation/procedure boundaries is not supported; return an explicit scalar status and branch before creating objects instead");
     if (ts.isObjectLiteralExpression(node) && node.properties.some(p => p.name && ts.isComputedPropertyName(p.name))) {
       reject(node, "Computed object literal keys are not supported; use literal property names");

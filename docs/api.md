@@ -194,7 +194,10 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
 - `Array.isArray(value)` folds statically known arrays and primitive literals;
   unknown types and arguments whose evaluation would have side effects are
   rejected (store the result in a variable first).
-- Inline array callbacks can read enclosing event-local variables. Capturing
+- Inline array callbacks can read and update enclosing event/timer-local variables through
+  the current invocation frame, including nested synchronous callbacks. Locals
+  survive cooperative waits in overlapping event invocations. Array/object
+  bindings are isolated without copying their referenced contents. Capturing
   enclosing inline-function parameters or locals is rejected; use an event-local
   or top-level variable instead.
   Captured string declarations and aliases retain their type before helper
@@ -225,6 +228,17 @@ defaults. Recursive scalar locals use per-call frames; recursive captures and
 function-argument specialization remain compile errors.
 
 ## Global Events
+
+Kitten N callbacks with local state run in suspendable statement procedures.
+Every invocation gets a fresh list frame, so broadcasts, timers and overlapping
+sprite/clone callbacks keep their own locals across `wait`. Synchronous nested
+callbacks share that invocation's captured frame. Top-level variables and
+`setVar`/`changeVar` remain shared; array/object bindings keep reference identity
+without deep copies. Restart cancels old tasks and starts with new frames.
+An early `return` exits only that callback; a returned expression is evaluated
+for its side effects and its result is ignored.
+Timer callbacks cannot capture outer invocation locals across scheduling; move
+that state to a top-level binding or use explicit event state instead.
 
 ### `onStart(body)`
 

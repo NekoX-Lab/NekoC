@@ -58,6 +58,10 @@ interface ReadonlyArray<T> {
 // Array.from(collection iterator) and collection spread are not supported.
 // Details and the conservative has/get! guard rule: docs/ts-map-set.md.
 
+// Reentrant Kitten N events/timers keep local bindings in per-invocation frames
+// across waits. Synchronous array callbacks capture that frame; top-level state
+// remains shared. Timer callbacks cannot capture outer invocation locals across
+// scheduling (use explicit shared state instead).
 type NekoStatementBody = () => void;
 /** Cooperative Kitten N timer handle; delays are milliseconds, frame-quantized. */
 interface NekoTimer { readonly active: boolean; readonly delay: number; }

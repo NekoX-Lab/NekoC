@@ -169,6 +169,10 @@ class WorkspaceCompiler {
     // Functions that cannot be inlined (recursive, or with early/multiple
     // returns) compile to custom blocks: name -> { fn, spec, returnsValue }.
     this.functionProcedures = new Map();
+    this.eventFunctions = new Map();
+    this.eventLocalOwners = new Map();
+    this.eventSlots = new Map();
+    this.currentEventFrames = new Map();
     this.functionParams = null;
     this.expressionBindings = [];
     this.resolvingBindings = new Set();
@@ -301,6 +305,7 @@ class WorkspaceCompiler {
         this.registerProcedureSpec(statement.expression);
       }
     });
+    this.planEventFunctions();
     this.planFunctionProcedures();
     const validateWrites = node => {
       if (ts.isBinaryExpression(node) && ts.isElementAccessExpression(node.left)
@@ -313,9 +318,16 @@ class WorkspaceCompiler {
       ts.forEachChild(node, validateWrites);
     };
     validateWrites(sourceFile);
-    for (const entry of this.functionProcedures.values()) {
+    // Event slot layouts must be available before compiling synchronous helpers
+    // which capture those slots. Calls may refer to definitions emitted later.
+    const compiled = new Set();
+    const compileProcedure = entry => {
+      if (compiled.has(entry.fn.name)) return;
+      compiled.add(entry.fn.name);
+      for (const owner of entry.fn.capturedEvents ?? []) compileProcedure(this.functionProcedures.get(owner));
       this.compileFunctionProcedure(entry);
-    }
+    };
+    for (const entry of this.functionProcedures.values()) compileProcedure(entry);
 
     sourceFile.statements.forEach((statement) => {
       if (this.isTypeOnlyStatement(statement)) return;
@@ -860,6 +872,148 @@ class WorkspaceCompiler {
     }
   }
 
+  planEventFunctions() {
+    if (this.target.name === "kitten4") return;
+    const indices = new Map([["onStart", 0], ["onClick", 0], ["onKey", -1],
+      ["onMessage", -1], ["when", 1], ["onBumpActor", 3]]);
+    const visit = node => {
+      if (ts.isCallExpression(node)) {
+        const index = indices.get(calleeName(node.expression).split(".").at(-1));
+        const callback = index === -1 ? node.arguments.at(-1) : node.arguments[index];
+        if (index !== undefined && callback && isCallbackBody(callback)) {
+          // Root start hats cannot re-enter during a run (restart cancels old
+          // tasks); sprite start hats also run for clones. Hats without lexical
+          // or inline locals need no mutable invocation storage.
+          const needsFrame = (body, seen = new Set()) => {
+            if (ts.isVariableDeclaration(body)) return true;
+            if (ts.isCallExpression(body)) {
+              const name = calleeName(body.expression);
+              // A synchronous warp finishes all of its lexical locals before
+              // another task can enter. Preserve that compact native path.
+              const yields = (node, visited = new Set()) => {
+                if (ts.isCallExpression(node)) {
+                  const called = calleeName(node.expression).split(".").at(-1);
+                  // Explicit custom procedures are opaque here and can yield.
+                  if (["callProc", "callReporter"].includes(called)) return true;
+                  if (["wait", "waitUntil", "ask", "askChoice", "broadcastAndWait", "tellAndWait", "syncTell", "glideTo", "glideChangeX", "glideChangeY", "say", "think", "stageDialog", "playAudioAndWait", "fadeVisibility", "appearWith"].includes(called)) return true;
+                  const target = this.inlineFunctions.get(called);
+                  if (target && !visited.has(called)) {
+                    visited.add(called);
+                    if (yields(target.body, visited)) return true;
+                  }
+                }
+                let result = false;
+                ts.forEachChild(node, child => { result ||= yields(child, visited); });
+                return result;
+              };
+              if (name === "warp" && !yields(body)) return false;
+              const fn = this.inlineFunctions.get(name);
+              if (fn && !seen.has(name)) {
+                seen.add(name);
+                if (needsFrame(fn.body, seen)) return true;
+              }
+            }
+            let needed = false;
+            ts.forEachChild(body, child => { needed ||= needsFrame(child, seen); });
+            return needed;
+          };
+          let spriteStart = false;
+          for (let parent = node.parent; parent; parent = parent.parent) {
+            if (ts.isCallExpression(parent) && calleeName(parent.expression) === "sprite") spriteStart = true;
+          }
+          if ((calleeName(node.expression).split(".").at(-1) === "onStart" && !spriteStart) || !needsFrame(callback.body)) {
+            ts.forEachChild(node, visit);
+            return;
+          }
+          const name = `__event${++this.helperCount}`;
+          const body = ts.factory.createBlock(callbackBody(callback, this));
+          const fn = { name, sourceNode: callback, body, event: true, statementEvent: true, params: [], defaults: [],
+            optional: [], arrayParams: [], budgetEligible: false };
+          this.eventFunctions.set(callback, fn);
+          this.inlineFunctions.set(name, fn);
+          // Inline loop/warp bodies belong to the event too.
+          const collectInline = child => {
+            if (ts.isFunctionLike(child)) {
+              const call = child.parent;
+              if (!call || !ts.isCallExpression(call) || !["warp", "forever", "repeatTimes", "repeatUntil", "forRange", "ifThen", "ifElse"].includes(calleeName(call.expression))) return;
+            }
+            if (ts.isVariableDeclaration(child)) {
+              const names = name => {
+                if (ts.isIdentifier(name)) this.eventLocalOwners.set(name.text, fn.name);
+                else if (ts.isArrayBindingPattern(name)) for (const e of name.elements) if (ts.isBindingElement(e)) names(e.name);
+              };
+              names(child.name);
+            }
+            ts.forEachChild(child, collectInline);
+          };
+          collectInline(body);
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    for (const file of this.objectSourceFiles) visit(file);
+    for (const event of this.generatedEvents) visit(event);
+    // Timer/array callback helpers are independent invocation owners as well;
+    // a nested synchronous callback can capture its parent's mutable frame.
+    for (const fn of this.inlineFunctions.values()) {
+      if (!this.helperSourceOrigins.get(fn.name)?.callback) continue;
+      fn.event = true;
+      fn.statementEvent = fn.name.startsWith("__timerCallback");
+      visitFunctionBody(fn.body, node => {
+        if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) this.eventLocalOwners.set(node.name.text, fn.name);
+      });
+    }
+    const calls = new Map();
+    for (const fn of this.inlineFunctions.values()) {
+      fn.capturedEvents = new Set();
+      const edges = new Set();
+      const scan = (node, parent) => {
+        if (ts.isFunctionLike(node)) {
+          const call = node.parent;
+          if (!call || !ts.isCallExpression(call) || !["warp", "forever", "repeatTimes", "repeatUntil", "forRange", "ifThen", "ifElse"].includes(calleeName(call.expression))) return;
+        }
+        if (ts.isIdentifier(node) && isRuntimeReference(node, parent)) {
+          const owner = this.eventLocalOwners.get(node.text);
+          if (owner && owner !== fn.name) fn.capturedEvents.add(owner);
+        }
+        if (ts.isCallExpression(node)) {
+          const helper = this.helperCalls.get(node);
+          const name = helper?.name ?? calleeName(node.expression);
+          if (this.inlineFunctions.has(name)) edges.add(name);
+        }
+        ts.forEachChild(node, child => scan(child, node));
+      };
+      scan(fn.body);
+      calls.set(fn.name, edges);
+    }
+    for (let changed = true; changed;) {
+      changed = false;
+      for (const fn of this.inlineFunctions.values()) for (const name of calls.get(fn.name)) {
+        for (const owner of this.inlineFunctions.get(name).capturedEvents) {
+          if (owner !== fn.name && !fn.capturedEvents.has(owner)) {
+            fn.capturedEvents.add(owner); changed = true;
+          }
+        }
+      }
+    }
+    for (const fn of this.inlineFunctions.values()) {
+      if (fn.name.startsWith("__timerCallback") && fn.capturedEvents.size) {
+        this.unsupported(fn.body, "Timer callbacks cannot capture invocation-local bindings across scheduling; move state to a top-level variable or pass explicit shared state instead");
+      }
+    }
+    // The existing variable emitters resolve captures by name before the graph
+    // rewrite binds them to a frame. This also covers Array.from callbacks,
+    // which do not use synthesizeCallbackHelper's scalar capture registry.
+    for (const name of this.eventLocalOwners.keys()) this.globalVariables.add(name);
+  }
+
+  compileEventBody(callback, parent, statements = null) {
+    const fn = this.eventFunctions.get(callback);
+    if (!fn) return this.compileStatementList(statements ?? callbackBody(callback, this), parent);
+    const { spec } = this.functionProcedures.get(fn.name);
+    return this.compileProcedureCallArgs(spec, [], parent, false);
+  }
+
   // Recursion and non-inlineable shapes require procedures independently of
   // the budget. Resolve those first, then plan acyclic callees before callers.
   planFunctionProcedures() {
@@ -925,8 +1079,9 @@ class WorkspaceCompiler {
       // Array helpers and their callbacks must freeze reference arguments and
       // keep mutable loop state in the invocation frame, even for simple bodies.
       const arrayHelper = name.startsWith("__arr") || name.startsWith("__str_") || /^__(cb|map|filter|forEach|reduce|find|findIndex|some|every)\d+$/.test(name);
-      returnValues.set(name, returnsValue);
-      if (!this.objectSlots.size && !fn.classGenerated && !arrayHelper
+      returnValues.set(name, fn.statementEvent ? false : returnsValue);
+      if (!fn.event && !fn.capturedEvents?.size
+        && !this.objectSlots.size && !fn.classGenerated && !arrayHelper
         && !reaches(name, name) && (simpleExpression || simpleStatement)) {
         continue;
       }
@@ -954,6 +1109,9 @@ class WorkspaceCompiler {
           })),
         ],
       };
+      for (const owner of fn.capturedEvents ?? []) {
+        spec.params.push({ id: `${spec.id}-capture-${owner}`, type: "String", name: `__eventFrame_${owner}` });
+      }
       this.functionProcedures.set(name, { fn, spec, returnsValue });
     }
   }
@@ -961,6 +1119,11 @@ class WorkspaceCompiler {
   // Mutable locals live in a fresh list passed to an internal implementation.
   // The public procedure allocates that list on every call, including recursion.
   compileFunctionProcedure({ fn, spec, returnsValue }) {
+    const savedStatementEvent = this.currentStatementEvent;
+    this.currentStatementEvent = fn.statementEvent;
+    const savedEventFrames = this.currentEventFrames;
+    const savedInvocationLocals = this.invocationLocals;
+    this.invocationLocals = fn.event ? new Set() : null;
     const savedStrings = new Set(this.stringVariables);
     for (const param of fn.params) this.stringVariables.delete(param);
     visitFunctionBody(fn.body, node => {
@@ -1019,6 +1182,9 @@ class WorkspaceCompiler {
     this.rangeBindings = [];
     this.loopDepth = 0;
     this.functionParams = new Set([...fn.params, frameName]);
+    this.currentEventFrames = new Map([...(fn.capturedEvents ?? [])].map(owner => [owner, `__eventFrame_${owner}`]));
+    for (const name of this.currentEventFrames.values()) this.functionParams.add(name);
+    if (fn.event) this.currentEventFrames.set(fn.name, frameName);
     try {
       const define = (definition) => {
         const defId = this.addBlockWithId(definition.id, {
@@ -1060,22 +1226,26 @@ class WorkspaceCompiler {
         }
         this.connectInput(defId, firstChild, "STACK", "statement");
       }
-      const generatedLocal = name => /^__(?:flow_|for_|thrown|error)/.test(name)
+      const generatedLocal = name => /^__(?:flow_|for_|thrown|error|arrDestructure)/.test(name)
+        || fn.event && name.startsWith("__nekoc_ts_")
         || fn.classGenerated && /^__objectTarget\d+$/.test(name);
-      const locals = new Set([...this.globalVariables].filter((name) => declared.has(name)
+      const locals = new Set([...this.globalVariables].filter((name) => declared.has(name) || this.invocationLocals?.has(name)
         || (!outerVariables.has(name) && generatedLocal(name))));
       // Named-variable APIs can introduce genuine project globals during a
       // procedure compile; only lexical declarations/compiler temps are local.
       for (const name of this.globalVariables) if (!locals.has(name)) outerVariables.add(name);
       const slots = new Map([...locals].map((name, index) => [name, index + 1]));
-      const rewrite = (workspace, parameterId) => {
+      if (fn.event) this.eventSlots.set(fn.name, slots);
+      const rewrite = (workspace, parameterId, params) => {
         const current = [this.blocks, this.connections];
         [this.blocks, this.connections] = [workspace.blocks, workspace.connections];
         try {
           const number = (value, parent) => this.addBlock({ type: "math_number", parent_id: parent,
             fields: { NUM: String(value) }, is_output: true });
+          let activeParameter = parameterId;
+          let activeName = frameName;
           const list = (parent) => this.addBlock({ type: "procedures_2_parameter", parent_id: parent,
-            fields: { param_name: frameName }, mutation: `<mutation id="${parameterId}"></mutation>`, is_output: true });
+            fields: { param_name: activeName }, mutation: `<mutation id="${activeParameter}"></mutation>`, is_output: true });
           const read = (slot, parent) => {
             const id = this.addBlock({ type: "list_item", parent_id: parent, fields: { item: "any" }, is_output: true });
             this.connectInput(id, list(id), "list", "value");
@@ -1087,7 +1257,17 @@ class WorkspaceCompiler {
               outerVariables.add(block.fields.variable);
               continue;
             }
-            const slot = slots.get(block.fields?.variable);
+            activeParameter = parameterId;
+            activeName = frameName;
+            let slot = slots.get(block.fields?.variable);
+            const owner = this.eventLocalOwners.get(block.fields?.variable);
+            if (!slot && fn.capturedEvents?.has(owner)) {
+              slot = this.eventSlots.get(owner)?.get(block.fields.variable);
+              activeParameter = procedureParamIds({ params }).get(`__eventFrame_${owner}`);
+              activeName = `__eventFrame_${owner}`;
+              if (!activeParameter) this.unsupported(fn.body, "Event-local capture cannot cross this helper boundary; pass explicit values instead");
+              if (!slot) this.unsupported(fn.body, "Event-local capture has no invocation slot; pass the value explicitly instead");
+            }
             if (!slot || !["variables_get", "variables_set", "change_variables"].includes(block.type)) continue;
             const kind = block.type;
             const decrease = block.fields.method === "decrease";
@@ -1116,12 +1296,12 @@ class WorkspaceCompiler {
         }
       };
       if (this.target.name === "kitten4") this.currentStatementNode = fn.sourceNode;
-      rewrite({ blocks: this.blocks, connections: this.connections }, frameParam.id);
+      rewrite({ blocks: this.blocks, connections: this.connections }, frameParam.id, implementation.params);
       // Lazy control-expression helpers capture the same mutable frame through
       // functionParams, not a stale copy of each individual local value.
       for (const procedure of this.procedures.slice(beforeProcedures)) {
         const captured = procedure.params.find((param) => param.name === frameName);
-        if (captured) rewrite(procedure.workspaceData, captured.id);
+        if (captured) rewrite(procedure.workspaceData, captured.id, procedure.params);
       }
       this.procedures.push({ ...implementation,
         workspaceData: { blocks: this.blocks, connections: this.connections, comments: {} } });
@@ -1129,6 +1309,7 @@ class WorkspaceCompiler {
       this.connections = {};
       this.currentProcedureParams = procedureParamIds(spec);
       this.functionParams = new Set(fn.params);
+      for (const owner of fn.capturedEvents ?? []) this.functionParams.add(`__eventFrame_${owner}`);
       const wrapper = define(spec);
       const parent = returnsValue ? this.addReturnValueBlock(wrapper) : wrapper;
       // List item blocks use editor indices (1-based); reserve item 1 as the
@@ -1138,6 +1319,7 @@ class WorkspaceCompiler {
       );
       const call = this.compileProcedureCallArgs(implementation, [
         ...fn.params.map((name) => ts.factory.createIdentifier(name)),
+        ...[...(fn.capturedEvents ?? [])].map(owner => ts.factory.createIdentifier(`__eventFrame_${owner}`)),
         frame,
       ], parent, returnsValue);
       if (returnsValue) {
@@ -1152,6 +1334,9 @@ class WorkspaceCompiler {
         workspaceData: { blocks: this.blocks, connections: this.connections, comments: {} },
       });
     } finally {
+      this.currentStatementEvent = savedStatementEvent;
+      this.currentEventFrames = savedEventFrames;
+      this.invocationLocals = savedInvocationLocals;
       this.stringVariables.clear();
       for (const name of savedStrings) this.stringVariables.add(name);
       [this.blocks, this.connections, this.expressionBindings, this.inlineCallStack,
@@ -1261,9 +1446,23 @@ class WorkspaceCompiler {
           if (ts.isFunctionLike(outer)) {
             for (const param of outer.parameters ?? []) {
               if (ts.isIdentifier(param.name) && expressionContainsIdentifier(callback.body, param.name.text)) {
-                this.unsupported(callback, `Timer callbacks cannot capture function parameter ${param.name.text}; copy it into a variable first`);
+                this.unsupported(callback, `Timer callbacks cannot capture function parameter ${param.name.text} across scheduling; move state to a top-level variable or pass explicit shared state instead`);
               }
             }
+            const scan = child => {
+              if (ts.isFunctionLike(child)) return;
+              if (ts.isVariableDeclaration(child)) {
+                const checkName = name => {
+                  if (ts.isIdentifier(name) && callbackReferencesName(callback, name.text)) {
+                    this.unsupported(callback, "Timer callbacks cannot capture invocation-local bindings across scheduling; move state to a top-level variable or pass explicit shared state instead");
+                  }
+                  if (ts.isArrayBindingPattern(name)) for (const element of name.elements) if (ts.isBindingElement(element)) checkName(element.name);
+                };
+                checkName(child.name);
+              }
+              ts.forEachChild(child, scan);
+            };
+            if (outer.body) scan(outer.body);
           }
         }
         const n = ++this.helperCount;
@@ -1418,6 +1617,7 @@ class WorkspaceCompiler {
               if (ts.isFunctionDeclaration(owner) || ts.isArrowFunction(owner) && ts.isVariableDeclaration(owner.parent)) {
                 this.unsupported(callback, "Callbacks cannot capture locals of an inline function; use an event-local or top-level variable");
               }
+              if (ts.isFunctionLike(owner)) break;
             }
             const previous = this.callbackCaptures.get(declaration.name.text);
             if (previous && previous !== declaration) this.unsupported(declaration, `Variable shadowing is not supported: ${declaration.name.text}`);
@@ -1523,6 +1723,11 @@ class WorkspaceCompiler {
   compileFunctionProcedureCall(call, parentId, asExpression) {
     const { fn, spec, returnsValue } = this.functionProcedures.get(calleeName(call.expression));
     const args = this.functionArguments(fn, call);
+    for (const owner of fn.capturedEvents ?? []) {
+      const frame = this.currentEventFrames.get(owner);
+      if (!frame) this.unsupported(call, "Event-local closure cannot escape its invocation; pass explicit values instead");
+      args.push(ts.factory.createIdentifier(frame));
+    }
     if (asExpression && !returnsValue) {
       this.unsupported(call, `Function ${spec.name} does not return a value`);
     }
@@ -1922,10 +2127,11 @@ class WorkspaceCompiler {
 
   compileNextHat(call, type, callbackIndex, fields = undefined) {
     const body = callbackBody(call.arguments[callbackIndex], this);
+    let ready;
     if (this.objectHeap && type === "on_running_group_activated") {
-      body.unshift(ts.factory.createExpressionStatement(ts.factory.createCallExpression(
+      ready = ts.factory.createExpressionStatement(ts.factory.createCallExpression(
         ts.factory.createIdentifier("waitUntil"), undefined, [ts.factory.createBinaryExpression(
-          ts.factory.createIdentifier(STARTUP_READY), ts.SyntaxKind.EqualsEqualsEqualsToken, ts.factory.createNumericLiteral(1))])));
+          ts.factory.createIdentifier(STARTUP_READY), ts.SyntaxKind.EqualsEqualsEqualsToken, ts.factory.createNumericLiteral(1))]));
     }
     const entryId = this.addBlock({
       type,
@@ -1933,7 +2139,12 @@ class WorkspaceCompiler {
       ...(fields ? { fields } : {}),
     });
     this.scriptCount += 1;
-    const first = this.compileStatementList(body, entryId);
+    let first = this.compileEventBody(call.arguments[callbackIndex], entryId, body);
+    if (ready) {
+      const gate = this.compileStatementList([ready], entryId);
+      if (first) this.connectNext(this.chainTail(gate), first);
+      first = gate;
+    }
     if (first) {
       this.connectNext(entryId, first);
     }
@@ -1959,7 +2170,7 @@ class WorkspaceCompiler {
     });
     this.scriptCount += 1;
     const body = callbackBody(bodyArg, this);
-    const first = this.compileStatementList(body, entryId);
+    const first = this.compileEventBody(bodyArg, entryId, body);
     if (first) {
       this.connectNext(entryId, first);
     }
@@ -1978,7 +2189,7 @@ class WorkspaceCompiler {
     const messageId = this.compileBroadcastMessage(call.arguments[0], entryId);
     this.connectInput(entryId, messageId, "message", "value");
     const body = callbackBody(call.arguments[1], this);
-    const firstChild = this.compileStatementList(body, entryId);
+    const firstChild = this.compileEventBody(call.arguments[1], entryId, body);
     if (firstChild) {
       this.connectInput(entryId, firstChild, "DO", "statement");
     }
@@ -1996,7 +2207,7 @@ class WorkspaceCompiler {
     const paramId = this.compileBroadcastParamName(call.arguments[1], entryId);
     this.connectInput(entryId, paramId, "param", "value");
     const body = callbackBody(call.arguments[2], this);
-    const firstChild = this.compileStatementList(body, entryId);
+    const firstChild = this.compileEventBody(call.arguments[2], entryId, body);
     if (firstChild) {
       this.connectInput(entryId, firstChild, "DO", "statement");
     }
@@ -2011,7 +2222,7 @@ class WorkspaceCompiler {
     const conditionId = this.compileExpression(call.arguments[0], entryId);
     this.connectInput(entryId, conditionId, "condition", "value");
     const body = callbackBody(call.arguments[1], this);
-    const firstChild = this.compileStatementList(body, entryId);
+    const firstChild = this.compileEventBody(call.arguments[1], entryId, body);
     if (firstChild) {
       this.connectInput(entryId, firstChild, "DO", "statement");
     }
@@ -2036,7 +2247,7 @@ class WorkspaceCompiler {
     });
     this.connectInput(entryId, paramId, "actor", "value");
     const body = callbackBody(call.arguments[3], this);
-    const firstChild = this.compileStatementList(body, entryId);
+    const firstChild = this.compileEventBody(call.arguments[3], entryId, body);
     if (firstChild) {
       this.connectInput(entryId, firstChild, "DO", "statement");
     }
@@ -2044,6 +2255,10 @@ class WorkspaceCompiler {
 
 
   compileStatementList(statements, parentIdForChildren) {
+    if (this.currentStatementEvent) {
+      const end = statements.findIndex(statement => ts.isReturnStatement(statement));
+      if (end >= 0) statements = statements.slice(0, end + 1);
+    }
     return controlFlow.statementList(this, statements, parentIdForChildren);
   }
 
@@ -2116,6 +2331,20 @@ class WorkspaceCompiler {
       return this.compileThrow(statement, parentId);
     }
     if (ts.isReturnStatement(statement)) {
+      if (this.currentStatementEvent) {
+        const exit = () => this.addBlock({ type: "procedures_2_return_value", parent_id: parentId,
+          mutation: '<mutation xmlns="http://www.w3.org/1999/xhtml" type="NORMAL" items="0"></mutation>' });
+        if (!statement.expression) return exit();
+        // Event results are ignored, but evaluating them can mutate shared state.
+        // NORMAL procedures have no VALUE socket on their return block.
+        const name = `__eventReturn${++this.helperCount}`;
+        this.globalVariables.add(name);
+        this.invocationLocals.add(name);
+        const evaluate = this.addBlock({ type: "variables_set", parent_id: parentId, fields: { variable: name } });
+        this.connectInput(evaluate, this.compileExpression(statement.expression, evaluate), "value", "value");
+        this.connectNext(evaluate, exit());
+        return evaluate;
+      }
       if (statement.expression) {
         return this.compileReturn(statement.expression, parentId);
       }
@@ -2200,6 +2429,7 @@ class WorkspaceCompiler {
     }
     if (capturedDeclaration) this.callbackCaptures.delete(variableName);
     this.globalVariables.add(variableName);
+    this.invocationLocals?.add(variableName);
   }
 
   compileArrayDestructuring(declaration, parentId) {
@@ -6628,7 +6858,8 @@ function scopeDeclaredNames(scope) {
 // Expression callbacks run as a synthesized block without a parent; the
 // wrapped statement still belongs to the user source file.
 function functionSourceFile(fn) {
-  return fn.body.getSourceFile() ?? fn.body.statements?.[0]?.expression?.getSourceFile();
+  return fn.body.getSourceFile() ?? fn.sourceNode?.getSourceFile()
+    ?? fn.body.statements?.[0]?.expression?.getSourceFile();
 }
 
 function stripParens(node) {

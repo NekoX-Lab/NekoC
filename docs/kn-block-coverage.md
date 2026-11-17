@@ -94,8 +94,9 @@
 - **T45**：[tests/textlenfast.rs](../tests/textlenfast.rs)（源码引用，执行状态见上文）
 - **T46**：[tests/textlenfast_bench.rs](../tests/textlenfast_bench.rs)（源码引用，执行状态见上文）
 - **T47**：[tests/tsctrl_runtime.rs](../tests/tsctrl_runtime.rs)（源码引用，执行状态见上文）
-- **T48**：[tests/tsfeat.rs](../tests/tsfeat.rs)（源码引用，执行状态见上文）
-- **T49**：[tests/video.rs](../tests/video.rs)（源码引用，执行状态见上文）
+- **T48**：[tests/tseventframes.rs](../tests/tseventframes.rs)（源码引用，执行状态见上文）
+- **T49**：[tests/tsfeat.rs](../tests/tsfeat.rs)（源码引用，执行状态见上文）
+- **T50**：[tests/video.rs](../tests/video.rs)（源码引用，执行状态见上文）
 
 ## 全量逐项表（300 行）
 
@@ -198,7 +199,7 @@
 | 93 | `list_index_of` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2074`<br>`src/engine.rs:2835` | T9, T39 | 有路径；完整语义未验证 |
 | 94 | `list_insert_value` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4508` | T9, T39 | 有路径；完整语义未验证 |
 | 95 | `list_is_exist` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2074`<br>`src/engine.rs:2835` | T9, T39 | 有路径；完整语义未验证 |
-| 96 | `list_item` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2208`<br>`src/engine.rs:2902`<br>`src/engine.rs:2905` | T1, T7, T9, T14, T39, T41 | 有路径；完整语义未验证 |
+| 96 | `list_item` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2208`<br>`src/engine.rs:2902`<br>`src/engine.rs:2905` | T1, T7, T9, T14, T39, T41, T48 | 有路径；完整语义未验证 |
 | 97 | `list_length` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2899` | T9, T14, T18, T39, T45 | 有路径；完整语义未验证 |
 | 98 | `logic_boolean` | 有执行路径／未完整验证 | 可配置面板／默认隐藏 | `src/engine.rs:2114`<br>`src/engine.rs:2793` | T8, T9, T14, T18, T19, T39, T47 | 有路径；完整语义未验证 |
 | 99 | `logic_compare` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2145`<br>`src/engine.rs:2871` | T1, T9, T14, T18, T21, T22, T23, T27, T36, T37, T39, T43 | 有路径；完整语义未验证 |
@@ -285,7 +286,7 @@
 | 180 | `repeat_forever` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4703` | T9, T14, T18, T35, T37, T39, T44, T46 | 有路径；完整语义未验证 |
 | 181 | `repeat_forever_until` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4703` | T9, T36, T37, T39 | 有路径；完整语义未验证 |
 | 182 | `repeat_n_times` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4703` | T1, T5, T8, T9, T11, T14, T17, T18, T19, T20, T21, T22, T23, T24, T26, T27, T30, T36, T37, T39, T43, T44, T45, T46 | 有路径；完整语义未验证 |
-| 183 | `replace_list_item` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4513` | T9, T14, T39, T43 | 有路径；完整语义未验证 |
+| 183 | `replace_list_item` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4513` | T9, T14, T39, T43, T48 | 有路径；完整语义未验证 |
 | 184 | `reset_timer` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:3710` | T18 | 只重置独立 block timer，不改变舞台计时器；官方墙钟与 VM 仿真时钟差异未验证 |
 | 185 | `restart` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4081` | T9, T14, T38, T39 | 有路径；完整语义未验证 |
 | 186 | `script_variables` | 有执行路径／未完整验证 | 可配置面板／默认隐藏 | `src/engine.rs:3695` | T9, T14, T18, T39 | 有路径；完整语义未验证 |
@@ -364,16 +365,16 @@
 | 259 | `sprite_on_tap` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3327` | T5, T9, T39 | 有路径；完整语义未验证 |
 | 260 | `stamp` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4554`<br>`src/engine.rs:4580` | T9, T39 | 有路径；完整语义未验证 |
 | 261 | `start_as_a_mirror` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3280` | T1, T9, T14 | 有路径；完整语义未验证 |
-| 262 | `start_on_click` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:3265` | T8, T9, T12, T39, T49 | 有路径；完整语义未验证 |
-| 263 | `stop` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4635` | T2, T9, T10, T11, T14, T17, T18, T38, T39 | 有路径；完整语义未验证 |
+| 262 | `start_on_click` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:3265` | T8, T9, T12, T39, T50 | 有路径；完整语义未验证 |
+| 263 | `stop` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4635` | T2, T9, T10, T11, T14, T17, T18, T38, T39, T48 | 有路径；完整语义未验证 |
 | 264 | `stop_audio` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4490` | T2, T9, T39 | 有路径；完整语义未验证 |
 | 265 | `stop_robot2_master_motor` | 部分语义 | 官方硬件扩展定义／未安装 | `src/engine.rs:3596` | T36 | 仅无连接 Promise 早退，求值输入后下一 update 继续；真实设备未实现，完整微任务/调度组合未验证 |
 | 266 | `stop_robot_master_light` | 部分语义 | 官方硬件扩展定义／未安装 | `src/engine.rs:3596` | T36 | 仅无连接 Promise 早退，求值输入后下一 update 继续；真实设备未实现，完整微任务/调度组合未验证 |
 | 267 | `stop_robot_master_motor` | 部分语义 | 官方硬件扩展定义／未安装 | `src/engine.rs:3596` | T36 | 仅无连接 Promise 早退，求值输入后下一 update 继续；真实设备未实现，完整微任务/调度组合未验证 |
 | 268 | `style_of_sprite` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2962` | T23, T32, T39 | 有路径；完整语义未验证 |
 | 269 | `switch_to_screen` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4088` | T9, T39 | 有路径；完整语义未验证 |
-| 270 | `sync_tell` | 有执行路径／未完整验证 | 可配置面板／默认隐藏 | `src/engine.rs:4437` | T1, T9, T14, T39, T48 | 有路径；完整语义未验证 |
-| 271 | `tell` | 有执行路径／未完整验证 | 可配置面板／默认隐藏 | `src/engine.rs:4437` | T39, T48 | 有路径；完整语义未验证 |
+| 270 | `sync_tell` | 有执行路径／未完整验证 | 可配置面板／默认隐藏 | `src/engine.rs:4437` | T1, T9, T14, T39, T49 | 有路径；完整语义未验证 |
+| 271 | `tell` | 有执行路径／未完整验证 | 可配置面板／默认隐藏 | `src/engine.rs:4437` | T39, T49 | 有路径；完整语义未验证 |
 | 272 | `temporary_list` | 有执行路径／未完整验证 | 可配置面板／默认隐藏 | `src/engine.rs:2216` | T9, T14, T39 | 有路径；完整语义未验证 |
 | 273 | `text_contain` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2066`<br>`src/engine.rs:2835` | T9, T39 | 有路径；完整语义未验证 |
 | 274 | `text_join` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2216`<br>`src/engine.rs:2835` | T9, T15, T39, T43, T45, T46 | 有路径；完整语义未验证 |
@@ -391,8 +392,8 @@
 | 286 | `user_info_of_th` | 部分语义 | 可配置面板／默认隐藏 | `src/engine.rs:1908`<br>`src/engine.rs:2732` | T30 | 仅无 KN 榜单后端的 numeric NaN，order 仍求值；真实用户查询未实现 |
 | 287 | `user_ranking_info` | 部分语义 | 可配置面板／默认隐藏 | `src/engine.rs:1908`<br>`src/engine.rs:2732` | T27, T30 | 仅无 KN 榜单后端的 numeric NaN；真实排名/分数查询未实现 |
 | 288 | `username_get` | 部分语义 | 可配置面板／默认隐藏 | `src/engine.rs:1953`<br>`src/engine.rs:2741` | T27 | 仅无账户后端 profile：官方未登录文本；已登录用户未实现 |
-| 289 | `variables_get` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2157`<br>`src/engine.rs:2796` | T1, T6, T8, T9, T10, T11, T14, T18, T19, T20, T21, T22, T24, T26, T27, T30, T32, T34, T36, T37, T39, T43, T45, T46 | 有路径；完整语义未验证 |
-| 290 | `variables_set` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3714` | T1, T3, T6, T7, T8, T9, T11, T14, T19, T20, T25, T26, T31, T32, T33, T34, T37, T39, T40, T41, T43, T45, T46, T47 | 有路径；完整语义未验证 |
+| 289 | `variables_get` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2157`<br>`src/engine.rs:2796` | T1, T6, T8, T9, T10, T11, T14, T18, T19, T20, T21, T22, T24, T26, T27, T30, T32, T34, T36, T37, T39, T43, T45, T46, T48 | 有路径；完整语义未验证 |
+| 290 | `variables_set` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3714` | T1, T3, T6, T7, T8, T9, T11, T14, T19, T20, T25, T26, T31, T32, T33, T34, T37, T39, T40, T41, T43, T45, T46, T47, T48 | 有路径；完整语义未验证 |
 | 291 | `voice_recognition` | 部分语义 | 普通面板配置／默认未隐藏 | `src/engine.rs:3645` | T27, T28, T29, T30 | 仅未登录提前返回与宿主提示；真实权限/识别/登录 UI 未实现 |
 | 292 | `wait` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4607` | T1, T5, T9, T14, T18, T39, T40 | 有路径；完整语义未验证 |
 | 293 | `wait_until` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4608` | T9, T36, T39 | 有路径；完整语义未验证 |
