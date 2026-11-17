@@ -112,9 +112,9 @@ onStart(() => {
             }
         }
         assert_eq!(engine.active_tasks(), 0);
-        let strokes: Vec<_> = lines.chunks_exact(9).collect();
+        let (strokes, _) = lines.as_chunks::<9>();
         assert!(strokes.len() > 2);
-        let color = |stroke: &[f32]| {
+        let color = |stroke: &[f32; 9]| {
             format!(
                 "#{:02x}{:02x}{:02x}",
                 (stroke[5] * 255.0).round() as u8,
@@ -124,7 +124,7 @@ onStart(() => {
         };
         // Engine emits both pen-down dot capsules and movement capsules; the
         // legacy renderer stored only movements. Compare ordered color runs.
-        let mut colors: Vec<_> = strokes.iter().map(|s| color(s)).collect();
+        let mut colors: Vec<_> = strokes.iter().map(color).collect();
         colors.dedup();
         assert_eq!(colors, ["#ff0000", "#0000ff", "#00ff00", "#080c18"]);
         assert_eq!(strokes[0][4], 2.0);
