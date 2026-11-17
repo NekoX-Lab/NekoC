@@ -22,7 +22,16 @@ function combine(c, tests, parent, type = "and") {
 }
 function chain(c, ids) {
   ids = ids.filter(Boolean);
-  for (let i = 1; i < ids.length; i++) c.connectNext(c.chainTail(ids[i - 1]), ids[i]);
+  for (let i = 1; i < ids.length; i++) {
+    const tail = c.chainTail(ids[i - 1]);
+    const block = c.blocks[tail];
+    // A NORMAL return ends this path. In particular, loop epilogues must not
+    // attach their increment/condition or completion cleanup to this socket.
+    // Conditional returns live inside a branch; their enclosing if still has a
+    // fallthrough path, and continue guards must still run the loop epilogue.
+    if (block?.type === "procedures_2_return_value" && /type="NORMAL"/.test(block.mutation ?? "")) break;
+    c.connectNext(tail, ids[i]);
+  }
   return ids[0] ?? null;
 }
 function scope(c, kind, extra = {}) {
