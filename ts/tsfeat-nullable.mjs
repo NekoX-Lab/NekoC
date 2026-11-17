@@ -192,6 +192,22 @@ export function lowerTsNullable(input) {
   const nilDeclared = node => !legacyOptionalParameter(node) && (mayHoldNil(node) || maybeNil(declaredType(node)))
     && domain(declaredType(node)) !== null;
 
+  // Do not erase nullish slice boundaries into numeric-typed sentinels: the
+  // array helper intentionally accepts numbers only, not JS ToNumber coercion.
+  const checkSliceBoundaries = node => {
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+      && node.expression.name.text === "slice") {
+      const receiver = checker.getNonNullableType(flowType(node.expression.expression));
+      if (checker.isArrayType(receiver) || checker.isTupleType(receiver)) {
+        for (const arg of node.arguments) {
+          if (mayHoldNil(arg)) fail(arg, "Array.slice boundaries must be numbers",
+            "omit optional arguments or convert the value to a number before this call");
+        }
+      }
+    }
+    ts.forEachChild(node, checkSliceBoundaries);
+  };
+
   // ---------- declarations ----------
   const topTypes = new Set(["Array", "ReadonlyArray"]);
   for (const statement of sourceFile.statements) {
@@ -692,6 +708,7 @@ export function lowerTsNullable(input) {
     return undefined;
   }
 
+  checkSliceBoundaries(sourceFile);
   const result = out(sourceFile);
   if (result === text && !declarations.length) return input;
   const lowered = `${result}\n${declarations.join("\n")}\n`;
