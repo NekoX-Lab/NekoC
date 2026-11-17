@@ -171,7 +171,12 @@ fn walk(
 /// Resolve after allocation when `rewrite` is true; otherwise enforce persisted
 /// IDs for imported projects. Procedure contexts propagate to a fixed point, so
 /// shared/recursive procedures must have the same selectable target for callers.
-type Replacements = BTreeMap<String, BTreeMap<String, String>>;
+enum TargetRewrite {
+    Actor(String),
+    Turn,
+}
+
+type Replacements = BTreeMap<String, BTreeMap<String, TargetRewrite>>;
 
 fn analyze(project: &Value, rewrite: bool) -> (Vec<Value>, Replacements) {
     let menu = Menu::new(project);
@@ -246,6 +251,7 @@ fn analyze(project: &Value, rewrite: bool) -> (Vec<Value>, Replacements) {
     let mut issues = Vec::new();
     let mut all_replacements = BTreeMap::new();
     for (path, contexts, blocks) in owners {
+        let procedure_workspace = path.starts_with("/procedures/");
         let mut replacements = BTreeMap::new();
         walk(blocks, &contexts, &menu, &mut |block, contexts| {
             if !matches!(
@@ -255,13 +261,35 @@ fn analyze(project: &Value, rewrite: bool) -> (Vec<Value>, Replacements) {
                 return;
             }
             let target = block["fields"]["sprite"].as_str().unwrap_or("");
+            // Orbiting the executing instance leaves its position unchanged and
+            // adds the angle to its direction. A prototype ID is not equivalent
+            // for clones. Turn also works in shared/recursive procedures without
+            // needing a static actor dropdown or repeating the angle expression.
+            let self_orbit = rewrite
+                && block["type"] == "self_rotate_around"
+                && target == "--self"
+                && !menu.actors.contains_key(target);
+            if self_orbit && !contexts.is_empty() && contexts.iter().all(|c| c.actor.is_some()) {
+                replacements.insert(
+                    block["id"].as_str().unwrap_or("").to_owned(),
+                    TargetRewrite::Turn,
+                );
+                return;
+            }
             let resolutions = contexts
                 .iter()
                 .map(|c| menu.resolve(target, c, rewrite))
                 .collect::<Result<BTreeSet<_>, _>>();
             let result = resolutions.and_then(|ids| {
                 if ids.len() == 1 {
-                    Ok(ids.into_iter().next().unwrap())
+                    let id = ids.into_iter().next().unwrap();
+                    // Procedures are global workspaces: the editor uses the
+                    // selected scene's menu, independently of runtime callers.
+                    // Require persistence in every scene, including after a
+                    // scene switch, rather than changing the initial scene.
+                    if procedure_workspace && menu.scenes.values().any(|actors| !actors.contains(&id)) {
+                        Err("global procedure workspace target is not selectable in every editor scene; move this actor-target action into the owning sprite's event callback (or an inline function)".to_owned())
+                    } else { Ok(id) }
                 } else {
                     Err(
                         "target differs between procedure callers (or owner has no scene)"
@@ -270,7 +298,7 @@ fn analyze(project: &Value, rewrite: bool) -> (Vec<Value>, Replacements) {
                 }
             });
             match result {
-                Ok(id) => { replacements.insert(block["id"].as_str().unwrap_or("").to_owned(), id); }
+                Ok(id) => { replacements.insert(block["id"].as_str().unwrap_or("").to_owned(), TargetRewrite::Actor(id)); }
                 Err(reason) => issues.push(json!({
                     "kind": "invalid_actor_menu_target", "owner": path, "block_id": block["id"],
                     "block_type": block["type"], "target": target,
@@ -296,12 +324,24 @@ pub(crate) fn resolve(project: &mut Value) -> Vec<Value> {
             while let Some(value) = pending.pop() {
                 match value {
                     Value::Object(object) => {
-                        if let Some(id) = object
+                        if let Some(replacement) = object
                             .get("id")
                             .and_then(Value::as_str)
                             .and_then(|id| replacements.get(id))
                         {
-                            object.get_mut("fields").unwrap()["sprite"] = json!(id);
+                            match replacement {
+                                TargetRewrite::Actor(id) => {
+                                    object.get_mut("fields").unwrap()["sprite"] = json!(id)
+                                }
+                                TargetRewrite::Turn => {
+                                    object.insert("type".into(), json!("self_rotate"));
+                                    object
+                                        .get_mut("fields")
+                                        .and_then(Value::as_object_mut)
+                                        .unwrap()
+                                        .remove("sprite");
+                                }
+                            }
                         }
                         object.remove("_nekocTargetSource");
                         pending.extend(object.values_mut());

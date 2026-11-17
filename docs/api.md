@@ -223,7 +223,9 @@ use a unique actor name or an actual actor ID. Names are resolved after final
 resource allocation; existing IDs take precedence. `"--self"` is a compiler
 alias for a definite actor owner/caller's ID, not a persisted menu option.
 Scene-owned scripts and unused procedures cannot infer `self`. Shared procedures
-must resolve to the same ID in every caller's scene. Unknown/ambiguous names,
+must resolve to the same ID in every caller's scene, and global procedure
+dropdowns must remain selectable in every editor scene. Otherwise move the
+action to its owning sprite event or an inline function. Unknown/ambiguous names,
 cross-scene IDs, mouse/random/edge and scene targets produce source diagnostics.
 Imported `.bcmkn` files must already contain selectable IDs (`nekoc check`
 checks this). These rules do **not** describe the other sensing or tell menus.
@@ -503,6 +505,10 @@ pointTowards(0); // Face right
 
 Rotates around a current-scene actor. The global and `self.rotateAround` APIs
 use the same name/ID/`"--self"` resolution rules as `onBumpActor` above.
+For `rotateAround` specifically, `"--self"` lowers to a turn of the current
+executing instance: position stays fixed and direction increases by `degrees`,
+evaluated once. This preserves clone identity and supports shared procedures
+without a static actor dropdown.
 
 ### `faceTo(target)` / `setFaceTo(target)`
 

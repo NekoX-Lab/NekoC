@@ -88,9 +88,11 @@ onStart(() => {
 
 Kitten N `rotateAround(target, degrees)` (also `self.rotateAround`) and
 `onBumpActor` targets are current-scene actor IDs or unique names, resolved after
-allocation. `"--self"` lowers to a definite actor owner/caller ID, never a scene
-or a guessed first actor. Shared procedures need the same target ID for every
-caller; use an explicit actor target if self is ambiguous. Unknown/ambiguous or
+allocation. For rotateAround, `"--self"` lowers to a current-instance turn
+(position unchanged, angle evaluated once), including clones and shared procedures.
+For onBumpActor, self resolves to the definite actor prototype ID. Global procedure
+dropdowns must be selectable in every editor scene as well as all runtime callers;
+move nonpersistent target actions into sprite events or inline functions. Unknown/ambiguous or
 cross-scene targets, scene IDs, mouse/random/edge are diagnosed with source
 locations. Other sprite-field APIs have different menus; do not generalize this
 rule to sensing or tell. `check` on an existing work requires persisted actor IDs.

@@ -70,17 +70,24 @@ onBumpActor("start", "--self", "actor", () => {});"#,
         bcmkn_compiler::default_template(),
     )
     .unwrap();
-    assert_targets(&p, &["nekoc-default-actor"; 2]);
+    assert_targets(&p, &["nekoc-default-actor"]);
     let p = assemble(
         r#"sprite("own", {}, self => { onStart(() => { self.rotateAround("--self", 45); }); });"#,
         bcmkn_compiler::default_template(),
     )
     .unwrap();
-    assert_targets(&p, &["nekoc-actor-own"]);
+    assert_targets(&p, &[]);
     for file in ["samples/motion_actor.ts", "samples/event_bump_received.ts"] {
         let source = std::fs::read_to_string(file).unwrap();
         let p = assemble(&source, bcmkn_compiler::default_template()).unwrap();
-        assert_targets(&p, &["nekoc-default-actor"]);
+        assert_targets(
+            &p,
+            if file.contains("motion_actor") {
+                &[]
+            } else {
+                &["nekoc-default-actor"]
+            },
+        );
     }
 }
 
@@ -173,7 +180,7 @@ defineProc("outer", [], () => { callProc("inner"); });
 onStart(() => { callProc("outer"); });"#;
     assert_targets(
         &assemble(source, bcmkn_compiler::default_template()).unwrap(),
-        &["nekoc-default-actor"],
+        &[],
     );
     let shared = r#"defineProc("p", [], () => { rotateAround("target", 90); });
 sprite("target", {}, () => {});
@@ -183,21 +190,20 @@ sprite("b", {}, () => { onStart(() => { callProc("p"); }); });"#;
         &assemble(shared, bcmkn_compiler::default_template()).unwrap(),
         &["nekoc-actor-target"],
     );
-    assert!(
-        assemble(
+    assert_targets(
+        &assemble(
             &shared.replace("rotateAround(\"target\"", "rotateAround(\"--self\""),
-            bcmkn_compiler::default_template()
+            bcmkn_compiler::default_template(),
         )
-        .unwrap_err()
-        .to_string()
-        .contains("differs")
+        .unwrap(),
+        &[],
     );
     let source = r#"defineProc("p", [], () => { rotateAround("--self", 90); ifThen(false, () => { callProc("p"); }); });
 sprite("target", {}, () => {});
 onStart(() => { tellAndWait("target", () => { callProc("p"); }); });"#;
     assert_targets(
         &assemble(source, bcmkn_compiler::default_template()).unwrap(),
-        &["nekoc-actor-target"],
+        &[],
     );
     let source = r#"defineProc("p", [], () => { rotateAround("target", 90); });
 screen("one", {}, () => { sprite("target", {}, () => { onStart(() => { callProc("p"); }); }); });
@@ -288,7 +294,7 @@ fn unsupported_targets_have_matching_check_build_source_locations_and_project_ch
         );
     }
     let mut p = assemble(
-        "onStart(() => { rotateAround(\"--self\", 90); });",
+        "onStart(() => { rotateAround(\"Sprite\", 90); });",
         bcmkn_compiler::default_template(),
     )
     .unwrap();
@@ -302,17 +308,50 @@ fn unsupported_targets_have_matching_check_build_source_locations_and_project_ch
     );
     // Imported procedure calls bind by mutation def_id, even when the visible
     // NAME is a label. A wrong field must not hide the procedure's actual scene.
-    let mut imported = assemble(
-        r#"defineProc("p", [], () => { rotateAround("target", 90); });
+    let source = r#"defineProc("p", [], () => { rotateAround("target", 90); });
 screen("one", {}, () => { sprite("unrelated", {}, () => {}); });
 screen("two", {}, () => { sprite("target", {}, () => {});
-sprite("caller", {}, () => { onStart(() => { callProc("p"); }); }); });"#,
+sprite("caller", {}, () => { onStart(() => { callProc("p"); }); }); });"#;
+    assert!(
+        assemble(source, bcmkn_compiler::default_template())
+            .unwrap_err()
+            .to_string()
+            .contains("global procedure workspace")
+    );
+    // Build the single-scene control, then add another scene to model a work
+    // imported with a formerly valid global procedure dropdown.
+    let mut imported = assemble(
+        r#"defineProc("p", [], () => { rotateAround("target", 90); });
+sprite("target", {}, () => {});
+sprite("caller", {}, () => { onStart(() => { callProc("p"); }); });"#,
         bcmkn_compiler::default_template(),
     )
     .unwrap();
     imported["actors"]["actorsDict"]["nekoc-actor-caller"]["nekoBlockJsonList"][0]["next"]["fields"]
         ["NAME"] = json!("display label");
     assert_eq!(validate::build_report(&imported).unwrap()["ok"], true);
+    imported["scenes"]["scenesDict"]["other"] = json!({"id":"other","actorIds":[]});
+    imported["scenes"]["sortList"] = json!(["nekoc-scene-main", "other"]);
+    for scene in ["nekoc-scene-main", "other"] {
+        imported["scenes"]["currentSceneId"] = json!(scene);
+        assert!(
+            check::project_diagnostics(&imported, None)
+                .unwrap()
+                .iter()
+                .any(|d| d.code == "invalid_actor_menu_target")
+        );
+    }
+    let procedures = imported["procedures"]["proceduresDict"]
+        .as_object_mut()
+        .unwrap();
+    let procedure = procedures.values_mut().next().unwrap();
+    procedure["nekoBlockJsonList"][0]["statements"]["STACK"]["type"] = json!("on_bump_actor");
+    assert!(
+        check::project_diagnostics(&imported, None)
+            .unwrap()
+            .iter()
+            .any(|d| d.code == "invalid_actor_menu_target")
+    );
     for target in ["Sprite", "--mouse", "missing", "nekoc-scene-main"] {
         p["actors"]["actorsDict"]["nekoc-default-actor"]["nekoBlockJsonList"][0]["next"]["fields"]
             ["sprite"] = json!(target);
@@ -397,5 +436,107 @@ fn typed_self_api_and_procedure_rejections_retain_source_positions() {
             Some(if source.starts_with("sprite") { 3 } else { 2 })
         );
         assert!(d.column.is_some());
+    }
+}
+
+#[test]
+fn clone_self_orbit_in_message_and_shared_procedure_preserves_instance_and_angle_evaluation() {
+    for body in ["rotateAround(\"--self\", angle());", "callProc(\"spin\");"] {
+        let source = format!(
+            r#"let calls = 0;
+function angle() {{ calls++; return 90; }}
+defineProc("spin", [], () => {{ rotateAround("--self", angle()); }});
+sprite("source", {{ x: 100, y: 100 }}, self => {{
+  onStart(() => {{ createClone(); }});
+  onMessage("go", () => {{
+    if (currentCloneIndex() > 0) {{
+      self.moveTo(200, 100); {body}
+      setVar("cloneX", xOf("--self")); setVar("cloneY", yOf("--self"));
+    }}
+  }});
+}});
+onStart(() => {{ wait(0.1); broadcastAndWait("go"); }});"#
+        );
+        // The unused spin body has no actor caller in the direct case, so leave
+        // only the definition used by each fixture.
+        let source = if body.starts_with("rotate") {
+            source.replace(
+                "defineProc(\"spin\", [], () => { rotateAround(\"--self\", angle()); });",
+                "",
+            )
+        } else {
+            source
+        };
+        let p = assemble(&source, bcmkn_compiler::default_template()).unwrap();
+        assert_targets(&p, &[]);
+        for jit in [false, true] {
+            let mut engine = Engine::new(Program::compile(&p).unwrap());
+            if !jit {
+                engine.disable_jit();
+            }
+            engine.use_virtual_clock();
+            engine.start();
+            for _ in 0..60 {
+                engine
+                    .advance(1.0 / 60.0, 100_000, Duration::from_secs(2))
+                    .unwrap();
+            }
+            assert_eq!(
+                engine.variable_value("kn-var-cloneX").number(),
+                200.0,
+                "{body} jit={jit}"
+            );
+            assert_eq!(engine.variable_value("kn-var-cloneY").number(), 100.0);
+            assert_eq!(engine.variable_value("kn-var-calls").number(), 1.0);
+            let snapshot = engine.oracle_snapshot(60);
+            let actors = snapshot["actors"].as_object().unwrap();
+            assert!(
+                actors
+                    .values()
+                    .any(|a| a["x"] == 200.0 && a["y"] == 100.0 && a["rotation"] == 0.0),
+                "{snapshot}"
+            );
+            assert!(
+                actors
+                    .values()
+                    .any(|a| a["x"] == 100.0 && a["y"] == 100.0 && a["rotation"] == 90.0)
+            );
+        }
+    }
+}
+
+#[test]
+fn global_procedure_menu_rejects_noncurrent_targets_and_scene_switches_with_source_locations() {
+    for screens in [
+        r#"screen("one", {}, () => { sprite("unrelated", {}, () => {}); });
+screen("two", {}, () => { sprite("target", {}, () => {}); sprite("source", {}, () => { onStart(() => { callProc("p"); }); }); });"#,
+        r#"screen("two", {}, () => { sprite("target", {}, () => {}); sprite("source", {}, () => { onStart(() => { callProc("p"); }); }); });
+screen("one", {}, () => { sprite("unrelated", {}, () => {}); });"#,
+    ] {
+        let source = format!(
+            "defineProc(\"p\", [], () => {{\n rotateAround(\"target\", 90);\n}});\n{screens}"
+        );
+        let err = assemble(&source, bcmkn_compiler::default_template())
+            .unwrap_err()
+            .to_string();
+        assert!(
+            err.contains(":2:") && err.contains("global procedure workspace"),
+            "{err}"
+        );
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("knactortarget.ts");
+        std::fs::write(&input, &source).unwrap();
+        let report = check::check_file(&input, &check::CheckOptions::default()).unwrap();
+        assert!(!report.ok);
+        assert_eq!(report.diagnostics[0].line, Some(2));
+        assert!(report.diagnostics[0].message.contains("inline function"));
+        // An inline function persists the block in its actor's workspace,
+        // so both scene orders retain a supported way to express the action.
+        let inline = source
+            .replace("defineProc(\"p\", [], () =>", "function p()")
+            .replace("\n});", "\n}")
+            .replace("callProc(\"p\")", "p()");
+        let p = assemble(&inline, bcmkn_compiler::default_template()).unwrap();
+        assert_targets(&p, &["nekoc-actor-target"]);
     }
 }

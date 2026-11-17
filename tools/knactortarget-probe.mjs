@@ -26,6 +26,31 @@ sprite("source", { costume: "${costume}", x: 100, y: 100 }, self => {
 });`;
 }
 
+export function cloneSelfSource(procedure = false) {
+  return `let angleCalls = 0;
+function angle() { angleCalls++; return 90; }
+${procedure ? 'defineProc("spin", [], () => { rotateAround("--self", angle()); });' : ''}
+sprite("source", { costume: "${costume}", x: 100, y: 100 }, self => {
+  onStart(() => { createClone(); });
+  onMessage("go", () => {
+    if (currentCloneIndex() > 0) {
+      self.moveTo(200, 100);
+      ${procedure ? 'callProc("spin");' : 'self.rotateAround("--self", angle());'}
+      setVar("done", 1);
+    }
+  });
+});
+onStart(() => { wait(0.1); broadcastAndWait("go"); });`;
+}
+
+export function sceneProcedureSource(inline = true, targetFirst = false) {
+  const one = 'screen("one", {}, () => { sprite("unrelated", {}, () => {}); });';
+  const two = `screen("two", {}, () => { sprite("target", {}, () => {});
+sprite("source", {}, () => { onStart(() => { ${inline ? 'spin()' : 'callProc("spin")'}; }); }); });`;
+  return `${inline ? 'function spin() { rotateAround("target", 90); }' : 'defineProc("spin", [], () => { rotateAround("target", 90); });'}
+${targetFirst ? `${two}\n${one}` : `${one}\n${two}`}`;
+}
+
 export const fixtures = {
   "target-self": `onStart(() => { rotateAround("--self", 45); });
 onBumpActor("start", "--self", "actor", () => { setVar("hit", 1); });`,
@@ -36,6 +61,13 @@ onBumpActor("start", "--self", "actor", () => { setVar("hit", 1); });`,
   "procedure": `defineProc("spin", [], () => { rotateAround("target", 90); });
 sprite("target", {}, () => {});
 sprite("source", {}, () => { onStart(() => { callProc("spin"); }); });`,
+  "clone-self-message": cloneSelfSource(),
+  "clone-self-procedure": cloneSelfSource(true),
+  "two-scenes-inline": sceneProcedureSource(),
+  "two-scenes-inline-current-two": sceneProcedureSource(true, true),
+  "two-scenes-self-procedure": `defineProc("spin", [], () => { rotateAround("--self", 90); });
+screen("one", {}, () => { sprite("unrelated", {}, () => {}); });
+screen("two", {}, () => { sprite("source", {}, () => { onStart(() => { callProc("spin"); }); }); });`,
 };
 
 export function assertSemantic(result, self = false) {
@@ -48,6 +80,15 @@ export function assertSemantic(result, self = false) {
   if (!v || !rotated ||
       v["kn-var-hits"] !== (self ? 0 : 1) || v["kn-var-hitX"] !== (self ? 0 : 100) || (v["kn-var-decoyHits"] ?? 0) !== 0 || v["kn-var-done"] !== 1) {
     throw new Error(`Unexpected target behavior: ${JSON.stringify(v)}`);
+  }
+}
+
+export function assertCloneSemantic(result) {
+  if (result.status !== "ok" || result.errors.length || result.page_errors.length) throw new Error("Official clone run failed");
+  const clone = result.instances?.find(a => a.clone), prototype = result.instances?.find(a => !a.clone);
+  if (!clone || !prototype || clone.x !== 200 || clone.y !== 100 || prototype.x !== 100 || prototype.y !== 100 ||
+      Math.abs(clone.rotation - prototype.rotation - Math.PI / 2) > 1e-8 || result.variables?.["kn-var-angleCalls"] !== 1) {
+    throw new Error(`Unexpected clone self behavior: ${JSON.stringify(result)}`);
   }
 }
 
@@ -76,7 +117,7 @@ async function runSemantic(input, bundles) {
     await page.evaluate(() => {
       const req = window.__nekocRequire, core = req(26921).cG.get_instance().getHeart().core;
       const manager = core.get_runtime_manager().run_mgr, store = req(54174).V.core.actors;
-      const trace = window.__actorTarget = { positions: [], runtimeErrors: [] };
+      const trace = window.__actorTarget = { positions: [], runtimeErrors: [], instances: [] };
       trace.variables = () => Object.fromEntries(Object.keys(req(91107).BcmInstance.variablesDict).map(id => [id, manager.get_variable(id)]));
       core.get_event_bus().error.runtime.immediate.sub(e => trace.runtimeErrors.push(String(e?.error?.message || e?.error || e)));
       const update = manager.update;
@@ -84,13 +125,17 @@ async function runSemantic(input, bundles) {
         const answer = update.apply(this, args);
         const found = store.get_actor("nekoc-actor-source"), actor = found?.value ?? found;
         if (actor?.get_position && trace.positions.length < 1000) trace.positions.push({ ...actor.get_position(), variables: trace.variables() });
+        trace.instances = store.get_actor_ids().map(id => {
+          const found = store.get_actor(id), actor = found?.value ?? found;
+          return { id, clone: actor.get_is_clone(), ...actor.get_position(), rotation: actor.get_rotation() };
+        });
         return answer;
       };
     });
     await page.getByText(/^开始$/).last().dispatchEvent("click");
     await page.waitForFunction(() => window.__actorTarget.variables()["kn-var-done"] === 1, null, { timeout: 30000 });
     Object.assign(result, await page.evaluate(() => ({ positions: window.__actorTarget.positions,
-      variables: window.__actorTarget.variables(), runtimeErrors: window.__actorTarget.runtimeErrors })));
+      variables: window.__actorTarget.variables(), instances: window.__actorTarget.instances, runtimeErrors: window.__actorTarget.runtimeErrors })));
     result.errors.push(...result.runtimeErrors);
     result.status = result.errors.length || result.page_errors.length ? "runtime-error" : "ok";
   } finally { await browser.close(); }
@@ -113,16 +158,38 @@ async function main() {
     execFileSync(binary, ["check", input, "--json"], { stdio: "pipe" });
     execFileSync(binary, ["check", output, "--json"], { stdio: "pipe" });
     files.push(output);
+    if (name.startsWith("two-scenes-")) {
+      // Re-open the same actor/procedure blocks after changing the selected
+      // scene. Do not certify persistence only in the favorable initial scene.
+      const project = JSON.parse(await readFile(output, "utf8"));
+      const current = project.scenes.currentSceneId;
+      project.scenes.currentSceneId = Object.keys(project.scenes.scenesDict).find(id => id !== current);
+      const switched = path.join(out, `${name}-switched.bcmkn`);
+      await writeFile(switched, JSON.stringify(project));
+      execFileSync(binary, ["check", switched, "--json"], { stdio: "pipe" });
+      files.push(switched);
+    }
   }
   execFileSync(process.execPath, ["tools/editor-compat.mjs", ...files, "--channel", "msedge", "--bundle-dir", out,
     "--out", path.join(out, "editor.json")], { stdio: "pipe" });
   const bundles = await readOfficialBundles(out);
   const results = {};
-  for (const name of ["target-name", "target-id", "target-self-semantic", "target-own-id"]) {
+  for (const targetFirst of [false, true]) {
+    const input = path.join(out, `two-scenes-procedure-invalid-${targetFirst}.ts`);
+    await writeFile(input, sceneProcedureSource(false, targetFirst));
+    for (const args of [["check", input, "--json"], ["build", input, "-o", path.join(out, "must-not-exist.bcmkn")]]) {
+      let rejected = false;
+      try { execFileSync(binary, args, { encoding: "utf8", stdio: "pipe" }); }
+      catch (error) { rejected = /global procedure workspace/.test(String(error.stdout) + String(error.stderr)); }
+      if (!rejected) throw new Error("Nonpersistent global procedure target was not rejected");
+    }
+  }
+  for (const name of ["target-name", "target-id", "target-self-semantic", "target-own-id", "clone-self-message", "clone-self-procedure"]) {
     const result = await runSemantic(path.join(out, `${name}.bcmkn`), bundles);
     results[name] = result;
     await writeFile(path.join(out, "official.json"), JSON.stringify(results, null, 2));
-    assertSemantic(result, name === "target-self-semantic" || name === "target-own-id");
+    if (name.startsWith("clone-")) assertCloneSemantic(result);
+    else assertSemantic(result, name === "target-self-semantic" || name === "target-own-id");
   }
   console.log("Official editor and controlled motion/collision checks passed");
 }
