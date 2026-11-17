@@ -31,6 +31,7 @@ pub fn build_report(value: &Value) -> Result<Value> {
     validate_scenes(value, &mut issues);
     validate_screen_references(value, &mut issues);
     validate_procedure_parameters(value, &mut issues);
+    issues.extend(crate::kn_actor_target::validate(value));
 
     Ok(json!({
         "ok": issues.is_empty(),
