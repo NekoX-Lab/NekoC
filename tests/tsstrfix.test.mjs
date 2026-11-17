@@ -106,6 +106,80 @@ test("tsstrfix review: unprovable UTF-16 selections fail at source rather than i
   assert.throws(() => compile('let s = "abc"; [s] = ["😀"]; console.log(s.charAt(0));'), /UTF-16|Assignment|assignment/);
 });
 
+test("tsstrfix re-review: loop and destructuring writes invalidate variable, parameter and return BMP proofs", () => {
+  const reject = (source, expression) => {
+    const offset = source.lastIndexOf(expression);
+    const prefix = source.slice(0, offset).split("\n");
+    const line = prefix.length, column = prefix.at(-1).length + 1;
+    assert.ok(offset >= 0);
+    for (const types of [false, true]) {
+      const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
+      assert.equal(checked.ok, false, source);
+      assert.ok(checked.diagnostics.some(d => d.line === line && d.column === column
+        && /UTF-16.*alternative/i.test(d.message)), JSON.stringify({ source, checked }));
+    }
+    assert.throws(() => compile(source), error => error.location.line === line && error.location.column === column
+      && /UTF-16.*alternative/i.test(error.message), source);
+  };
+  const methods = ['includes("a", 0)', 'charAt(0)', 'substring(0, 1)', 'split("", 1)'];
+  for (const method of methods) {
+    // The four reviewer paths, including proof propagation through a return.
+    reject(`let s = "abc";\nfor (s of ["😀abc"]) {\nconsole.log(s.${method});\n}`, `s.${method}`);
+    reject(`function p(s: string) {\nfor (s of ["😀abc"]) {}\nconsole.log(s.${method});\n} p("abc");`, `s.${method}`);
+    reject(`function p(): string { let s = "abc";\nfor (s of ["😀abc"]) {}\nreturn s; }\nconsole.log(p().${method});`, `p().${method}`);
+  }
+  const targets = ["s", "(s)", "(s as string)", "(<string>s)", "s!", "(s satisfies string)",
+    "[s]", "[...s]", '[s = "abc"]', "({s})", "({value: s})", "({...s})",
+    "({value: [s]})", '({value: s = "abc"})', "[(s as string)]"];
+  for (const target of targets) {
+    for (const loop of ["of", "in"]) {
+      for (const scope of ["variable", "parameter"]) {
+        const setup = scope === "variable" ? 'let s = "abc";' : 'function p(s: string) {';
+        const end = scope === "variable" ? "" : '} p("abc");';
+        reject(`${setup}\nfor (${target} ${loop} ["😀abc"]) {}\nconsole.log(s.charAt(0));\n${end}`, "s.charAt(0)");
+      }
+    }
+  }
+  for (const write of ['s = "😀"', 's += "😀"', 's ||= "😀"', 's++', '--(s as any)',
+    '[s] = ["😀"]', '({s} = {s: "😀"})', '({v: [s]} = {v: ["😀"]})',
+    '([...s] = ["😀"])', '({v: s = "abc"} = {v: "😀"})']) {
+    reject(`let s = "abc";\n${write};\nconsole.log(s.charAt(0));`, "s.charAt(0)");
+    reject(`function p(s: string) {\n${write};\nconsole.log(s.charAt(0)); } p("abc");`, "s.charAt(0)");
+  }
+  // Writes anywhere invalidate the proof, even if selection appears first.
+  reject('let s = "abc";\nconsole.log(s.charAt(0));\nfor (s of ["😀"]) {}', "s.charAt(0)");
+  reject('const s = "abc";\nfor (s of ["😀"]) {}\nconsole.log(s.charAt(0));', "s.charAt(0)");
+  // Safe simple assignments and lexical shadowing remain distinct from unknown
+  // loop/destructuring writes. Unary reads are not ++/-- writes.
+  compile('let s = "abc"; s = "xyz"; s += "中"; console.log(!s, s.charAt(0));');
+  compile('let s = "abc"; function p() { let s = "x"; for (s of ["😀"]) {} } console.log(s.charAt(0));');
+});
+
+test("tsstrfix re-review: shared write facts also invalidate bounded producers and DSL exemptions", () => {
+  for (const write of ['for (n of [bad]) {}', '[n] = [bad]', '({n} = {n: bad})', 'n++']) {
+    const source = `function n(): number { return 2; } function bad(): number { return Infinity; }\n${write};\nconsole.log("x".repeat(n()));`;
+    for (const types of [false, true]) {
+      const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
+      assert.equal(checked.ok, false, source);
+      assert.ok(checked.diagnostics.some(d => d.line === 3 && /bounded.*alternative/i.test(d.message)), JSON.stringify(checked));
+    }
+    assert.throws(() => compile(source), /bounded.*alternative/i);
+  }
+  for (const write of ['for (self of ["x"]) {}', '[self] = ["x"]', '({self} = {self: "x"})', 'self++']) {
+    const body = `${write};\nconsole.log(self.repeat(Infinity));`;
+    const source = `sprite("cat", {}, (self: any) => { ${body} });`;
+    for (const types of [false, true]) {
+      const checked = checkFile("strings.ts", { types, host: { readFile: () => source } });
+      assert.ok(checked.diagnostics.some(d => d.line === 2 && /bounded.*alternative/i.test(d.message)), JSON.stringify(checked));
+    }
+    assert.throws(() => compile(source), /bounded.*alternative/i);
+    // Unbound implicit self also needs invalidation in no-types mode.
+    const checked = checkFile("strings.ts", { types: false, host: { readFile: () => body } });
+    assert.ok(checked.diagnostics.some(d => d.line === 2 && /bounded.*alternative/i.test(d.message)), JSON.stringify(checked));
+    assert.throws(() => compile(body), /bounded.*alternative/i);
+  }
+});
+
 test("tsstrfix CLI and shared npm/browser wrapper preserve options and compatibility diagnostics", async () => {
   const wrapper = fs.readFileSync("packages/nekoc/api.mjs", "utf8")
     .replace('"./dist/frontend/compile-ts.mjs"', JSON.stringify(new URL("../ts/compile-ts.mjs", import.meta.url).href))

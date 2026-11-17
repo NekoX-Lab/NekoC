@@ -73,6 +73,11 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   `includes`/`startsWith` with an explicit position require a provably BMP-only
   receiver. The proof follows lexical initializers, all assignments, visible
   function returns and direct call arguments, not just a `string` annotation.
+  A shared symbol-based write analysis includes wrapped/destructured targets,
+  compound assignments, updates, and nondeclaration `for-of`/`for-in` targets.
+  Loop, destructuring and update writes conservatively invalidate the proof for
+  variables and parameters, even for BMP-looking loop sources; simple `=`/`+=`
+  writes can preserve a variable's proof when their values are provably BMP.
   Unknown parameters, array elements and class fields are conservatively
   rejected for these paths, with a source location and alternative. This avoids
   constructing isolated surrogate temporaries even when a search's final result
@@ -87,7 +92,9 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   or keep complete characters instead.
 - Only the actual symbol bound by a `sprite` callback is a DSL receiver; naming
   an ordinary variable/parameter `self`, or asserting `any`, does not exempt it
-  from growth validation. Validated dynamic growth is lowered immediately into
+  from growth validation. Any write (including loops/destructuring/updates) also
+  invalidates a DSL receiver exemption or a bounded function-producer proof.
+  Validated dynamic growth is lowered immediately into
   a bounded helper; any remaining string repeat/padding at final lowering fails
   closed instead of generating an unchecked loop.
 - String methods reject extra/spread arguments instead of silently discarding

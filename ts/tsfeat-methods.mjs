@@ -38,13 +38,53 @@ export function lowerTsMethods(sourceFile) {
   };
   collect(sourceFile);
   const helpers = [];
-  const reassigned = new Set();
+  const unwrap = node => {
+    while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)
+      || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)
+      || ts.isSatisfiesExpression(node))) node = node.expression;
+    return node;
+  };
+  // One source of write facts for all safety proofs. Unbound names also matter
+  // in no-types mode (notably the implicit DSL self); do not collapse them to an
+  // undefined symbol shared by unrelated identifiers.
+  const bindingKey = node => (ts.isShorthandPropertyAssignment(node.parent)
+    ? checker.getShorthandAssignmentValueSymbol(node.parent) : checker.getSymbolAtLocation(node)) ?? node.text;
+  const writes = new Map();
+  const writeTarget = (target, fact) => {
+    target = unwrap(target);
+    if (ts.isIdentifier(target)) {
+      const key = bindingKey(target);
+      const facts = writes.get(key) ?? [];
+      facts.push(fact);
+      writes.set(key, facts);
+    } else if (ts.isArrayLiteralExpression(target) || ts.isArrayBindingPattern(target)) {
+      for (const element of target.elements) writeTarget(element, null);
+    } else if (ts.isObjectLiteralExpression(target) || ts.isObjectBindingPattern(target)) {
+      for (const property of target.properties ?? target.elements) writeTarget(property, null);
+    } else if (ts.isPropertyAssignment(target)) {
+      writeTarget(target.initializer, null);
+    } else if (ts.isShorthandPropertyAssignment(target)) {
+      writeTarget(target.name, null);
+    } else if (ts.isSpreadElement(target) || ts.isSpreadAssignment(target)) {
+      writeTarget(target.expression, null);
+    } else if (ts.isBindingElement(target)) {
+      writeTarget(target.name, null);
+    } else if (ts.isBinaryExpression(target) && target.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+      writeTarget(target.left, null); // destructuring default, not a known source
+    }
+    // Property/element writes mutate a container, not its base binding. Such
+    // reads are already excluded from the primitive BMP proof.
+  };
   const findWrites = node => {
     if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment
       && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
-      let left = node.left;
-      while (ts.isParenthesizedExpression(left) || ts.isAsExpression(left) || ts.isNonNullExpression(left)) left = left.expression;
-      if (ts.isIdentifier(left)) reassigned.add(checker.getSymbolAtLocation(left));
+      writeTarget(node.left, { operator: node.operatorToken.kind, value: node.right });
+    } else if ((ts.isPrefixUnaryExpression(node) || ts.isPostfixUnaryExpression(node))
+      && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator)) {
+      writeTarget(node.operand, null);
+    } else if ((ts.isForOfStatement(node) || ts.isForInStatement(node))
+      && !ts.isVariableDeclarationList(node.initializer)) {
+      writeTarget(node.initializer, null); // loop/destructured sources stay unknown
     }
     ts.forEachChild(node, findWrites);
   };
@@ -73,12 +113,6 @@ export function lowerTsMethods(sourceFile) {
     error.location = { file: sourceFile.fileName, line: line + 1, column: character + 1 };
     throw error;
   };
-  const unwrap = node => {
-    while (node && (ts.isParenthesizedExpression(node) || ts.isAsExpression(node)
-      || ts.isTypeAssertionExpression(node) || ts.isNonNullExpression(node)
-      || ts.isSatisfiesExpression(node))) node = node.expression;
-    return node;
-  };
   const unshadowed = (node, name) => ts.isIdentifier(node) && node.text === name
     && !checker.getSymbolAtLocation(node)?.declarations?.length;
   const globalMember = (node, owner, member) => ts.isPropertyAccessExpression(node)
@@ -97,7 +131,8 @@ export function lowerTsMethods(sourceFile) {
       if (unshadowed(node, "undefined")) return undefined;
       const declaration = checker.getSymbolAtLocation(node)?.valueDeclaration;
       if (!declaration || !ts.isVariableDeclaration(declaration) || seen.has(declaration)
-        || !(declaration.parent.flags & ts.NodeFlags.Const) || declaration.end > node.pos) return UNKNOWN;
+        || !(declaration.parent.flags & ts.NodeFlags.Const) || declaration.end > node.pos
+        || writes.has(bindingKey(node))) return UNKNOWN;
       const next = new Set(seen).add(declaration);
       const value = constant(declaration.initializer, next);
       // A const array is still mutable (including through aliases).
@@ -216,7 +251,7 @@ export function lowerTsMethods(sourceFile) {
       return a && b ? [...a, ...b] : null;
     }
     if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
-      if (reassigned.has(checker.getSymbolAtLocation(node.expression))) return null;
+      if (writes.has(bindingKey(node.expression))) return null;
       const declaration = checker.getSymbolAtLocation(node.expression)?.valueDeclaration;
       if (ts.isVariableDeclaration(declaration ?? {}) && !(declaration.parent.flags & ts.NodeFlags.Const)) return null;
       const fn = ts.isVariableDeclaration(declaration ?? {}) ? unwrap(declaration.initializer) : declaration;
@@ -283,20 +318,9 @@ export function lowerTsMethods(sourceFile) {
       next.add(declaration);
       if (ts.isVariableDeclaration(declaration) && declaration.initializer) {
         if (!bmp(declaration.initializer, next)) return false;
-        return (references.get(symbol) ?? []).every(ref => {
-          let use = ref;
-          while (use.parent && unwrap(use.parent) === ref) use = use.parent;
-          const parent = use.parent;
-          let target = use;
-          while (target.parent && (ts.isArrayLiteralExpression(target.parent) || ts.isObjectLiteralExpression(target.parent)
-            || ts.isPropertyAssignment(target.parent) || ts.isSpreadElement(target.parent))) target = target.parent;
-          if (target !== use && ts.isBinaryExpression(target.parent) && target.parent.left === target) return false;
-          if (ts.isBinaryExpression(parent) && parent.left === use
-            && parent.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && parent.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
-            return [ts.SyntaxKind.EqualsToken, ts.SyntaxKind.PlusEqualsToken].includes(parent.operatorToken.kind) && bmp(parent.right, next);
-          }
-          return !(ts.isPrefixUnaryExpression(parent) || ts.isPostfixUnaryExpression(parent));
-        });
+        return (writes.get(symbol) ?? []).every(fact => fact
+          && [ts.SyntaxKind.EqualsToken, ts.SyntaxKind.PlusEqualsToken].includes(fact.operator)
+          && bmp(fact.value, next));
       }
       if (ts.isParameter(declaration) && ts.isFunctionDeclaration(declaration.parent) && declaration.parent.name) {
         const fn = declaration.parent;
@@ -304,7 +328,7 @@ export function lowerTsMethods(sourceFile) {
         const fnSymbol = checker.getSymbolAtLocation(fn.name);
         const index = fn.parameters.indexOf(declaration);
         const calls = (references.get(fnSymbol) ?? []).filter(ref => ref !== fn.name);
-        return calls.length > 0 && !reassigned.has(symbol) && calls.every(ref => {
+        return calls.length > 0 && !writes.has(symbol) && calls.every(ref => {
           const call = ref.parent;
           return ts.isCallExpression(call) && call.expression === ref && call.arguments[index] && bmp(call.arguments[index], next);
         });
@@ -319,7 +343,7 @@ export function lowerTsMethods(sourceFile) {
       if (ts.isIdentifier(node.expression)) {
         const symbol = checker.getSymbolAtLocation(node.expression);
         const fn = symbol?.valueDeclaration;
-        if (!fn || !ts.isFunctionDeclaration(fn) || !fn.body || reassigned.has(symbol)) return false;
+        if (!fn || !ts.isFunctionDeclaration(fn) || !fn.body || writes.has(symbol)) return false;
         if (next.has(fn)) return true; // recursive edges cannot introduce text by themselves
         next.add(fn);
         let found = false, safe = true;
@@ -335,9 +359,10 @@ export function lowerTsMethods(sourceFile) {
     return false;
   };
   const dslReceiver = receiver => {
-    if (unshadowed(unwrap(receiver), "self")) return true; // implicit DSL global, never a lexical binding
-    const symbol = ts.isIdentifier(unwrap(receiver)) && checker.getSymbolAtLocation(unwrap(receiver));
-    if (reassigned.has(symbol)) return false;
+    receiver = unwrap(receiver);
+    if (!ts.isIdentifier(receiver) || writes.has(bindingKey(receiver))) return false;
+    if (unshadowed(receiver, "self")) return true; // unwritten implicit DSL global
+    const symbol = checker.getSymbolAtLocation(receiver);
     const declaration = symbol?.valueDeclaration;
     if (!declaration || !ts.isParameter(declaration)) return false;
     const callback = declaration.parent;

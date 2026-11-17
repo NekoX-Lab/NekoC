@@ -101,6 +101,24 @@ function unicodeSearch(value: string) {
 }
 unicodeSearch(unicode);
 unicode = "🙂,xyz"; unicodeSearch(unicode);
+// A loop write invalidates BMP proof, but not the native whole-character paths.
+let loopText = "abc";
+for (loopText of ["😀,abc", "🙂,xyz"]) {
+  console.log(loopText.includes("a")); console.log(loopText.startsWith("😀"));
+  console.log(loopText.split(",", 1).join("|"));
+}
+function loopParameter(value: string) {
+  for (value of ["😀,abc"]) console.log(value.includes("a"));
+}
+loopParameter("abc");
+function loopReturn(): string {
+  let value = "abc";
+  for (value of ["😀,abc"]) {}
+  return value;
+}
+console.log(loopReturn().includes("a")); console.log(loopReturn().split(",").join("|"));
+let bmpWrites = "abc"; bmpWrites = "中文"; bmpWrites += "字";
+console.log(bmpWrites.charAt(0)); console.log(bmpWrites.includes("字", 1));
 // Hot procedure paths, without wall-clock assertions.
 for (let hot = 0; hot < 700; hot++) console.log(s.substring(0, 1));
 `;
