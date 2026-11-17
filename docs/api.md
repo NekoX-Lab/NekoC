@@ -160,6 +160,9 @@ without narrowing, `x!` on a maybe-null value, `?.` on call results, `f?.()`,
   means zero. Omitted deleteCount deletes to the end; no arguments is a no-op.
   Multiple inserted references retain their order and identity. Non-numeric or
   explicit undefined bounds are diagnosed with conversion/omission hints.
+  Numeric type parameter constraints (including constraint chains such as
+  `T extends number, U extends T`) are accepted for start and deleteCount;
+  unconstrained or mixed number/string parameters still require narrowing.
   This does not add the deleted-items return value, sparse arrays or coercion.
 - Array `includes`, `indexOf` and `lastIndexOf` accept a numeric `fromIndex`.
   Fractions truncate toward zero, negatives count from the end, NaN starts at

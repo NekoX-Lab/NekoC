@@ -2714,13 +2714,10 @@ class WorkspaceCompiler {
       const constant = this.inlineConstantExpression(expression);
       if (constant) {
         bindings.set(fn.params[index], constant);
-      } else if (this.isArrayExpression(expression) && expression === call.arguments[index]) {
-        // Preserve the legacy direct-argument alias for DSL wrappers. Defaults
-        // and already-frozen arguments must instead be evaluated in order below;
-        // storing a list in a procedure parameter keeps the same reference.
-        bindings.set(fn.params[index], expression);
-        bindings.callerScope.add(fn.params[index]);
       } else {
+        // Arrays also need evaluation when unused, and a later argument can
+        // reassign the source variable. Procedure parameters freeze references
+        // without copying their contents. Resource/name literals stay above.
         inputs.push(expression);
         params.push(fn.params[index]);
       }

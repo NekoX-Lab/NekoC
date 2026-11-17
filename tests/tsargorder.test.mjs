@@ -12,7 +12,7 @@ const run = (command, args) => {
   assert.equal(result.status, 0, result.stderr || result.stdout);
   return result.stdout;
 };
-for (const name of ["defaults", "procedures", "classes", "plain-classes", "modules", "splice"]) {
+for (const name of ["defaults", "procedures", "classes", "plain-classes", "modules", "splice", "generic", "unused-arrays"]) {
   test(`tsargorder: ${name} matches Node and passes structural/share checks`, async () => {
     const input = `tests/fixtures/tsargorder-${name}.ts`;
     const checked = checkFile(input);
@@ -37,6 +37,9 @@ for (const source of [
   'let a = [1]; a.splice("1", 0);',
   'let a = [1]; a.splice(1, undefined);',
   'let a = [1]; a.splice(...[1, 0]);',
+  'function f<T extends string>(n: T) { const a = [1]; a.splice(n, 0); } f("1");',
+  'function f<T>(n: T) { const a = [1]; a.splice(0, n); } f(1);',
+  'function f<T extends number | string>(n: T) { const a = [1]; a.splice(n, 0); } f(1);',
 ]) test(`tsargorder: unsupported arguments stay located and actionable: ${source}`, () => {
   assert.throws(() => compileFile("tsargorder.ts", { readFile: () => source }), error =>
     error instanceof CompileError && error.location?.line === 1 && /constant|omit|pass|convert/.test(error.message));

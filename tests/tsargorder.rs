@@ -11,6 +11,8 @@ fn calls_and_splice_match_node_in_both_modes_and_optimizations_including_native_
         "plain-classes",
         "modules",
         "splice",
+        "generic",
+        "unused-arrays",
     ] {
         let input = format!("tests/fixtures/tsargorder-{name}.ts");
         let oracle = Command::new("node")
