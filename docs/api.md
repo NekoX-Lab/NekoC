@@ -58,8 +58,11 @@ astral receiver produces a located compile error: use a nonempty constant search
 or a constant BMP-only receiver. This conservative rule also applies when the
 replacement is empty. RegExp searches, callback replacers, coercion, spread,
 missing arguments and extra arguments produce located diagnostics; use the two
-string arguments instead. Isolated surrogate literals in the receiver, search
-or replacement are rejected with a hint to use complete Unicode characters.
+string arguments instead. Isolated surrogate literals anywhere in source (also
+in `let` initializers, templates and imported modules) are rejected before
+lowering/JSON serialization with their original coordinates and a hint to use
+complete Unicode characters. Replacement diagnostics also retain the original
+call coordinates inside class methods and nullable optional calls.
 The ES2020 declarations include the implemented
 `replaceAll` overload for CLI, npm and browser checking.
 

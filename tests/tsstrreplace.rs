@@ -104,3 +104,80 @@ fn unsupported_overloads_fail_check_and_build_without_emitting_a_work() {
         }
     }
 }
+
+#[test]
+fn cli_reports_original_coordinates_before_nullable_and_class_rewrites() {
+    let dir = tempfile::tempdir().unwrap();
+    for (index, (source, line, column, message)) in [
+        (
+            "let s: string | null = \"😀\";\nconsole.log(s?.replaceAll(\"\", \"X\"));",
+            2,
+            13,
+            "UTF-16",
+        ),
+        (
+            "class A {\n  s: string = \"abc\";\n  f(): string {\n    return this.s.replace(\"b\", () => \"X\");\n  }\n}\nconsole.log(new A().f());",
+            4,
+            12,
+            "exactly two string arguments",
+        ),
+        (
+            "class A {\n  s: string = \"abc\";\n  f(): string {\n    return this.s.replace(/b/, \"X\");\n  }\n}\nconsole.log(new A().f());",
+            4,
+            12,
+            "exactly two string arguments",
+        ),
+        (
+            "let search: string = \"\\uD83D\";\nconsole.log(\"😀\".replace(search, \"X\"));",
+            1,
+            22,
+            "complete Unicode",
+        ),
+        (
+            "let replacement: string = \"\\uD83D\";\nconsole.log(\"😀\".replace(\"😀\", replacement));",
+            1,
+            27,
+            "complete Unicode",
+        ),
+    ]
+    .iter()
+    .enumerate()
+    {
+        let input = dir.path().join(format!("location-{index}.ts"));
+        fs::write(&input, source).unwrap();
+        for types in [false, true] {
+            let mut check = Command::new(env!("CARGO_BIN_EXE_nekoc"));
+            check.arg("check").arg(&input).arg("--json");
+            if !types {
+                check.arg("--no-types");
+            }
+            let result = check.output().unwrap();
+            assert!(!result.status.success(), "{result:?}");
+            let checked: Value = serde_json::from_slice(&result.stdout).unwrap();
+            let diagnostic = checked["diagnostics"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|d| d["source"] == "compat")
+                .unwrap();
+            assert_eq!(diagnostic["line"], *line);
+            assert_eq!(diagnostic["column"], *column);
+            assert!(diagnostic["message"].as_str().unwrap().contains(message));
+        }
+        for optimize in [false, true] {
+            let output = dir.path().join(format!("location-{index}-{optimize}.bcmkn"));
+            let mut build = Command::new(env!("CARGO_BIN_EXE_nekoc"));
+            build.arg("build").arg(&input).arg("-o").arg(&output);
+            if optimize {
+                build.arg("--optimize");
+            }
+            let result = build.output().unwrap();
+            assert!(!result.status.success(), "{result:?}");
+            let stderr = String::from_utf8_lossy(&result.stderr);
+            assert!(stderr.contains(&format!(":{line}:{column}:")), "{stderr}");
+            assert!(stderr.contains(message), "{stderr}");
+            assert!(!stderr.contains("invalid JSON"), "{stderr}");
+            assert!(!output.exists());
+        }
+    }
+}

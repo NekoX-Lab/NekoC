@@ -171,6 +171,7 @@ export function createExpressionTypes(files, declarations = "", path = portableP
   const objects = new WeakSet();
   const concatKinds = new WeakMap();
   const stringConstants = new WeakMap();
+  const nonNullableKinds = new WeakMap();
   const stringConstant = (node, seen = new Set()) => {
     if (!node || seen.has(node)) return null;
     seen.add(node);
@@ -199,9 +200,10 @@ export function createExpressionTypes(files, declarations = "", path = portableP
         kinds.set(node, expressionKind(node));
         const type = checker.getTypeAtLocation(node);
         if (checker.isArrayType(type) || checker.isTupleType(type)) arrays.add(node);
-        if (type.flags & ts.TypeFlags.Object) objects.add(node);
+        if (checker.getNonNullableType(type).flags & ts.TypeFlags.Object) objects.add(node);
         concatKinds.set(node, concatKind(declaredReadType(node) ?? type));
         stringConstants.set(node, stringConstant(node));
+        nonNullableKinds.set(node, classify(checker.getNonNullableType(declaredReadType(node) ?? type)));
       }
       ts.forEachChild(node, visit);
     };
@@ -215,6 +217,7 @@ export function createExpressionTypes(files, declarations = "", path = portableP
   result.object = node => objects.has(node && ts.getOriginalNode(node));
   result.concatKind = node => concatKinds.get(node && ts.getOriginalNode(node));
   result.stringConstant = node => stringConstants.get(node && ts.getOriginalNode(node)) ?? null;
+  result.nonNullableKind = node => nonNullableKinds.get(node && ts.getOriginalNode(node));
   return result;
 }
 

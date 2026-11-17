@@ -4,6 +4,7 @@ import path from "node:path";
 import vm from "node:vm";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import ts from "typescript";
+import { diagnosticCases } from "./tsstrreplace-diagnostics.mjs";
 
 const context = vm.createContext({ URL });
 const cache = new Map();
@@ -33,4 +34,25 @@ for (const expression of ['"abc".replace(/b/, "X")', '"abc".replaceAll("b", () =
   assert.equal(checked.ok, false);
   assert.equal(checked.diagnostics.find(d => d.source === "compat").line, 2);
   assert.throws(() => api.compile("/main.ts", { files }), /String.replace/);
+}
+for (const item of diagnosticCases) {
+  for (const imported of [false, true]) {
+    const file = imported ? "/lib.ts" : "/main.ts";
+    const files = imported ? { "/main.ts": 'import { value } from "./lib"; console.log(value());', [file]: item.source + '\nexport function value() { return 1; }' } : { [file]: item.source };
+    for (const types of [false, true]) {
+      const checked = api.check("/main.ts", { files, types });
+      assert.equal(checked.ok, false);
+      const diagnostic = checked.diagnostics.find(d => d.source === "compat");
+      assert.match(diagnostic.message, item.message);
+      assert.equal(diagnostic.file, file);
+      assert.equal(diagnostic.line, item.line);
+      assert.equal(diagnostic.column, item.column);
+    }
+    assert.throws(() => api.compile("/main.ts", { files }), error => {
+      assert.equal(error.location.file, file);
+      assert.equal(error.location.line, item.line);
+      assert.equal(error.location.column, item.column);
+      return true;
+    });
+  }
 }

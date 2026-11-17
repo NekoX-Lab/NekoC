@@ -40,6 +40,7 @@ function fail(message, location = null, code = "NEKOC") {
 }
 
 const helperOrigins = new WeakMap();
+const frontendOriginals = new WeakMap();
 
 function nodeLocation(node) {
   const origin = node && (helperOrigins.get(node) ?? helperOrigins.get(ts.getOriginalNode(node)));
@@ -90,13 +91,20 @@ function lowerFrontendFeatures(sourceFile) {
     rejectAsyncSyntax(sourceFile);
     // Validate raw entry/module identifiers before lexical renaming or helper
     // registration can hide a collision with the compiler's bitwise procedures.
-    const reserveBitwiseNames = node => {
+    const validateRawSyntax = node => {
       if (ts.isIdentifier(node) && node.text.startsWith("__nekocBit_")) {
         fail("Names starting with __nekocBit_ are reserved for bitwise lowering; rename this identifier", nodeLocation(node));
       }
-      ts.forEachChild(node, reserveBitwiseNames);
+      // JSON/Rust strings cannot represent lone UTF-16 units, even when a
+      // literal reaches a replacement through a mutable variable or import.
+      if ((ts.isStringLiteralLike(node) || ts.isTemplateHead(node)
+        || ts.isTemplateMiddle(node) || ts.isTemplateTail(node))
+        && /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(node.text)) {
+        fail("String literals cannot preserve isolated UTF-16 surrogates; use complete Unicode characters instead", nodeLocation(node));
+      }
+      ts.forEachChild(node, validateRawSyntax);
     };
-    reserveBitwiseNames(sourceFile);
+    validateRawSyntax(sourceFile);
     const classes = lowerTsClasses(lowerTsNullable(lowerTsCollections(sourceFile)));
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
@@ -121,6 +129,7 @@ function lowerFrontendFeatures(sourceFile) {
         if (origin) mark(statement, origin);
       }
     }
+    frontendOriginals.set(lowered, sourceFile);
     return lowered;
   } catch (error) {
     if (error instanceof CompileError) throw error;
@@ -195,6 +204,7 @@ class WorkspaceCompiler {
     // Type queries use the last parsed file: tsfeat transforms may leave
     // synthesized nodes that the TypeScript checker cannot bind.
     this.typeSourceFiles = new Map([[this.entryPath, ts.getOriginalNode(sourceFile)]]);
+    this.replacementSourceFiles = new Map([[this.entryPath, frontendOriginals.get(sourceFile) ?? sourceFile]]);
     this.loopDepth = 0;
     this.tryStack = [];
     this.rangeBindings = [];
@@ -221,6 +231,42 @@ class WorkspaceCompiler {
       // TypeScript's own lib files come from the installed package when one
       // exists; a catch-all memory host must not replace them with user code.
       name => defaultHost.readFile(name) ?? this.host.readFile(name));
+    // Nullable/class lowering reprints source and can retain only method-level
+    // origins. Validate replacement calls on untouched, fully loaded modules so
+    // diagnostics identify the actual call, not generated text or a declaration.
+    const replacementCalls = [];
+    const collectReplacement = node => {
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+        && ["replace", "replaceAll"].includes(node.expression.name.text)
+        && !selfListHandleCall(node)) replacementCalls.push(node);
+      ts.forEachChild(node, collectReplacement);
+    };
+    for (const file of this.replacementSourceFiles.values()) collectReplacement(file);
+    const replacementTypes = replacementCalls.length ? createExpressionTypes(this.replacementSourceFiles,
+      this.host.readFile(DECLARATIONS) ?? defaultHost.readFile(DECLARATIONS) ?? "", path,
+      name => defaultHost.readFile(name) ?? this.host.readFile(name)) : null;
+    const validateReplacement = node => {
+      if (!replacementTypes.object(node.expression.expression)) {
+        const method = node.expression.name.text;
+        const receiver = node.expression.expression;
+        // Null safety (including narrowing/optional short-circuiting) belongs to
+        // the nullable pass. Here inspect only the present string overload.
+        const receiverKind = replacementTypes.nonNullableKind(receiver);
+        if (node.arguments.length !== 2 || node.arguments.some(ts.isSpreadElement)
+          || receiverKind !== "string" || node.arguments.some(value => replacementTypes.nonNullableKind(value) !== "string")) {
+          this.unsupported(node, `String.${method} supports exactly two string arguments; use a string search and string replacement instead of RegExp, a replacer function, coercion or spread`);
+        }
+        if (method === "replaceAll") {
+          const search = replacementTypes.stringConstant(node.arguments[0]);
+          const text = replacementTypes.stringConstant(receiver);
+          if (!(search !== null && search.length > 0)
+            && (text === null || /[\uD800-\uDFFF]/.test(text))) {
+            this.unsupported(node, "String.replaceAll with a possibly empty search requires a constant BMP-only receiver: empty matches advance by UTF-16 code unit and may split surrogate pairs; use a nonempty constant string search or a constant BMP-only receiver");
+          }
+        }
+      }
+    };
+    for (const call of replacementCalls) validateReplacement(call);
     // Callback bodies are copied into generated helper ASTs below. Validate
     // user additions before copying so an any/union type cannot lose its type
     // information and accidentally fall back to numeric helper lowering.
@@ -236,31 +282,6 @@ class WorkspaceCompiler {
       }
       if (ts.isBinaryExpression(node) && [ts.SyntaxKind.PlusToken, ts.SyntaxKind.PlusEqualsToken].includes(node.operatorToken.kind)) {
         this.additionIsString(node.left, node.right);
-      }
-      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
-        && ["replace", "replaceAll"].includes(node.expression.name.text)
-        && !selfListHandleCall(node)
-        && !this.expressionType.object(node.expression.expression)) {
-        const method = node.expression.name.text;
-        const values = [node.expression.expression, ...node.arguments];
-        if (node.arguments.length !== 2 || node.arguments.some(ts.isSpreadElement)
-          || values.some(value => this.expressionType(value) !== "string")) {
-          this.unsupported(node, `String.${method} supports exactly two string arguments; use a string search and string replacement instead of RegExp, a replacer function, coercion or spread`);
-        }
-        for (const value of values) {
-          const text = this.expressionType.stringConstant(value);
-          if (text !== null && /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(text)) {
-            this.unsupported(value, `String.${method} cannot preserve isolated UTF-16 surrogates; use complete Unicode characters in the receiver, search and replacement`);
-          }
-        }
-        if (method === "replaceAll") {
-          const search = this.expressionType.stringConstant(node.arguments[0]);
-          const receiver = this.expressionType.stringConstant(node.expression.expression);
-          if (!(search !== null && search.length > 0)
-            && (receiver === null || /[\uD800-\uDFFF]/.test(receiver))) {
-            this.unsupported(node, "String.replaceAll with a possibly empty search requires a constant BMP-only receiver: empty matches advance by UTF-16 code unit and may split surrogate pairs; use a nonempty constant string search or a constant BMP-only receiver");
-          }
-        }
       }
       ts.forEachChild(node, validateAddition);
     };
@@ -469,6 +490,7 @@ class WorkspaceCompiler {
       );
       rejectParseDiagnostics(moduleSourceFile);
       moduleSourceFile = lowerFrontendFeatures(moduleSourceFile);
+      this.replacementSourceFiles.set(resolvedPath, frontendOriginals.get(moduleSourceFile) ?? moduleSourceFile);
       this.objectSourceFiles.push(moduleSourceFile);
       this.typeSourceFiles.set(resolvedPath, ts.getOriginalNode(moduleSourceFile));
       this.loadImports(moduleSourceFile, resolvedPath);

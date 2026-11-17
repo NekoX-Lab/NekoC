@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 import { compileFile, checkFile } from "../ts/compile-ts.mjs";
 import { readManifest } from "../tools/compat/kn-share-player-check.mjs";
+import { diagnosticCases } from "./tsstrreplace-diagnostics.mjs";
 
 const entry = path.resolve("tsstrreplace-main.ts");
 const fixture = fs.readFileSync(new URL("fixtures/tsstrreplace.ts", import.meta.url), "utf8");
@@ -89,10 +90,51 @@ test("tsstrreplace imported functions preserve the same argument validation", ()
   });
 });
 
+test("tsstrreplace diagnostics retain original class/nullable/literal coordinates in all frontend entrypoints", () => {
+  const parent = path.join(root, "dist/tsstrreplace-revision");
+  fs.mkdirSync(parent, { recursive: true });
+  const dir = fs.mkdtempSync(path.join(parent, "diagnostics-"));
+  try {
+    for (const item of diagnosticCases) {
+      const file = path.join(dir, `${item.name}.ts`);
+      fs.writeFileSync(file, item.source);
+      const assertLocation = error => {
+        assert.match(error.message, item.message);
+        assert.equal(path.resolve(error.location.file), file);
+        assert.equal(error.location.line, item.line);
+        assert.equal(error.location.column, item.column);
+        return true;
+      };
+      assert.throws(() => compileFile(file), assertLocation);
+      for (const types of [false, true]) {
+        const checked = checkFile(file, { types });
+        assert.equal(checked.ok, false);
+        const diagnostic = checked.diagnostics.find(d => d.source === "compat");
+        assertLocation({ message: diagnostic.message, location: diagnostic });
+        const result = spawnSync(process.execPath, ["ts/compile-ts.mjs", "--check", "--json", ...(types ? [] : ["--no-types"]), file], { encoding: "utf8" });
+        assert.equal(result.status, 1, result.stderr);
+        const cli = JSON.parse(result.stdout).diagnostics.find(d => d.source === "compat");
+        assertLocation({ message: cli.message, location: cli });
+      }
+      // Imports retain their own untouched file, not just the entry's text.
+      const main = path.join(dir, "main.ts");
+      fs.appendFileSync(file, '\nexport function value() { return 1; }');
+      fs.writeFileSync(main, `import { value } from "./${item.name}"; console.log(value());`);
+      assert.throws(() => compileFile(main), assertLocation);
+    }
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
+
 test("tsstrreplace string validation leaves the typed named-list replace API available", () => {
   const report = compileFile(path.resolve("samples/typed_self_api.ts"));
   assert.ok(report.resources.sprites.length > 0);
   assert.doesNotThrow(() => compileFile(entry, guidance('onStart(() => { self.list("items").replace("index", 1, 2); });')));
+  for (const source of [
+    'let s: string | null = null; console.log(s?.replace("a", "X") ?? "NULL");',
+    'let s: string | null = "abc"; if (s !== null) console.log(s.replace("b", "X"));',
+    'class A { replace(n: number): number { return n + 1; } } console.log(new A().replace(2));',
+    'class A { s: string = "abc"; f(): string { return this.s.replace("b", "X"); } } console.log(new A().f());',
+  ]) assert.doesNotThrow(() => compileFile(entry, guidance(source)));
 });
 
 test("tsstrreplace check/build and npm/browser accept the same string overloads", async () => {
@@ -122,6 +164,22 @@ test("tsstrreplace check/build and npm/browser accept the same string overloads"
       const files = { "/main.ts": `console.log(${expression});` };
       assert.equal(frontend.check("/main.ts", { files }).ok, false, expression);
       assert.throws(() => frontend.compile("/main.ts", { files }), message);
+    }
+    for (const item of diagnosticCases) {
+      const files = { "/main.ts": item.source };
+      for (const types of [false, true]) {
+        const checked = frontend.check("/main.ts", { files, types });
+        assert.equal(checked.ok, false);
+        const diagnostic = checked.diagnostics.find(d => d.source === "compat");
+        assert.match(diagnostic.message, item.message);
+        assert.equal(diagnostic.line, item.line);
+        assert.equal(diagnostic.column, item.column);
+      }
+      assert.throws(() => frontend.compile("/main.ts", { files }), error => {
+        assert.equal(error.location.line, item.line);
+        assert.equal(error.location.column, item.column);
+        return true;
+      });
     }
     const browser = spawnSync(process.execPath, ["--experimental-vm-modules", "tests/tsstrreplace-browser.mjs", dir], { encoding: "utf8" });
     assert.equal(browser.status, 0, browser.stdout + browser.stderr);
