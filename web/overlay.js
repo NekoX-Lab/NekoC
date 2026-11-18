@@ -40,6 +40,14 @@ const STYLE = `
 .neko-ask.k4-choice .choices button{height:var(--choice-height);padding:0;border:calc(1 * var(--neko-unit)) solid #d8d8d8;background:#fff;color:#000;border-radius:calc(9 * var(--neko-unit));font-size:calc(22 * var(--neko-unit));font-weight:normal;opacity:.9999}
 .neko-ask.k4-choice .choices button:hover{background:#297eff;color:#fff}`;
 
+// KN saves each monitor's top-left corner in stage pixels (variablesDict[id].position);
+// the official player draws it there instead of stacking widgets in a corner.
+export function knMonitorPosition(project, id) {
+  const position = project?.variables?.variablesDict?.[id]?.position;
+  const x = Number(position?.x), y = Number(position?.y);
+  return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
+}
+
 export class StageOverlay {
   constructor(box, renderer, onAnswer) {
     if (!document.getElementById('neko-overlay-style')) {
@@ -79,15 +87,19 @@ export class StageOverlay {
   }
   apply(frame) {
     this.root.style.setProperty('--neko-unit', `${100 / this.renderer.width}cqw`);
-    this.monitors.style.left = this.monitors.style.top = this.renderer.kitten4 ? '0' : '';
     const monitors = frame.monitors || [], key = JSON.stringify([monitors,frame.cloud_ui?.lists]);
+    const placed = !this.renderer.kitten4 && monitors.some(m => knMonitorPosition(this.project, m.id));
+    this.monitors.style.left = this.monitors.style.top = this.renderer.kitten4 || placed ? '0' : '';
     if (key !== this.monitorKey) {
       this.monitorKey = key;
       this.monitors.replaceChildren(...monitors.map(m => {
         const canvas = this.renderer.monitorCanvas?.(m,frame.cloud_ui); if (canvas) return canvas;
         const row = document.createElement('div'); row.className = `neko-monitor${m.list ? ' list' : ''}`;
         const name = document.createElement('b'), value = document.createElement('span');
-        name.textContent = m.name; value.textContent = m.value; row.append(name, value); return row;
+        name.textContent = m.name; value.textContent = m.value; row.append(name, value);
+        const at = this.renderer.kitten4 ? null : knMonitorPosition(this.project, m.id);
+        if (at) row.style.cssText = `position:absolute;left:calc(${at.x} * var(--neko-unit));top:calc(${at.y} * var(--neko-unit))`;
+        return row;
       }));
     }
     const ask = frame.ask || null;
