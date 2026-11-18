@@ -78,7 +78,7 @@ pub fn check_project_shape(project: &Value) -> Result<()> {
     ensure!(project.is_object(), "expected project object");
     if let Some(tool) = project.get("toolType") {
         ensure!(
-            tool == "KN",
+            tool.as_str().is_some_and(crate::bcmkn::is_kn_tool_type),
             "编辑器需要规范 KN JSON；Kitten4 .bcm 请使用导入"
         );
     }

@@ -9,11 +9,18 @@ pub fn import(value: impl Into<crate::json::Json>) -> Result<(crate::json::Json,
     let value = value.into();
     crate::json::expanded(|| import_inner(value))
 }
+/// Official KN editions share one project format; the editor's tool-type enum
+/// is KN, TANYUE_KN, GUYU_KN and EXAM_KN, and all of them play in
+/// kn.codemao.cn/player.
+pub fn is_kn_tool_type(tool: &str) -> bool {
+    matches!(tool, "KN" | "TANYUE_KN" | "GUYU_KN" | "EXAM_KN")
+}
+
 fn import_inner(value: crate::json::Json) -> Result<(crate::json::Json, Value)> {
     let _timing = crate::import_perf::span("diagnostics_coverage");
     ensure!(value.is_object(), ".bcmkn 顶层必须是 JSON 对象");
     ensure!(
-        value["toolType"].as_str().is_none_or(|t| t == "KN"),
+        value["toolType"].as_str().is_none_or(is_kn_tool_type),
         "不是 Kitten N 项目（toolType 应为 KN）"
     );
     for path in ["/scenes/scenesDict", "/actors/actorsDict"] {

@@ -28,7 +28,12 @@ fn main() -> Result<()> {
         .context("Usage: kn-trace <native.bcmkn>")?;
     let source = std::fs::read_to_string(input)?;
     let project: Value = serde_json::from_str(&source)?;
-    ensure!(project["toolType"] == "KN", "expected a native KN project");
+    ensure!(
+        project["toolType"]
+            .as_str()
+            .is_some_and(nekoc::bcmkn::is_kn_tool_type),
+        "expected a native KN project"
+    );
     let mut engine = Engine::new(Program::compile(&project)?);
     engine.use_virtual_clock();
     engine.start();
