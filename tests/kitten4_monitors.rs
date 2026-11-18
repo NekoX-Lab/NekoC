@@ -99,9 +99,10 @@ fn initial_and_script_monitor_frames_match_official_widgets() {
 }
 
 /// Canonical edits remain authoritative; metadata provenance is not a frozen
-/// runtime copy. Removing K4 provenance must not enable this K4-only behavior.
+/// runtime copy. Without K4 provenance the project runs as KN, whose official
+/// player (kn.codemao.cn/player) also shows saved visible monitors at start.
 #[test]
-fn canonical_visibility_edits_apply_but_kn_behavior_stays_unchanged() {
+fn canonical_visibility_edits_apply_in_k4_and_kn() {
     let mut project = kitten4::to_neko(&fixture("idle")).unwrap();
     project["variables"]["variablesDict"]["z-score"]["visible"] = json!(false);
     project["variables"]["variablesDict"]["hidden"]["visible"] = json!(true);
@@ -116,7 +117,9 @@ fn canonical_visibility_edits_apply_but_kn_behavior_stays_unchanged() {
     let mut kn = Engine::new(Program::compile(&project).unwrap());
     kn.use_virtual_clock();
     kn.start();
-    assert!(advance(&mut kn).monitors.is_empty());
+    let frame = advance(&mut kn);
+    assert!(frame.monitors.iter().any(|m| m.id == "hidden"));
+    assert!(!frame.monitors.iter().any(|m| m.id == "z-score"));
 }
 
 /// Private list monitors share the existing global list output cap, rather

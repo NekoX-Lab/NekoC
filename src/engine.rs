@@ -1486,6 +1486,8 @@ impl Program {
         // Pass 2: scripts, resolving actor references within the owner's scene first.
         if semantics == RuntimeSemantics::Kitten4 {
             compiler.k4_initial_monitors(project)?;
+        } else if semantics == RuntimeSemantics::KnCurrent {
+            compiler.kn_initial_monitors(project)?;
         }
         compiler.extension_globals = compiler.slots.keys().cloned().collect();
         for scene_index in 0..compiler.program.scenes.len() {

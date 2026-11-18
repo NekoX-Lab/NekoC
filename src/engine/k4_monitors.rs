@@ -21,7 +21,18 @@ pub(super) fn list_text(items: &[Cell]) -> String {
 }
 
 impl Compiler {
+    /// KN saves the same `visible` flag per variable, and the official player
+    /// shows those monitors before any show/hide block runs. KN declarations
+    /// without a runtime cell are skipped so a stale entry never stops a work.
+    pub(super) fn kn_initial_monitors(&mut self, project: &Value) -> Result<()> {
+        self.initial_monitors(project, true)
+    }
+
     pub(super) fn k4_initial_monitors(&mut self, project: &Value) -> Result<()> {
+        self.initial_monitors(project, false)
+    }
+
+    fn initial_monitors(&mut self, project: &Value, kn: bool) -> Result<()> {
         let Some(vars) = project
             .pointer("/variables/variablesDict")
             .and_then(Value::as_object)
@@ -32,7 +43,17 @@ impl Compiler {
         // same target, not duplicate the initially visible widget. Preserve
         // declaration order rather than sorting by id or block discovery order.
         for (id, var) in vars {
-            let list = var["type"] == "list";
+            let list = var["type"] == "list" || (kn && var["type"] == "private_list");
+            if kn {
+                let known = if list {
+                    self.lists.contains_key(id)
+                } else {
+                    self.slots.contains_key(id)
+                };
+                if !known && !self.actor_variables.contains_key(id) {
+                    continue;
+                }
+            }
             let target = if let Some(&slot) = self.actor_variables.get(id) {
                 let owner = self
                     .program
