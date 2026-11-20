@@ -31,14 +31,18 @@
     "nekoc": "bin/nekoc.mjs"
   },
   "files": [
-    "*.mjs",
-    "*.d.ts",
+    "index.mjs",
+    "index.d.ts",
+    "browser.mjs",
+    "api.mjs",
+    "frame.mjs",
     "bin",
     "dist"
   ],
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --test --test-concurrency=1 test/*.test.mjs"
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "test:pack": "node --test test/r2-entry.test.mjs"
   },
   "dependencies": {
     "typescript": "~5.9.3"

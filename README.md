@@ -14,42 +14,22 @@ Kitten 4 目标和 Kitten N 共用同一个 TypeScript 前端，另外加了原�
 
 ## 快速开始
 
-不想装 Rust：到 Releases 下载 Windows / Linux / macOS（x64 与 ARM64）预编译包，解压即用，编译 TS 只需要 Node.js，见 **[安装预编译版](docs/install.md)**。下面是从源码构建的用法。
+| 你想做什么 | 入口 | 本机需要 |
+| --- | --- | --- |
+| 在线写作品 | [在线编译页](https://nekox-lab.github.io/NekoC/) | 浏览器 |
+| 只装编译器 | `npx --package=@fttawa/nekoc nekoc check hello.ts` | Node.js 22+（含 npm） |
+| 运行已有作品 | [Releases](https://github.com/NekoX-Lab/NekoC/releases) 预编译包或浏览器播放器 | 浏览器；原生包按系统选择 |
+| 开发 NekoC | 克隆本仓库，见第 4 节 | Rust stable、Node.js 22+、Git |
 
-### Web Studio
+### 1. 在线写作品
 
-```powershell
-cargo run --release --bin web -- samples/native-studio.bcmkn
-```
+打开 **[在线编译页](https://nekox-lab.github.io/NekoC/)**，在浏览器里写 TypeScript、检查、编译、WASM 运行并下载 `.bcmkn`。代码在浏览器内编译，不需要安装或启动本机后端。
 
-打开 **<http://127.0.0.1:4173>**，打开或拖入 Kitten N `.bcmkn` / Kitten 4 `.bcm` 作品，就可以编辑积木、在 Rust 字节码虚拟机里运行，并按原格式导出。
+### 2. 只装编译器
 
-- 舞台用 WebGL2 渲染，画笔采用二进制增量更新和常驻 GPU 画布。可以试试 `samples/web-pen-stress.bcmkn`（一万段画笔线）。
-- 导入导出会原样保留暂不支持的积木；快速虚拟机遇到不支持的执行特性会报告出来。
-- 超过请求大小的大作品可以用"压缩导出"，生成在官方播放器里也能自解压的 `.bcmkn`，见 **[压缩器](docs/pack.md)**。
+安装 **Node.js 22+** 后即可使用 [`@fttawa/nekoc`](packages/nekoc/README.md)。包内已经带有编译好的 WebAssembly 和 TypeScript 前端；使用者不需要 Rust、cargo、桌面应用或浏览器扩展，也没有安装时编译步骤。
 
-已支持的执行特性、性能数据和限制见 **[Web Studio、格式支持与性能](docs/web-studio.md)**。
-
-### PICKCAT 浏览器扩展
-
-把 `dist/pickcat-rust` 作为已解压的扩展加载到 Chrome / Edge。它会把 PICKCAT 上的 Kitten N 和 Kitten 4 播放器换成 Neko 播放器，带 FPS 显示、性能设置和切回原播放器的开关。默认用扩展自带的 WASM 运行，不需要本机程序；在扩展弹窗里可以切换到本机 Rust 后端（先运行 `start-rust-backend.cmd`，有 JIT，更快）。
-
-构建扩展用 `node packages/nekoc/build.mjs && node tools/build-extension.mjs`，详见 **[安装与验证](docs/pickcat-extension.md)**。
-
-### 在线编译
-
-[在线编译页](https://nekox-lab.github.io/NekoC/)在浏览器里完成类型检查、编译和 WASM 运行，代码不会上传，还能下载 `.bcmkn`。本地生成站点：`node packages/nekoc/build.mjs && node tools/build-pages.mjs`，输出在 `dist/pages`。独立播放器 `play.html?engine=wasm` 同样不需要后端。
-
-### TypeScript 编译器
-
-不想安装 Rust/cargo？纯 JS + WebAssembly 包见
-[`@fttawa/nekoc`](packages/nekoc/README.md)：`npm install @fttawa/nekoc`。
-已构建的包在 Node.js / 浏览器内完成编译、检查和无头运行。
-
-```bash
-npm install
-cargo build
-```
+先保存 `hello.ts`：
 
 ```ts
 // hello.ts
@@ -61,35 +41,63 @@ onStart(() => {
 ```
 
 ```bash
-nekoc build hello.ts
+npx --yes --package=@fttawa/nekoc nekoc check hello.ts --json
+npx --yes --package=@fttawa/nekoc nekoc build hello.ts -o hello.bcmkn
 ```
 
-`build` 不需要模板作品：舞台、角色、造型和初始坐标都可以写在同一个 `.nk.ts` 文件里声明（见 [samples/stage_demo.nk.ts](samples/stage_demo.nk.ts)）。只检查、不出包：
+长期使用时，在自己的项目目录安装并固定依赖，再运行本地入口：
 
 ```bash
-nekoc check hello.ts --json
+npm install --save-dev --save-exact @fttawa/nekoc
+npx --no-install nekoc check hello.ts --json
+npx --no-install nekoc build hello.ts -o hello.bcmkn
 ```
 
-`check` 依次做类型检查（对照 `ts/nekoc.d.ts`）、Kitten N 兼容检查和作品结构检查，每条诊断都带文件、行号、列号，适合 AI 反复修改后重跑。`.bcmkn` / `.bcm` 也可以直接 `check`。需要沿用已有作品的素材时，仍可用 `--template`：
+也可以从 [Releases](https://github.com/NekoX-Lab/NekoC/releases) 下载 `fttawa-nekoc-<版本>.tgz`，用 `npm install --save-dev ./fttawa-nekoc-<版本>.tgz` 安装同样的 npm 包。依赖 TypeScript 仍需 npm 获取或已有缓存。
+
+`check` 做类型、兼容和作品结构检查，错误带文件、行号、列号并返回退出码 1。`build` 默认生成 `.bcmkn`，不需要模板；舞台、角色和造型声明见 [stage_demo.nk.ts](samples/stage_demo.nk.ts)。把生成的作品导入 Kitten N 编辑器即可继续编辑。
+
+npm CLI 提供 `check`、`build`、`run --frames`。原生 `.bcm` 导出、`--template`、`watch` 等完整命令请使用[预编译原生包](docs/install.md)。npm 的 `--target=kitten4` 选择 K4 兼容检查/降低规则，输出仍为 `.bcmkn`，不是原生 `.bcm`。包内容、体积和复测方法见[轻量入口说明](docs/compiler-only.md)。
+
+### 3. 运行已有作品
+
+**有画面的播放器**：打开[浏览器播放器](https://nekox-lab.github.io/NekoC/play/play.html?engine=wasm)，导入作品；或者下载系统对应的[预编译包](docs/install.md)，Windows 双击 `start.cmd`，macOS / Linux 运行 `./start.sh`，在打开的页面拖入 `.bcmkn` / `.bcm`。原生包自带后端，运行作品无需 Rust 或 Node.js。
+
+**命令行无头运行**：已装 npm 包后，打印指定帧数内的日志：
 
 ```bash
-nekoc compile-ts-bcmkn hello.ts --template samples/kitten-n-0.27.4.bcmkn --out hello.bcmkn
+npx --no-install nekoc run hello.bcmkn --frames 120
 ```
 
-编译并打开 Kitten 4 画笔示例：
+npm WASM 无头运行没有画面或 JIT；需要 JIT、输入事件和 JSON 快照时，用原生包的 `nekoc run hello.bcmkn --ticks 120`，详见 [CLI 无头运行](docs/cli-run.md)。在 PICKCAT 页面播放可安装 Release 中的[浏览器扩展](docs/pickcat-extension.md)，默认自带 WASM。界面与格式支持见 [Web Studio](docs/web-studio.md)。
 
-```powershell
-cargo run --bin nekoc -- compile-ts-kitten4 samples/kitten4-demo.ts --out samples/kitten4-demo.bcm
-cargo run --release --bin web -- samples/kitten4-demo.bcm
-```
+### 4. 开发 NekoC
 
-生成或修改 `.bcmkn` 后，可以用官方编辑器检查一遍兼容性：
+只有修改 NekoC 本身才需要从源码构建。准备 Rust stable、Node.js 22+ 和 Git：
 
 ```bash
-node tools/editor-compat.mjs hello.bcmkn
+git clone https://github.com/NekoX-Lab/NekoC.git
+cd NekoC
+npm ci --ignore-scripts
+cargo build
+cargo run --bin nekoc -- check samples/stage_demo.nk.ts --json
+cargo run --bin nekoc -- build samples/stage_demo.nk.ts -o dist-demo.bcmkn
+cargo run --release --bin web -- dist-demo.bcmkn
 ```
+
+Web Studio 默认地址为 **<http://127.0.0.1:4173>**。构建 npm/WASM 包另外需要 wasm32 target 和匹配的 wasm-bindgen，步骤见[包维护说明](packages/nekoc/README.md)。本地站点和扩展分别用 `node tools/build-pages.mjs`、`node tools/build-extension.mjs`（先构建 npm 包）。
+
+生成或修改 `.bcmkn` 后，开发环境安装 Playwright 及浏览器，再做官方编辑器兼容检查：
+
+```bash
+node tools/editor-compat.mjs dist-demo.bcmkn
+```
+
+贡献前遵守 [AGENTS.md](AGENTS.md)，运行本文末尾的测试。
 
 ## 命令行
+
+下表是**原生 CLI** 的完整命令；npm/WASM CLI 的三个入口见[包文档](packages/nekoc/README.md#cli)。
 
 | 命令 | 说明 |
 |------|------|

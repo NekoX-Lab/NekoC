@@ -56,6 +56,7 @@ test("packaging rejects unsupported targets before writing output", async () => 
 test("release workflow keeps draft releases tag-only, ships npm + extension, excludes Android", async () => {
   const workflow = await fs.readFile(new URL("../.github/workflows/release.yml", import.meta.url), "utf8");
   const smoke = await fs.readFile(new URL("../tools/smoke-npm-package.sh", import.meta.url), "utf8");
+  const packTest = await fs.readFile(new URL("../packages/nekoc/test/r2-entry.test.mjs", import.meta.url), "utf8");
   const ci = await fs.readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
   const wasm = ci.slice(ci.indexOf("  wasm:"), ci.indexOf("  test:"));
   for (const target of targets) assert.ok(workflow.includes(`target: ${target}`), target);
@@ -68,7 +69,9 @@ test("release workflow keeps draft releases tag-only, ships npm + extension, exc
   for (const job of [workflow, wasm]) {
     assert.match(job, /node packages\/nekoc\/build\.mjs[\s\S]*bash tools\/smoke-npm-package\.sh/);
   }
-  assert.match(smoke, /npm pack --ignore-scripts/);
+  assert.match(smoke, /npm --prefix .* run test:pack/);
+  assert.match(packTest, /"pack", "--ignore-scripts", "--json"/);
+  assert.match(packTest, /"install", "--ignore-scripts"/);
   assert.match(workflow, /node tools\/build-extension\.mjs/);
   assert.match(workflow, /needs: \[build, web\]/);
   assert.doesNotMatch(workflow, /package-extension|\.apk|gradle/);

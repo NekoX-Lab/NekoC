@@ -10,7 +10,7 @@ export const targets = [
   "x86_64-apple-darwin", "aarch64-apple-darwin",
 ];
 export const docs = [
-  "install.md", "syntax.md", "ts-support-audit.md", "api.md", "self-api.md",
+  "install.md", "compiler-only.md", "syntax.md", "ts-support-audit.md", "api.md", "self-api.md",
   "operators.md", "web-studio.md", "cli-run.md", "pack.md", "extensions.md",
   "kitten-n-compatibility.md", "kitten4.md", "kitten4-block-coverage.md",
   "kn-block-coverage.md", "player-sdk.md",

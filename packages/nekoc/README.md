@@ -5,6 +5,31 @@
 运行时 npm 依赖只有 TypeScript。官方编辑器兼容检查另需开发环境提供 Playwright
 及可用浏览器，不是本包的运行时依赖。
 
+## 只用编译器
+
+准备 Node.js **22+**（含 npm），保存自己的 `hello.ts`，无需克隆源码：
+
+```sh
+npx --yes --package=@fttawa/nekoc nekoc check hello.ts --json
+npx --yes --package=@fttawa/nekoc nekoc build hello.ts -o hello.bcmkn
+```
+
+在项目里固定安装后，可通过本地 bin 使用：
+
+```sh
+npm install --save-dev --save-exact @fttawa/nekoc
+npx --no-install nekoc check hello.ts --json
+npx --no-install nekoc build hello.ts -o hello.bcmkn
+```
+
+也支持 `npm install --save-dev ./fttawa-nekoc-<版本>.tgz`，文件来自同版本
+GitHub Release；TypeScript 依赖仍需网络或 npm 缓存。`npx --package` 显式
+选择 scoped 包，避免误装名为 `nekoc` 的其它包。
+
+这里的“轻量”指无需原生工具链、桌面应用或扩展；当前单个 WASM 模块仍包含
+编译器和无头播放器，包内保留 Node/浏览器两套绑定，不是裁剪过的 compiler-only
+WASM。实际文件清单、体积和验证边界见[轻量入口说明](../../docs/compiler-only.md)。
+
 ## 构建（仅维护者需要 Rust）
 
 需要 wasm32-unknown-unknown target 和与 `Cargo.lock` 同版本的 wasm-bindgen CLI
@@ -13,6 +38,10 @@
 `npm run build`：cargo 构建 `nekoc-wasm`，wasm-bindgen 生成 nodejs / web 两套绑定，
 再复制 TypeScript 前端和类型检查用的声明文件到 `dist/`。
 `npm pack --ignore-scripts` 可以检查独立分发包。无 postinstall，不在用户机器编译 Rust。
+发布前从仓库根运行 `bash tools/smoke-npm-package.sh`：真实 pack 后安装到仓库外
+干净目录，验证 bin 入口、无 Rust PATH 的检查/导出/运行、相对导入及类型错误。
+输出 `dist/releases/npm-package-size.json` 记录压缩包、解包及含 TypeScript 的安装体积。
+该脚本在 CI 和 Release workflow 中执行，未构建或漏打包必要文件会失败。
 
 ## Node.js 22+
 
