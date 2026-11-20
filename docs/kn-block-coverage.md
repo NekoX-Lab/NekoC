@@ -325,7 +325,7 @@
 | 199 | `self_change_pen_color_property` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4707` | T10, T51 | 有路径；完整语义未验证 |
 | 200 | `self_change_pen_size` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4154`<br>`src/engine.rs:4739` | T51 | 有路径；完整语义未验证 |
 | 201 | `self_change_scale` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4137` | T10, T20, T51 | 有路径；完整语义未验证 |
-| 202 | `self_dialog` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4297` | T10, T51 | 有路径；完整语义未验证 |
+| 202 | `self_dialog` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4297` | T10, T51, T55 | 有路径；完整语义未验证 |
 | 203 | `self_dialog_wait` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4297` | T20, T38, T51 | 官方0.27.4原生非阻塞无限时气泡主路径配对，见 docs/kn-partial2-appearance.md；未验证边界：跨场景、并发timed气泡取消及像素排版 |
 | 204 | `self_face_to` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4165` | T10, T51 | 有路径；完整语义未验证 |
 | 205 | `self_face_to_sprite` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4165` | T51 | 有路径；完整语义未验证 |
@@ -339,7 +339,7 @@
 | 213 | `self_listen_with_param` | 有执行路径／未完整验证 | 可配置面板／默认隐藏 | `src/engine.rs:3392` | T10, T51 | 有路径；完整语义未验证 |
 | 214 | `self_move_specify` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4168` | T51 | 有路径；完整语义未验证 |
 | 215 | `self_move_specify_sprite` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4168` | T51 | 有路径；完整语义未验证 |
-| 216 | `self_move_to` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4047` | T10, T11, T16, T17, T41, T51, T60 | 有路径；完整语义未验证 |
+| 216 | `self_move_to` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4047` | T10, T11, T16, T17, T41, T51, T55, T60 | 有路径；完整语义未验证 |
 | 217 | `self_pen_down` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4659` | T9, T10, T13, T16, T17, T51, T60 | 有路径；完整语义未验证 |
 | 218 | `self_pen_up` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4660` | T10, T13, T17, T51, T60 | 有路径；完整语义未验证 |
 | 219 | `self_point_towards` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4065` | T10, T20, T51 | 有路径；完整语义未验证 |

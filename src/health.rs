@@ -14,6 +14,7 @@ const CATEGORIES: [(&str, &str); 5] = [
 struct Block<'a> {
     value: &'a Value,
     location: Value,
+    path: String,
 }
 
 fn owner_location(project: &Value, kind: &str, id: &str, owner: &Value) -> Value {
@@ -54,13 +55,17 @@ fn blocks(project: &Value) -> Vec<Block<'_>> {
             .flatten()
         {
             let location = owner_location(project, kind, id, owner);
+            let owner_path = format!("${}.{id}.nekoBlockJsonList", path.replace('/', "."));
             let mut pending: Vec<_> = owner["nekoBlockJsonList"]
                 .as_array()
-                .into_iter()
-                .flatten()
+                .map(Vec::as_slice)
+                .unwrap_or_default()
+                .iter()
+                .enumerate()
                 .rev()
+                .map(|(index, block)| (block, format!("{owner_path}[{index}]")))
                 .collect();
-            while let Some(block) = pending.pop() {
+            while let Some((block, path)) = pending.pop() {
                 if block["type"].is_string() {
                     let mut location = location.clone();
                     location["block"] = block["id"].clone();
@@ -68,14 +73,20 @@ fn blocks(project: &Value) -> Vec<Block<'_>> {
                     blocks.push(Block {
                         value: block,
                         location,
+                        path: path.clone(),
                     });
                 }
                 if let Some(next) = block.get("next") {
-                    pending.push(next);
+                    pending.push((next, format!("{path}.next")));
                 }
                 for key in ["statements", "inputs"] {
                     if let Some(children) = block[key].as_object() {
-                        pending.extend(children.values().rev());
+                        pending.extend(
+                            children
+                                .iter()
+                                .rev()
+                                .map(|(name, child)| (child, format!("{path}.{key}.{name}"))),
+                        );
                     }
                 }
             }
@@ -195,25 +206,44 @@ fn diagnostic_location<'a>(
     blocks: &'a [Block<'_>],
     diagnostic: &Value,
 ) -> Option<(&'a Value, bool)> {
-    let message = diagnostic["message"].as_str().unwrap_or_default();
-    // Match ID-bearing error phrases, not arbitrary quoted strings (an owner
-    // name or a field value can happen to equal a block ID). Search procedures
-    // too: a call root can fail inside its shared definition.
-    blocks
-        .iter()
-        .find(|block| {
-            let id = &block.location["block"];
-            id.as_str().is_some_and(|s| !s.is_empty())
-                && [
-                    format!("at block {id}"),
-                    format!("at {id}"),
-                    format!("({id})"),
-                    format!("(block {id})"),
-                ]
-                .iter()
-                .any(|needle| message.contains(needle))
-                && (block.location["owner"] == diagnostic["owner"]
-                    || block.location["owner_kind"] == "procedure")
+    // Never search arbitrary error text for an ID-shaped substring. Only a
+    // complete, known root-cause template reconstructed from that exact block
+    // is evidence. Context/field/type strings are untrusted and may contain IDs.
+    // New compiler error templates deliberately fall back to script precision.
+    let message = diagnostic["root_error"].as_str().unwrap_or_default();
+    let mut candidates = blocks.iter().filter(|block| {
+        let id = &block.location["block"];
+        let kind = block.value["type"].as_str().unwrap_or_default();
+        let dialog_type = block.value["fields"]["type"].as_str().unwrap_or_default();
+        id.as_str().is_some_and(|s| !s.is_empty())
+            && [
+                format!("unsupported fast-VM block {kind} ({id})"),
+                format!("unsupported expression {kind} at block {id}"),
+                // self_dialog is the only source of this error template.
+                if matches!(kind, "self_dialog" | "self_dialog_wait") {
+                    format!("unknown dialog type {dialog_type} at {id}")
+                } else {
+                    String::new()
+                },
+            ]
+            .iter()
+            .any(|expected| !expected.is_empty() && message == expected)
+            && (block.location["owner"] == diagnostic["owner"]
+                || block.location["owner_kind"] == "procedure")
+    });
+    let candidate = candidates.next();
+    let unique = candidates.next().is_none();
+    candidate
+        .filter(|candidate| {
+            unique
+                && blocks
+                    .iter()
+                    .filter(|block| {
+                        block.location["owner"] == candidate.location["owner"]
+                            && block.location["block"] == candidate.location["block"]
+                    })
+                    .count()
+                    == 1
         })
         .map(|block| (&block.location, true))
         .or_else(|| {
@@ -288,6 +318,14 @@ pub fn build_report(project: &Value, import: &Value) -> Value {
                         .is_some_and(|id| block.location["block"] == id)
             })
             .map(|block| block.location.clone())
+            .or_else(|| {
+                // The validator's legacy path is an opaque key, NOT code or a
+                // dot-split expression: owner/socket IDs can contain punctuation.
+                let path = issue["path"].as_str()?;
+                let mut matches = blocks.iter().filter(|block| block.path == path);
+                let found = matches.next()?;
+                matches.next().is_none().then(|| found.location.clone())
+            })
             .or_else(|| {
                 let id = owner?;
                 for (section, dict, kind) in [

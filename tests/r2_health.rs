@@ -345,3 +345,119 @@ fn k4_device_stubs_are_not_promoted_to_complete_support() {
         "{report}"
     );
 }
+
+#[test]
+fn dangling_screen_paths_locate_nested_blocks_with_punctuation_in_owner_and_socket_ids() {
+    let mut p = project(json!([]));
+    let id = "actor.[0]/~\"\\";
+    let mut actor = p["actors"]["actorsDict"]["nekoc-default-actor"].clone();
+    actor["nekoBlockJsonList"] = json!([{"id":"move","type":"self_move_to","inputs":{
+        "socket.with[0]/~":{"id":"screen-reference","type":"get_screens","is_output":true,"fields":{"screen_id":"deleted-scene"}}
+    }}]);
+    p["actors"]["actorsDict"].as_object_mut().unwrap().clear();
+    p["actors"]["actorsDict"][id] = actor;
+    let scene = p["scenes"]["currentSceneId"].as_str().unwrap().to_owned();
+    p["scenes"]["scenesDict"][&scene]["actorIds"] = json!([id]);
+    let report = health(p);
+    let issue = items(&report)
+        .iter()
+        .find(|item| {
+            item["code"] == "invalid_structure"
+                && item["impact"]
+                    .as_str()
+                    .unwrap()
+                    .contains("dangling_screen_reference")
+        })
+        .unwrap();
+    assert_eq!(issue["scene"], scene);
+    assert_eq!(issue["owner"], id);
+    assert_eq!(issue["block"], "screen-reference");
+    assert_eq!(issue["block_type"], "get_screens");
+}
+
+#[test]
+fn field_and_type_text_cannot_forge_a_precise_block_location() {
+    for (hat, failing) in [
+        (
+            "hat",
+            json!({"id":"bad-field","type":"self_dialog","fields":{"type":"nonsense at \"hat\""},"inputs":{"text":{"id":"literal","type":"text","fields":{"TEXT":"hi"}}}}),
+        ),
+        (
+            "innocent",
+            json!({"id":"actual-failure","type":"future_command (\"innocent\")"}),
+        ),
+        (
+            "hat",
+            json!({"id":"quote\"\\end","type":"future_command (\"hat\")"}),
+        ),
+    ] {
+        let expected = failing["id"].clone();
+        let report = health(project(
+            json!([{"id":hat,"type":"on_running_group_activated","next":failing}]),
+        ));
+        let issue = items(&report)
+            .iter()
+            .find(|item| item["code"] == "script_compile_failed")
+            .unwrap();
+        assert_eq!(issue["block"], expected, "{report}");
+        assert_eq!(issue["location_precision"], "block");
+        assert!(
+            items(&report)
+                .iter()
+                .any(|item| item["block"] == hat && item["category"] == "unverified")
+        );
+    }
+}
+
+#[test]
+fn arbitrary_message_substrings_and_ambiguous_ids_only_locate_scripts() {
+    let p = project(
+        json!([{"id":"hat","type":"on_running_group_activated","next":{"id":"bad","type":"future_command"}}]),
+    );
+    let report = nekoc::health::build_report(
+        &p,
+        &json!({"script_diagnostics":[{
+            "owner":"nekoc-default-actor","block":"hat","message":"unknown error at \"bad\"",
+            "root_error":"unknown error at \"bad\""
+        }]}),
+    );
+    let issue = items(&report)
+        .iter()
+        .find(|item| item["code"] == "script_compile_failed")
+        .unwrap();
+    assert_eq!(issue["block"], "hat");
+    assert_eq!(issue["location_precision"], "script");
+    assert!(
+        items(&report)
+            .iter()
+            .any(|item| item["block"] == "bad" && item["category"] == "unverified")
+    );
+
+    // Even a known template does not certify duplicated IDs or two matching
+    // candidates in different owners (e.g. a shared procedure definition).
+    for duplicate_owner in [false, true] {
+        let mut p = p.clone();
+        if duplicate_owner {
+            p["procedures"]["proceduresDict"]["p"] =
+                json!({"nekoBlockJsonList":[{"id":"bad","type":"future_command"}]});
+        } else {
+            p["actors"]["actorsDict"]["nekoc-default-actor"]["nekoBlockJsonList"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({"id":"bad","type":"text"}));
+        }
+        let report = nekoc::health::build_report(
+            &p,
+            &json!({"script_diagnostics":[{
+                "owner":"nekoc-default-actor","block":"hat",
+                "root_error":"unsupported fast-VM block future_command (\"bad\")"
+            }]}),
+        );
+        let issue = items(&report)
+            .iter()
+            .find(|item| item["code"] == "script_compile_failed")
+            .unwrap();
+        assert_eq!(issue["block"], "hat");
+        assert_eq!(issue["location_precision"], "script");
+    }
+}

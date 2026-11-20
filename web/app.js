@@ -68,6 +68,17 @@ function transaction(fn,{render=true}={}){if(started){notify(t('stopBeforeEdit')
   for(const details of document.querySelectorAll('details[data-expression]')){const value=find(details.dataset.expression);if(value)details.firstElementChild.textContent=expressionText(value);}
 }}
 function find(id,value=entity()?.nekoBlockJsonList){if(!value||typeof value!=='object')return null;if(value.id===id&&value.type)return value;for(const v of Object.values(value)){const b=find(id,v);if(b)return b;}return null;}
+// Only statements reached through root/next/statement sockets may accept an
+// appended action. A report focus (or a nested reporter click) is not one.
+function insertionTarget(id){
+  const pending=[...(entity()?.nekoBlockJsonList||[])];
+  while(pending.length){const block=pending.pop();if(!block)continue;
+    if(block.id===id)return block.is_output||block.is_shadow?null:block;
+    if(block.next)pending.push(block.next);
+    pending.push(...Object.values(block.statements||{}));
+  }
+  return null;
+}
 function entity(){return project.actors?.actorsDict?.[owner]||project.scenes?.scenesDict?.[owner]||project.procedures?.proceduresDict?.[owner];}
 function isProcedure(){return !!project.procedures?.proceduresDict?.[owner]&&!project.actors?.actorsDict?.[owner]&&!project.scenes?.scenesDict?.[owner];}
 function kitten4(value=project){return Object.hasOwn(value,'_nekocKitten4');}
@@ -85,7 +96,7 @@ function navigateHealthItem(item){
   const target=resolveHealthTarget(project,item);
   // Selection is editor UI state only: report navigation must never transact a scene change.
   healthTarget={...item,resolvedOwner:target.owner,path:new Set(healthBlockPath(target.entity,target.block)),report:health.report};
-  if(target.owner)owner=target.owner;selected=target.owner?target.block:'';
+  if(target.owner)owner=target.owner;selected='';
   activateTab([...document.querySelectorAll('[data-tab]')].find(button=>button.dataset.tab==='blocks'));renderEditor();
   const block=target.owner&&target.block?[...$('#blocks').querySelectorAll('[data-block]')].find(node=>node.dataset.block===target.block):null;
   const destination=block||$('#health-location');destination.scrollIntoView({block:'center',inline:'nearest'});destination.focus({preventScroll:true});
@@ -189,12 +200,16 @@ function renderEditor(){
 function renderPalette(){
   const root=$('#palette');root.replaceChildren();for(const item of palette){if(categoryFilter&&item[1]!==categoryFilter)continue;const name=blockLabel(item[0]),query=$('#search').value.toLowerCase();if(!name.toLowerCase().includes(query)&&!item[0].includes(query))continue;
     const button=make('button','palette-block',`${symbols[item[1]]}  ${name}`);button.setAttribute('aria-label',name);button.style.setProperty('--accent',colors[item[1]][2]);button.disabled=started||isProcedure();
+    if(((healthTarget?.block&&!insertionTarget(healthTarget.block))||(selected&&!insertionTarget(selected)))&&!item[0].startsWith('on_'))button.disabled=true;
     button.onclick=()=>transaction(()=>{
-      const b=newBlock(item),target=find(selected);const a=entity();a.nekoBlockJsonList??=[];
+      // Guard the handler as well as the disabled UI, including manually
+      // selected nested expressions. Do not silently create a loose action.
+      if(!item[0].startsWith('on_')&&((healthTarget?.block&&!insertionTarget(healthTarget.block))||(selected&&!insertionTarget(selected))))return;
+      const b=newBlock(item),target=insertionTarget(selected||healthTarget?.block);const a=entity();a.nekoBlockJsonList??=[];
       if(!target||b.type.startsWith('on_'))a.nekoBlockJsonList.push(b);
       else if(target.statements&&!target.statements.DO)target.statements.DO=b;
       else{let tail=target;while(tail.next)tail=tail.next;tail.next=b;}
-      for(const block of a.nekoBlockJsonList)repair(block);selected=b.id;
+      for(const block of a.nekoBlockJsonList)repair(block);healthTarget=null;selected=b.id;
     });root.append(button);
   }
 }

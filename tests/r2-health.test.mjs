@@ -136,7 +136,7 @@ async function appFixture(){
   const noop=()=>{};
   const sandbox={document,console,HealthReportState,HealthReportView,healthLocation,resolveHealthTarget,healthBlockPath,
     StageRenderer:Renderer,ProjectAudio:class{stop(){}},StageInput:class{reset(){}},StageOverlay:class{},
-    performance:{now:()=>0},window:{addEventListener:noop},requestAnimationFrame:noop,setTimeout:noop,clearTimeout:noop,
+    performance:{now:()=>0},window:{addEventListener:noop},requestAnimationFrame:noop,setTimeout:noop,clearTimeout:noop,crypto:globalThis.crypto,
     Blob,URL:class extends URL{static createObjectURL(blob){downloads.push(blob);return 'blob:report';}static revokeObjectURL(){}},
     fetch:async(path,options)=>{const value=options?.body?JSON.parse(options.body):null;calls.push({path,value});
       if(path==='/api/health-report'){const pending=deferred();refreshes.push(pending);return {ok:true,json:()=>pending.promise};}
@@ -149,7 +149,7 @@ async function appFixture(){
 test('Studio clicks navigate literal and procedure blocks without dirtying or switching scenes',async()=>{
   const {app,document,calls}=await appFixture(),before=JSON.stringify(app.getState().project),requests=calls.length;
   document.ids.get('health-report').querySelectorAll('.health-entry')[0].click();
-  let state=app.getState();assert.equal(state.owner,'a2');assert.equal(state.selected,'literal[0].id');assert.equal(state.dirty,false);assert.equal(state.undo.length,0);
+  let state=app.getState();assert.equal(state.owner,'a2');assert.equal(state.selected,'');assert.equal(state.dirty,false);assert.equal(state.undo.length,0);
   assert.equal(state.project.scenes.currentSceneId,'s1');assert.equal(JSON.stringify(state.project),before);assert.equal(calls.length,requests);
   assert.equal(document.focused.dataset.block,'literal[0].id');assert.ok(document.focused.classList.contains('health-block-target'));assert.match(document.ids.get('health-location').textContent,/第二场景/);
   app.navigateHealthItem(item({owner:'p1',owner_name:'绘图过程',owner_kind:'procedure',scene:null,scene_name:null,block:'proc-block'}));
@@ -193,4 +193,36 @@ test('Studio recheck while running does not stop, restart, replace or dirty the 
   refreshes[0].resolve(report());await pending;
   assert.deepEqual(calls.slice(count).map(call=>call.path),['/api/health-report']);assert.equal(app.getState().running,true);assert.equal(app.getState().started,true);
   assert.equal(app.getState().dirty,false);assert.equal(app.getState().undo.length,0);assert.equal(JSON.stringify(app.getState().project),before);
+});
+
+test('report focus on numeric/text inputs never becomes an action insertion socket',async()=>{
+  for(const [type,fields] of [['math_number',{NUM:1}],['text',{TEXT:'hi'}]]){
+    const {app,document}=await appFixture(),p=projectFixture();
+    p.actors.actorsDict.a2.nekoBlockJsonList=[{id:'hat',type:'on_running_group_activated',next:{id:'statement',type:type==='text'?'console_log':'self_go_forward',inputs:{[type==='text'?'console_log':'steps']:{id:'input-risk',type,fields}}}}];
+    await app.loadProject(p);app.navigateHealthItem(item({block:'input-risk',block_type:type}));
+    const before=JSON.stringify(app.getState().project),action=document.ids.get('palette').querySelectorAll('button').find(button=>button.textContent.includes('移动步数'));
+    assert.equal(action.disabled,true);action.click();action.onclick();
+    assert.equal(JSON.stringify(app.getState().project),before);
+    assert.equal(app.getState().dirty,false);assert.equal(app.getState().undo.length,0);
+    assert.equal(app.getState().selected,'');assert.equal(document.focused.dataset.block,'input-risk');
+    document.ids.get('deselect').click();
+    assert.equal(document.ids.get('palette').querySelectorAll('button').find(button=>button.textContent.includes('移动步数')).disabled,false);
+    app.navigateHealthItem(item({block:'input-risk',block_type:type}));
+    // Selecting the enclosing statement is a separate editing action. It
+    // appends a visible statement, never a hidden input.next connection.
+    const node=document.ids.get('blocks').querySelectorAll('[data-block]').find(node=>node.dataset.block==='statement');
+    node.onclick({stopPropagation(){}});
+    const append=document.ids.get('palette').querySelectorAll('button').find(button=>button.textContent.includes('移动步数'));
+    assert.equal(append.disabled,false);append.click();
+    const statement=app.getState().project.actors.actorsDict.a2.nekoBlockJsonList[0].next;
+    assert.equal(statement.next.type,'self_go_forward');assert.equal(Object.values(statement.inputs)[0].next,undefined);
+    assert.ok(document.ids.get('blocks').querySelectorAll('[data-block]').some(node=>node.dataset.block===statement.next.id));
+  }
+});
+
+test('located structural-error rows remain clickable with literal punctuation IDs',()=>{
+  const state=new HealthReportState({getProject:()=>({}),request:async()=>null});
+  const issue=item({category:'unsupported',code:'invalid_structure',owner:'actor.[0]/~',block:'screen-reference',block_type:'get_screens'});
+  state.replace(report({items:[issue]}));const {root,navigated}=viewFixture(state);
+  const row=root.querySelectorAll('.health-entry')[0];assert.equal(row.disabled,false);row.click();assert.equal(navigated[0],issue);
 });

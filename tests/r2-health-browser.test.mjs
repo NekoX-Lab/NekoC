@@ -6,6 +6,7 @@ import {once} from 'node:events';
 import {setTimeout as delay} from 'node:timers/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
+import {readFile} from 'node:fs/promises';
 import {loadPlaywright} from '../tools/probe-kitten4.mjs';
 
 // Explicit opt-in after building web. Shared Playwright uses NEKOC_NODE_MODULES.
@@ -34,21 +35,23 @@ test('real Studio import health: pagination, read-only navigation, exact downloa
   const socket=createServer();socket.listen(0,'127.0.0.1');await once(socket,'listening');
   const port=socket.address().port;await new Promise(resolve=>socket.close(resolve));
   const binary=process.env.NEKOC_WEB_BIN||path.join(root,'target','debug',process.platform==='win32'?'web.exe':'web');
-  const child=spawn(binary,['--port',String(port)],{cwd:root,stdio:['ignore','pipe','pipe']});
-  let output='',spawnError,browser;child.stdout.on('data',data=>output+=data);child.stderr.on('data',data=>output+=data);child.on('error',error=>spawnError=error);
-  const origin=`http://127.0.0.1:${port}`;
+  const child=process.env.NEKOC_HEALTH_ORIGIN?null:spawn(binary,['--port',String(port)],{cwd:root,stdio:['ignore','pipe','pipe']});
+  let output='',spawnError,browser;child?.stdout.on('data',data=>output+=data);child?.stderr.on('data',data=>output+=data);child?.on('error',error=>spawnError=error);
+  const origin=process.env.NEKOC_HEALTH_ORIGIN||`http://127.0.0.1:${port}`;
   const api=async(pathname,value)=>{
     const response=await fetch(`${origin}/api/${pathname}`,value===undefined?undefined:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});
     assert.equal(response.ok,true,`${pathname}: HTTP ${response.status}`);return response.json();
   };
   try{
     for(let i=0;;i++){
-      if(spawnError)throw spawnError;if(child.exitCode!==null||i>=200)throw Error(`Backend failed: ${output}`);
+      if(spawnError)throw spawnError;if((child&&child.exitCode!==null)||i>=200)throw Error(`Backend failed: ${output}`);
       try{if((await fetch(`${origin}/api/project`)).ok)break;}catch{}await delay(50);
     }
     const imported=await api('import',ownedProject());assert.equal(imported.health_report.schema_version,1);
     browser=await loadPlaywright().chromium.launch({headless:true,channel:process.env.NEKOC_BROWSER_CHANNEL||'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
     const context=await browser.newContext({viewport:{width:1440,height:1000},acceptDownloads:true}),page=await context.newPage(),errors=[],posts=[];
+    // Optional local source against a freshly built remote backend over SSH.
+    if(process.env.NEKOC_HEALTH_LOCAL_APP==='1')await page.route('**/app.js',async route=>route.fulfill({contentType:'text/javascript',body:await readFile(path.join(root,'web','app.js'),'utf8')}));
     page.on('pageerror',error=>errors.push(error.message));page.on('request',request=>{if(request.method()==='POST')posts.push(new URL(request.url()).pathname);});
     await page.goto(origin);await page.waitForFunction(()=>window.nekoImportReport?.project?.projectName==='原创体检浏览器回归'&&window.nekoDiagnostics);
     const report=await page.evaluate(()=>window.nekoImportReport.health_report),panel=page.locator('#health-report');
@@ -103,8 +106,45 @@ test('real Studio import health: pagination, read-only navigation, exact downloa
       await page.locator('#undo').click();assert.equal((await editorProject()).projectName,baseline.projectName);assert.equal(await download().isDisabled(),true);
     });
 
+    await t.test('numeric and text report focus rejects hidden insertion; enclosing statements append and execute',async()=>{
+      for(const type of ['math_number','text']){
+        const p=ownedProject(),actor=p.actors.actorsDict['first-actor'];
+        p.projectName=`输入插入回归-${type}`;p.actors.actorsDict['second-actor'].nekoBlockJsonList=[];p.procedures.proceduresDict={};
+        actor.rotation=0;
+        const text=type==='text',literal={id:'literal[0].id',type,fields:text?{TEXT:'hello'}:{NUM:1},parent_id:'statement'};
+        actor.nekoBlockJsonList=[{id:'hat',type:'on_running_group_activated',next:{id:'statement',type:text?'console_log':'self_go_forward',parent_id:'hat',inputs:{[text?'console_log':'steps']:literal}}}];
+        await api('import',p);await page.reload();await page.waitForFunction(name=>window.nekoImportReport?.project?.projectName===name,p.projectName);
+        const row=panel.locator('.health-entry').filter({hasText:'积木 ID：literal[0].id'}).first();await row.click();
+        const move=page.locator('#palette button').filter({hasText:'移动步数'}).first();assert.equal(await move.isDisabled(),true);
+        const before=await editorProject();await move.evaluate(button=>button.onclick());assert.deepEqual(await editorProject(),before);
+        assert.equal(await page.locator('#undo').isDisabled(),true);assert.equal(await page.locator('#blocks .health-block-target').getAttribute('data-block'),'literal[0].id');
+        await page.locator('#blocks [data-block="statement"] > .block-label').click();assert.equal(await move.isEnabled(),true);await move.click();
+        const edited=await editorProject(),statement=edited.actors.actorsDict['first-actor'].nekoBlockJsonList[0].next;
+        assert.equal(statement.next.type,'self_go_forward');assert.equal(Object.values(statement.inputs)[0].next,undefined);
+        assert.equal(await page.locator('#blocks [data-block]').evaluateAll((nodes,id)=>nodes.filter(node=>node.dataset.block===id).length,statement.next.id),1);
+        await page.locator('#run').click();await page.waitForFunction(()=>window.nekoDiagnostics()?.pipeline.completedFrames>0);
+        await page.locator('#pause').click();
+        const sprite=await page.evaluate(()=>window.nekoDiagnostics().sprites.find(sprite=>sprite.id==='first-actor'));
+        assert.ok(Math.abs(Math.hypot(sprite.x,sprite.y)-(text?10:11))<1e-8,JSON.stringify(sprite));
+        if(text)assert.ok((await page.locator('#logs').textContent()).includes('hello'));
+        await page.locator('#stop').click();await page.waitForFunction(()=>!window.nekoDiagnostics().started);
+      }
+    });
+
+    await t.test('a dangling screen error row from the backend locates its nested input',async()=>{
+      const p=ownedProject(),id='actor.[0]/~',actor=p.actors.actorsDict['first-actor'];
+      p.projectName='结构错误定位回归';p.actors.actorsDict={[id]:actor};p.scenes.scenesDict['first-scene'].actorIds=[id];p.scenes.scenesDict['second-scene'].actorIds=[];p.procedures.proceduresDict={};
+      actor.id=id;actor.nekoBlockJsonList=[{id:'statement',type:'self_move_to',inputs:{'socket.with[0]/~':{id:'screen-reference',type:'get_screens',is_output:true,fields:{screen_id:'deleted-scene'}}}}];
+      const imported=await api('import',p),issue=imported.health_report.items.find(item=>item.code==='invalid_structure'&&item.impact.includes('dangling_screen_reference'));
+      assert.equal(issue.owner,id);assert.equal(issue.block,'screen-reference');assert.equal(issue.block_type,'get_screens');
+      await page.reload();await page.waitForFunction(()=>window.nekoImportReport?.project?.projectName==='结构错误定位回归');
+      const before=await editorProject(),row=panel.locator('.health-entry').filter({hasText:'dangling_screen_reference'}).first();
+      assert.equal(await row.isEnabled(),true);await row.click();assert.equal(await page.locator('#blocks .health-block-target').getAttribute('data-block'),'screen-reference');
+      assert.deepEqual(await editorProject(),before);assert.equal(await page.locator('#undo').isDisabled(),true);
+    });
+
     assert.deepEqual(errors,[]);await context.close();
   }finally{
-    await browser?.close();if(child.exitCode===null&&!spawnError){child.kill();await once(child,'exit');}
+    await browser?.close();if(child&&child.exitCode===null&&!spawnError){child.kill();await once(child,'exit');}
   }
 });

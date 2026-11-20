@@ -122,7 +122,7 @@ fn import_inner(value: crate::json::Json) -> Result<(crate::json::Json, Value)> 
                                 json!(item["affected_scripts"].as_u64().unwrap_or(1) + 1);
                         } else {
                             diagnostic_indices.insert(key, diagnostics.len());
-                            diagnostics.push(json!({"scene":scene_id,"owner":owner_id,"block":block["id"],"message":message,"affected_scripts":1}));
+                            diagnostics.push(json!({"scene":scene_id,"owner":owner_id,"block":block["id"],"message":message,"root_error":error.root_cause().to_string(),"affected_scripts":1}));
                         }
                     }
                     probe[container][kind][owner_id]["nekoBlockJsonList"] = json!([]);
