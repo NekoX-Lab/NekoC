@@ -1,3 +1,19 @@
 # Official observations bind these original fixtures to their exact byte hash.
 # Keep them stable on core.autocrlf=true checkouts without normalizing evidence.
 tests/fixtures/kn-semantics/partial2-*.bcmkn text eol=lf
+
+# These existing evidence ledgers recorded CRLF byte hashes. Preserve those
+# exact bytes on every checkout; do not rewrite observations or relax hashes.
+docs/kncompat-hateneko-evidence.json text eol=crlf
+docs/kn-value-types-official.json text eol=crlf
+docs/kn-semantics-official.json text eol=crlf
+docs/kn-objects-official.json text eol=crlf
+docs/actor-variables-official.json text eol=crlf
+docs/kn-async-services-evidence.json text eol=crlf
+docs/input-kn-evidence.json text eol=crlf
+docs/audio-evidence.json text eol=crlf
+docs/audio-runtime-evidence.json text eol=crlf
+docs/nonfinite-verification.json text eol=crlf
+samples/kitten-n-0.27.4.bcmkn text eol=crlf
+samples/native-studio.bcmkn text eol=crlf
+samples/web-pen-stress.bcmkn text eol=crlf
