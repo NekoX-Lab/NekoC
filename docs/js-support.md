@@ -172,6 +172,8 @@ cleanup();
 | API / 语法 | 接受边界及替代 |
 | --- | --- |
 | 数组 literal、length、0 基索引、声明解构（含跳过项和 rest） | 不支持 hole/spread、嵌套/default 解构；用明确元素、slice/concat、逐层读取，见 **arrays/objects** |
+| 独立语句中的数组解构赋值，如 `[a, b] = [b, a]` | 右侧必须为无 hole/spread 的数组字面量，先完整求值一次再赋值；目标限已有可写变量和跳过项，不支持属性目标、rest/default/嵌套或表达式取值，见 **arrays** |
+| 普通变量声明中的浅层对象解构、字面量键及重命名 | 初始化器只求值一次，引用保持身份；不支持对象 rest/default/嵌套/计算键或参数、循环头模式，显式逐层读取，见 **objects** |
 | 数组索引写、算术/位复合写 | 必须证明为稳定稠密数组界内非负整数；追加用 push，删除用 splice；length 只允许赋 0，见 **arrays** |
 | push/unshift/splice | 语句效果可用；需要返回值时显式保存元素/长度，见 **arrays** |
 | slice/concat/reverse/join/at/includes/indexOf/lastIndexOf/pop/shift | 参数数量/静态域受限；不传显式 undefined/thisArg/spread；负索引和搜索位置按各方法规则处理；可能缺失结果不等价 JS undefined，先检查长度/索引，见 **arrays** |
@@ -179,7 +181,7 @@ cleanup();
 | flat | 仅 depth 1、结构稳定且只含子数组的字面量；多层展平用嵌套循环，见 **arrays** |
 | Array.isArray | 静态类型已知、稳定且无副作用的值；先保存结果，不作动态类型系统，见 **arrays** |
 | Array(n).fill(v)、Array.from({length:n}, inlineMapper) | 仅这些工厂形态；一般 a.fill、Array.from(iterable)、flatMap 不支持，改循环，见 **factory**。动态 length 和 mapper 第一参数有已知差异，见末节 |
-| `{x: value}`、简写、固定键 obj.x/obj["x"]，嵌套/引用/对象参数返回 | 动态 key/新增属性/对象 spread、原型、反射、对象解构、对象 coercion/日志拒绝；固定字段或 Map，显式读取/复制，见 **objects/maps** |
+| `{x: value}`、简写、固定键 obj.x/obj["x"]，嵌套/引用/对象参数返回 | 动态 key/新增属性/对象 spread、原型、反射、对象 coercion/日志拒绝；固定字段或 Map，显式读取/复制，见 **objects/maps** |
 | delete | 不支持删属性或制造 hole；删除数组元素用 splice；对象用 validity 标记，见 **objects** |
 
 **arrays**：替代展开、浅复制、声明解构、显式界限和迭代复制。
@@ -189,6 +191,8 @@ const xs = [1, 2, 3];
 const copy = xs.slice();
 const joined = xs.concat([4]);
 const [head, ...tail] = xs;
+let left = head, right = 2;
+[left, right] = [right, left];
 xs[0] = 5;
 copy.push(4);
 copy.unshift(0);
@@ -197,6 +201,7 @@ if (copy.length > 0) console.log(copy[0]);
 const out: number[] = [];
 for (const row of [[1, 2], [3]]) for (const x of row) out.push(x);
 console.log(head, tail.join(","), joined.length, out.join(","), Array.isArray(xs));
+console.log(left, right);
 ```
 
 **callbacks**：不在遍历期间删除，用返回新数组的 filter。
@@ -230,11 +235,22 @@ console.log(xs.join(","));
 const original = { x: 1, valid: true, child: { y: 2 } };
 const copy = { x: original.x, valid: original.valid, child: original.child };
 const child = original.child;
+const { x: first, child: shared } = original;
 console.log(original.x, child.y);
 original.valid = false;
 copy.child.y = 3;
 console.log(child.y);
+console.log(first, shared === child);
 ```
+
+解构的求值顺序、索引和模式限制见 [浅层解构](ts-r2-destructuring.md)。确定为
+负数、非整数、非有限值或稳定稠密字面量数组上确定越界的直接索引会明确拒绝；
+数组字符串键只接受规范索引及 length，不把 `"01"` 等强制转成列表位置。
+普通对象继续使用分享播放器支持的列表/变量/过程积木，不依赖私有对象积木。
+返回对象的函数每条路径必须返回已初始化引用，不能让提前 `return;` 伪造句柄；
+共享属性的断言、实参、返回及 tuple 边界必须保留标量存储类型，不能通过
+any/unknown/宽联合别名破坏原引用。新容器的上下文初始化不等于已有别名可拓宽。
+无值同步 callback 的 `return;` 只退出当前过程。详见 [对象复核](r2-tsobject.md)。
 
 ## 4. 字符串、数值与标准库
 
@@ -321,6 +337,9 @@ extends/super、abstract、受限 instanceof、多态实例 getter/setter、显�
 普通方法和显式初始化改写：class expression/嵌套类、#私有名、装饰器、泛型类/方法、
 mixin/内建继承、函数值字段/脱离方法、static block/static this/static 继承、动态类值。
 构造必须安全初始化；复杂 super/前向读取/初始化时虚调用会被拒绝，先初始化再调用。
+派生类先完成基类构造，再执行自身字段和构造体；多态调用保留接收者及全部实参
+各求值一次。static 字段按类声明处、成员顺序初始化；间接读取未初始化字段也拒绝。
+可选/可空字段保留 undefined/null 域；非可空字段不能依赖堆中占位 0 作为初值。
 跨模块类继承不支持，把相关类放同文件；详见 [类规则](ts-classes.md)。
 
 ```ts example=classes file=main.ts
@@ -329,8 +348,18 @@ class Counter {
   constructor(public step: number) {}
   advance(): number { this.value += this.step; return this.value; }
 }
-const counter = new Counter(2);
-console.log(counter.advance(), counter.value);
+class FastCounter extends Counter {
+  static initialStep = 2;
+  constructor() { super(FastCounter.initialStep); }
+  advance(): number { return super.advance() + 1; }
+  get current(): number { return this.value; }
+  set current(n: number) { this.value = n; }
+}
+const counter = new FastCounter();
+const base: Counter = counter;
+console.log(base.advance(), counter.current, base instanceof FastCounter);
+counter.current = 5;
+console.log(counter.value);
 ```
 
 ## 6. 模块与宿主环境
@@ -372,7 +401,8 @@ Proxy/Reflect、Web API、TypedArray/ArrayBuffer、Intl、Promise 等宿主设�
 官方一致性。更细证据见 [对象证据](ts-share-objects.md)、[字符串 API](api.md)、
 [内联限制](ts-inline-budget.md) 及对应专项测试。
 
-- 数组越界、空 pop/shift、find 未命中不是统一的 JS undefined。先检查 length 或
+- 静态非法/确定越界索引明确拒绝；动态数组越界、空 pop/shift、find 未命中
+  不是统一的 JS undefined。先检查 length 或
   findIndex（**arrays/callbacks**）；不要把空列表项当 nullable 值。
 - Array(n).fill 的动态非整数/负数长度没有 JS RangeError 保证；Array.from 的 mapper
   首参当前按占位 0 传入，不是缺失元素 undefined，默认参数也不能据此推断。
@@ -397,6 +427,7 @@ Proxy/Reflect、Web API、TypedArray/ArrayBuffer、Intl、Promise 等宿主设�
 具体错误代码及措辞可能随来源变化。输出诊断不得伪装成功或返回部分作品。
 读取源码失败时没有可知行列，不虚构坐标。
 
-实现入口：`ts/compile-ts.mjs`、`ts/js-support.mjs`；预处理模块依次处理集合、nullable、
+实现入口：`ts/compile-ts.mjs`、`ts/js-support.mjs`；原始语法和 sequence 先预检，
+预处理模块依次处理浅层解构、集合、nullable、
 class、常量方法、值/sequence、函数/作用域，再由前端生成积木。新增语法或 API 时同时
 更新本表、编译正例和拒绝反例；专项文件中的详细限制仍需保持对应回归测试。

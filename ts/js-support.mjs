@@ -17,7 +17,7 @@ export function validateUnsupportedSyntax(sourceFile, reject) {
       reject(node.asteriskToken, "Generator functions are not supported: calling a generator creates an iterator without executing its body; alternative: return an array instead or use an ordinary callback");
     }
     if (ts.isBinaryExpression(node) && [ts.SyntaxKind.BarBarEqualsToken, ts.SyntaxKind.AmpersandAmpersandEqualsToken].includes(node.operatorToken.kind)) {
-      reject(node.operatorToken, "Logical assignment ||= / &&= is not supported: the assignment backend cannot preserve short-circuit evaluation; use an explicit if statement and assign only in the selected branch");
+      reject(node.operatorToken, "Logical assignment ||= / &&= is not supported: the assignment backend cannot preserve short-circuit evaluation; alternative: use an explicit if statement and assign only in the selected branch");
     }
     if (ts.isForInStatement(node)) {
       reject(node, "for...in enumerates property keys, not list elements; use for...of or an explicit index loop");
@@ -48,7 +48,20 @@ export function validateUnsupportedSyntax(sourceFile, reject) {
       reject(node, "Spread arguments are not supported: calls need an explicit argument list; pass each argument explicitly or pass an array to a function that accepts an array");
     }
     if (ts.isSpreadElement(node) && ts.isArrayLiteralExpression(node.parent)) {
-      reject(node, "Array spread is not supported: the list backend does not expand iterable elements; use slice() for a shallow copy, concat() for arrays, or an explicit for-of loop");
+      // Assignment patterns share ArrayLiteralExpression syntax with values.
+      // Let destructuring lowering diagnose a rest target (not an iterable
+      // spread), or the dense-literal RHS requirement, on the original tree.
+      let array = node.parent;
+      while (ts.isParenthesizedExpression(array.parent)) array = array.parent;
+      const assignment = array.parent;
+      let target = assignment && ts.isBinaryExpression(assignment) ? assignment.left : undefined;
+      while (target && ts.isParenthesizedExpression(target)) target = target.expression;
+      const destructuring = assignment && ts.isBinaryExpression(assignment)
+        && assignment.operatorToken.kind === ts.SyntaxKind.EqualsToken
+        && target && ts.isArrayLiteralExpression(target);
+      if (!destructuring) {
+        reject(node, "Array spread is not supported: the list backend does not expand iterable elements; use slice() for a shallow copy, concat() for arrays, or an explicit for-of loop");
+      }
     }
     if (ts.isVoidExpression(node)) {
       let value = node.expression;

@@ -57,6 +57,13 @@ differences among the 245 original probes. A later frontend change may turn a
 compile error into a match; update only the relevant baseline entry and its
 evidence after confirming both Node and VM results.
 
+After merging main's destructuring/class/object changes, `core-006` (array
+swap) and `core-179` (shallow object binding) remain matches, while `core-162`
+is explicitly rejected for a statically out-of-bounds index rather than
+retaining its former NaN/undefined difference. The 222/22/1 classification
+is recomputed from the merged frontend and verified by the full VM batch,
+not selected wholesale from either side of the rebase.
+
 The JS/TS support contract rejects `core-015` (logical assignment) and
 `core-157` (array spread) rather than accepting incomplete lowering. The BigInt
 and generator probes (`core-190`, `core-205`) retain compile-error status with

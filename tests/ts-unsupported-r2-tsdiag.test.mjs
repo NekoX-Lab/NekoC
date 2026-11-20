@@ -4,6 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
 import { compileFile, checkFile, CompileError, formatDiagnostic } from "../ts/compile-ts.mjs";
+import { assertJsLogs } from "./ts-runtime.mjs";
 
 const entry = path.resolve("virtual/r2-tsdiag/main.ts");
 const normalized = file => file.replaceAll(String.fromCharCode(92), "/");
@@ -43,6 +44,8 @@ const rawCases = [
   ["call-spread", "const values = [1, 2]; console.log(/*error*/...values);", /Spread arguments.*explicit argument list/],
   ["constructor-spread", "const values = [1, 2]; new Array(/*error*/...values);", /Spread arguments/],
   ["array-spread", "const values = [1, 2]; const copy = [/*error*/...values];", /Array spread/],
+  ["destructuring-rest-target", "let values = [0]; [/*error*/...values] = [1];", /rest.*explicit statements/],
+  ["destructuring-spread-source", "let value = 0; [value] = /*error*/[...[1]];", /dense array literal without spread/],
   ["void-value", "const value = /*error*/void 7;", /void expressions.*effects/],
   ["debugger", "/*error*/debugger;", /debugger.*breakpoint/],
   ["with", "/*error*/with (value) { console.log(x); }", /with statements.*statically/],
@@ -77,7 +80,9 @@ const cases = [
   ["generator", "function* f() { yield 1; }", /Generator/],
   ["rest-parameter", "function f(...xs: number[]) { return xs.length; } f(1);", /Rest parameters/],
   ["parameter-pattern", "function f([x]: number[]) { return x; } f([1]);", /parameter/],
-  ["object-destructuring", "const p = {x: 1}; const {x} = p; console.log(x);", /simple variable|destructur/i],
+  ["object-destructuring-rest", "const p = {x: 1, y: 2}; const {x, ...rest} = p; console.log(rest.y);", /Object destructuring rest/],
+  ["object-destructuring-default", "const {x = 1} = {x: 2}; console.log(x);", /Object destructuring rest, defaults/],
+  ["object-destructuring-nested", "const {child: {x}} = {child: {x: 1}}; console.log(x);", /nested patterns/],
   ["nested-destructuring", "const [[x]] = [[1]]; console.log(x);", /Nested array destructuring/],
   ["destructuring-default", "const [x = 1] = [2]; console.log(x);", /destructuring defaults/],
   ["delete", "const a = [1]; delete a[0];", /delete.*hole/],
@@ -135,6 +140,20 @@ for (const [name, source, reason] of cases) {
     const d = diagnostic([`// counterexample: ${name}`, source].join(nl));
     assert.equal(d.file, normalized(entry));
     assert.match(d.message, reason);
+  });
+}
+
+// Keep main's new capabilities live alongside original-AST rejection guards.
+for (const [name, source] of [
+  ["shallow object bindings and array swap", 'const p = {x: 1, child: {y: 2}}; const {x: first, child} = p; child.y = 3; let a = first, b = 2; [a,b] = [b,a]; console.log(a,b,p.child.y,child === p.child);'],
+  ["class inheritance accessors and static initialization", 'class Base { value = 1; get next(): number { return this.value + 1; } set next(n: number) { this.value = n - 1; } read(): number { return this.value; } } class Derived extends Base { static seed = 3; constructor() { super(); this.value = Derived.seed; } read(): number { return super.read() + 1; } } const d = new Derived(); d.next += 2; const base: Base = d; console.log(base.read(),d.next,base instanceof Derived);'],
+  ["object callback return and alias identity", 'function make(): {value: number} { [1].forEach(n => { if (n === 1) return; }); return {value: 7}; } const a = make(), b = a; b.value += 2; console.log(a.value,a === b);'],
+  ["nullable equality and primitive coercion", 'let x: number | null = null; console.log(x == undefined,x === undefined); x = 2; console.log(x == 2,0 == false,"2" == 2);'],
+]) {
+  test(`r2-tsdiag merged main capability: ${name}`, () => {
+    const checked = checkFile(entry, { types: false, host: { readFile: () => source } });
+    assert.equal(checked.ok, true, JSON.stringify(checked.diagnostics));
+    assertJsLogs(source);
   });
 }
 
