@@ -27,7 +27,13 @@
 
 ## 回归和复现
 
-KN 原生相等与 TS 数值相等需要分开：TS 的两个静态 number 操作数先按从左到右各求值一次，保存到调用局部参数，再以 `a <= b && a >= b` 实现相等（不等取反）。这样 NaN 不等于自身，Infinity 和正负零保持 JS 数值语义，而不改变原生 KN EQ。`tests/tsnonfiniteinit-cases.mjs` 同时覆盖四种等号、操作数副作用顺序、递归和热循环，并由 Rust/CLI 在优化开关和解释器/JIT 下与 Node 配对。未知/混合非原始类型不新增保证。
+KN 原生相等与 TS 相等需要分开：TS 的两个静态 number 操作数先按从左到右各求值一次，保存到调用局部参数，再以 `a <= b && a >= b` 实现相等（不等取反）。已知非 NaN 数值常数的比较保留原生快路径。泛型、联合类型、`any` 等静态域不确定的严格相等，以及 `switch` 的 case 选择，使用共享 `ts/js-equality.mjs`：保存两侧后计算原生 `EQ(a,b) && !EQ(a,0/0)`，不等取反；numeric NaN 检测不经过字符串转换，也不把任意值送进数值 LTE/GTE。这样文本 `"NaN"`、布尔、数值及已支持的对象身份比较保持原规则，NaN 则不等于自身。nullable 数值宽松相等的非 nullish 比较复用同一过滤器，保留 `null == undefined`。所有修复只用于 KN 目标，不改变 K4 原路径或原生 DSL `eq`/`neq`。
+
+`tests/tsnonfiniteinit-cases.mjs` 覆盖四种等号、NaN switch 判别式/case、case 顺序与匹配短路、泛型/union/any、nullable null/undefined、文本/布尔类型对照、对象别名/独立对象、Infinity/正负零、操作数副作用顺序、递归和热循环，由 Rust/CLI 在优化开关及显式禁用 JIT/默认 JIT 下与 Node 配对。对象经泛型/any 擦除仍按既有对象边界明确报错，不扩大其支持范围。
+
+内部 EQ 审计：`control-flow.mjs` 的其它相等为有限状态/计数器；`compile-ts.mjs` 的 catch 标志为 0/1，Math.max/min 的 NaN 哨兵是已转换文本与文本字面量比较，原生 `eq`/`neq` API 必须保持 KN 语义；`nil-intrinsics.mjs` 的 nullish 哨兵比较及非数值域不会形成 numeric NaN/NaN 配对，因此不替换。普通二元表达式的 KN 静态 number 路径保持既有实现，unknown 严格相等走共享过滤器；工厂节点的内部运算仍由各自已知域降低规则负责。发布与 npm/web frontend 的共享文件清单同步包含新模块。
+
+审查修订的[官方播放与编辑器证据](kn-r3-text-review.json)：`reviewEqualitySource` 经真实 CLI 生成的优化开关两份工程各 1537 块，editor-compat 均 `ok: true`，连接/字段/参数无问题。播放观测工程只把 19 个 console 语句换为保存同一 reporter 的变量赋值并加完成标志，不改相等、参数和控制流；19 项实际值全部与 Node 基准一致，页面无错误，该 1539 块工程亦通过 editor-compat。JSON 绑定工程 SHA-256、官方 bundle SHA-256 和浏览器版本。此证据仅覆盖该原创回归，不声称未知输入的完整语言一致性。
 
 `tests/kn_r3_text.rs` 对 716 条可通过积木输入复现的域结果分别跑解释器和 JIT（两个 raw-null join 刻意排除），每条在 80 次循环中重复；另覆盖热循环 NaN、拼接树文本排序、console_log 的嵌套 join 及 null 截断。718 条官方调用的完整性与证据对应关系由 `tests/kn-r3-text.test.mjs` 检查。
 

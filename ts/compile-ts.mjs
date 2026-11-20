@@ -12,6 +12,7 @@ import { createExpressionTypes, withParsedParents } from "./tsstr-types.mjs";
 import { evaluateStaticNumericCall } from "./tsstr-numeric.mjs";
 import { boxedValue, evaluatedChoice, evaluatedStatement, evaluatedValue, lazyChoice, nonNullishBinding, returnChoice, updateValue } from "./control-expressions.mjs";
 import * as controlFlow from "./control-flow.mjs";
+import { jsEquality } from "./js-equality.mjs";
 import { compileTarget, checkTargetBlock } from "./compile-target.mjs";
 import { lowerTsValues } from "./tsfeat-values.mjs";
 import { lowerTsSequences } from "./tsfeat-sequences.mjs";
@@ -6648,6 +6649,12 @@ class WorkspaceCompiler {
       const value = constantNumber(node);
       return value !== null && !Number.isNaN(value);
     };
+    const strict = operator === ts.SyntaxKind.EqualsEqualsEqualsToken || operator === ts.SyntaxKind.ExclamationEqualsEqualsToken;
+    if (this.target.name === "kitten-n" && strict
+        && [expression.left, expression.right].some(node => this.expressionType?.(node) === "unknown")
+        && !knownOrdered(expression.left) && !knownOrdered(expression.right)) {
+      return jsEquality(this, expression.left, expression.right, parentId, operator === ts.SyntaxKind.ExclamationEqualsEqualsToken);
+    }
     if (this.target.name === "kitten-n" && equality && this.expressionType?.(expression.left) === "number"
         && this.expressionType?.(expression.right) === "number"
         && !knownOrdered(expression.left) && !knownOrdered(expression.right)) {

@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { jsEquality } from "./js-equality.mjs";
 
 const num = (c, value, parent) => c.addBlock({ type: "math_number", parent_id: parent, fields: { NUM: String(value) }, is_output: true });
 const get = (c, variable, parent) => c.addBlock({ type: "variables_get", parent_id: parent, fields: { variable }, is_output: true });
@@ -123,9 +124,14 @@ export function switchStatement(c, statement, parent) {
     const check = c.addBlock({ type: "controls_if", parent_id: parent });
     c.connectInput(check, compare(c, selected, -1, check), "IF0", "value");
     const match = c.addBlock({ type: "controls_if", parent_id: check });
-    const eq = c.addBlock({ type: "logic_compare", parent_id: match, fields: { OP: "EQ" }, is_output: true });
-    c.connectInput(eq, get(c, value, eq), "A", "value");
-    c.connectInput(eq, c.compileExpression(clause.expression, eq), "B", "value");
+    let eq;
+    if (c.target.name === "kitten-n") {
+      eq = jsEquality(c, ts.factory.createIdentifier(value), clause.expression, match);
+    } else {
+      eq = c.addBlock({ type: "logic_compare", parent_id: match, fields: { OP: "EQ" }, is_output: true });
+      c.connectInput(eq, get(c, value, eq), "A", "value");
+      c.connectInput(eq, c.compileExpression(clause.expression, eq), "B", "value");
+    }
     c.connectInput(match, eq, "IF0", "value");
     c.connectInput(match, set(c, selected, index, match), "DO0", "statement");
     c.connectInput(check, match, "DO0", "statement");

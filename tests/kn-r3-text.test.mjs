@@ -1,9 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { expectedFor, reviewEqualitySource } from "./tsnonfiniteinit-cases.mjs";
 
 const evidence = JSON.parse(fs.readFileSync(new URL("../docs/kn-r3-text-evidence.json", import.meta.url)));
 const playback = JSON.parse(fs.readFileSync(new URL("../docs/kn-r3-text-playback.json", import.meta.url)));
+const review = JSON.parse(fs.readFileSync(new URL("../docs/kn-r3-text-review.json", import.meta.url)));
 const calls = evidence.observation.calls;
 const call = label => {
   const matches = calls.filter(c => c.label === label);
@@ -64,4 +66,26 @@ test("r3 case conversion expands Unicode and uses context-sensitive final sigma"
   assert.equal(call("case-7/String.toLowerCase").result, "ος");
   assert.equal(call("case-8/String.toLowerCase").result, "οσα");
   assert.equal(call("case-12/String.toUpperCase").result, "FFI");
+});
+
+test("r3 equality review official playback matches Node and checked project hashes", () => {
+  assert.equal(review.playback.ok, true);
+  assert.deepEqual(review.playback.pageErrors, []);
+  assert.deepEqual(review.playback.expected, expectedFor(reviewEqualitySource));
+  assert.deepEqual(review.playback.actual, review.playback.expected);
+  assert.equal(review.editorCompat.projects.length, 2);
+  for (const report of [review.editorCompat, review.playbackCompat]) {
+    assert.equal(report.ok, true);
+    for (const project of report.projects) {
+      assert.equal(project.ok, true);
+      assert.deepEqual(project.issues, []);
+      assert.deepEqual(project.pageErrors, []);
+      assert.match(project.sha256, /^[a-f0-9]{64}$/);
+    }
+  }
+  assert.ok(review.playbackCompat.projects.some(p => p.sha256 === review.playback.fixtureSha256));
+  for (const bundle of review.playback.bundles) {
+    assert.match(bundle.sha256, /^[a-f0-9]{64}$/);
+    assert.ok(evidence.bundles.some(b => b.sha256 === bundle.sha256 && b.url === bundle.url));
+  }
 });

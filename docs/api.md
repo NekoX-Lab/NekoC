@@ -20,8 +20,16 @@ For the Kitten N target, statically numeric `==`, `===`, `!=` and `!==` preserve
 semantics, unlike the underlying KN equality block (which considers NaN equal
 to NaN). The compiler saves both operands once, left to right, in invocation-local
 parameters and combines ordered comparisons. Infinities and signed zeros retain
-their numeric equality semantics. This does not extend equality guarantees for
-`any`/unknown or mixed non-primitive operands.
+their numeric equality semantics. Strict equality with statically uncertain
+operands (including generic, union and `any` primitive values), and `switch` case
+selection, instead combine type-sensitive KN equality with a numeric NaN
+exclusion. Text `"NaN"` remains ordinary text; arbitrary values are not sent
+through numeric ordered comparisons. Nullable numeric `==`/`!=` use the same
+exclusion while preserving `null == undefined`. All operands are saved once,
+left to right, and matched switch cases do not evaluate later case expressions.
+Existing object/container support and diagnostics are unchanged; object identity
+requires supported explicit object types, not generic/`any` shape erasure. K4
+lowering and native DSL `eq`/`neq` retain their existing semantics.
 
 `Math.max` / `Math.min` accept one or more numeric arguments, save each once in
 left-to-right order, and propagate numeric NaN in any position. Arguments after
@@ -33,7 +41,7 @@ finite integers return true and fractions return false. Statically string/boolea
 arguments return false while preserving their evaluation. Dynamic mixed types,
 arbitrary any/text coercion, and signed-zero behavior are outside these guarantees.
 
-NaN detection uses the saved numeric value's verified `String(number)` spelling
+Math helper NaN detection uses the saved numeric value's verified `String(number)` spelling
 ([official conversion evidence](kn-conversion-evidence.json)), then returns that
 original number. It does not rely on Kitten N NaN equality or produce text `"NaN"`.
 
