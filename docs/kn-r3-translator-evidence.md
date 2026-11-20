@@ -74,6 +74,8 @@ Playwright 加载官方公开分享页和固定主包，匿名且 `navigator.onL
 - 禁用语句跳过自身、输入和嵌套体，继续 next；游离 event 根保持不启动，
   无论是否禁用（官方没有注册此类型为事件帽）。
 - 两种启用 reporter 求值动态输入，保留 false/NaN 类型；禁用表达式明确报错。
+- 禁用 reporter 的校验在普通、异步展开和深树遍历读取子表达式之前进行；
+  即使过时输入含未知类型，仍优先报告该 reporter 的 `disabled_param` 和积木 ID。
 - 未禁用 execution/event 位于可执行语句体时仍拒绝，不能把缺失实现伪装为成功。
 - 原有 `translate` / `translate_result` 不变。
 
@@ -99,3 +101,15 @@ Playwright 加载官方公开分享页和固定主包，匿名且 `navigator.onL
 - 只读语料 303456318 已越过转换占位错误，但仍被旧物理指令
   `self_enable_physics`（`xnBVQ7gxCOL6KmFD95Dx`）拦截，未完成 600 ticks。
   本任务不将其它未知/物理指令静默兜底，也不据此声称完整作品兼容。
+
+## 审查后复验
+
+- 临时 `browser-probe.mjs` 已采用审查员复验的硬判定：匿名/离线、errors 为空、
+  注册表存在性、返回类型和值、非 Promise、无参数属性访问、12 组语句和 6 组
+  表达式编译的结果及错误类别/编号全部符合预期才置 `ok=true`；否则退出非零。
+  早期仅依据 offline/calls 数量的 `ok` 本身不是语义证明。
+- 2026-11-21 加固后的原脚本复跑：退出 0、`ok=true`、`errors=[]`，
+  anonymous/offline 均为 true，4 类注册表/调用与 12/6 组编译案例通过硬判定。
+- `tests/kn_r3_translator.rs` 新增禁用 reporter 错误优先级回归矩阵：
+  两类型 × 同步/异步输入 × 0/40 层 `_array_literal` × typed/numeric 消费者。
+  所有组合都要求 `disabled_param` 和原始 ID，不得先报过时未知输入错误。

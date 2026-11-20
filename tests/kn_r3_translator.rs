@@ -180,6 +180,44 @@ fn disabled_reporters_are_errors_not_invented_results() {
 }
 
 #[test]
+fn disabled_reporter_error_precedes_stale_inputs_in_async_and_deep_lowering() {
+    for kind in [BOOLEAN, VALUE] {
+        for asynchronous in [false, true] {
+            for depth in [0, 40] {
+                let mut reporter = json!({"id":"disabled-conversion","type":kind,"disabled":true,
+                    "inputs":{"ADD0":{"type":"does_not_exist"}}});
+                if asynchronous {
+                    reporter["inputs"]["ADD1"] = json!({"type":"microbit_accelerometer"});
+                }
+                for _ in 0..depth {
+                    reporter = json!({"type":"_array_literal","inputs":{"items0":reporter}});
+                }
+                // Typed and numeric consumers enter different compiler paths.
+                for numeric in [false, true] {
+                    let value = if numeric {
+                        json!({"type":"math_arithmetic","fields":{"type":"add"},
+                            "inputs":{"A":reporter.clone(),"B":num(1.0)}})
+                    } else {
+                        reporter.clone()
+                    };
+                    let p = project(vec![start(log(value))]);
+                    let Err(error) = Program::compile(&p) else {
+                        panic!("disabled reporter compiled");
+                    };
+                    let error = format!("{error:#}");
+                    assert!(
+                        error.contains("disabled_param"),
+                        "{kind} async={asynchronous} depth={depth} numeric={numeric}: {error}"
+                    );
+                    assert!(error.contains("disabled-conversion"), "{error}");
+                    assert!(!error.contains("does_not_exist"), "{error}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn reporter_inputs_run_once_in_object_order_including_async_children() {
     for asynchronous in [false, true] {
         for kind in [BOOLEAN, VALUE] {

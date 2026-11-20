@@ -77,6 +77,27 @@ impl State {
 }
 
 impl Compiler {
+    /// Official compile_expression rejects these disabled reporters before
+    /// looking at their params. Async/deep lowering must preserve that priority.
+    pub(super) fn check_kn_conversion_reporter(&self, b: &Value) -> Result<()> {
+        if self.program.semantics == RuntimeSemantics::KnCurrent
+            && matches!(
+                b["type"].as_str(),
+                Some(
+                    "bcm_translator_text_return_boolean_block"
+                        | "bcm_translator_text_return_value_block"
+                )
+            )
+        {
+            ensure!(
+                b["disabled"] != true,
+                "KN conversion placeholder: disabled_param at {}",
+                b["id"]
+            );
+        }
+        Ok(())
+    }
+
     fn kn_panel_arg(&mut self, b: &Value, name: &str) -> Result<usize> {
         if let Some(value) = b["inputs"].get(name) {
             self.value(value)
@@ -144,11 +165,7 @@ impl Compiler {
         Ok(match b["type"].as_str().unwrap_or("") {
             "bcm_translator_text_return_boolean_block"
             | "bcm_translator_text_return_value_block" => {
-                ensure!(
-                    b["disabled"] != true,
-                    "KN conversion placeholder: disabled_param at {}",
-                    b["id"]
-                );
+                self.check_kn_conversion_reporter(b)?;
                 // Official compile_params evaluates dynamic sockets in object
                 // order even though these handlers ignore their arguments.
                 // Evidence: docs/kn-r3-translator-evidence.md.

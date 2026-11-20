@@ -1780,6 +1780,7 @@ impl Compiler {
         let mut work = vec![(root, false)];
         let mut output = BTreeMap::new();
         while let Some((node, exit)) = work.pop() {
+            self.check_kn_conversion_reporter(node)?;
             ensure!(
                 node["type"] != "_compiled_value",
                 "reserved internal expression type"

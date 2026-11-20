@@ -41,6 +41,7 @@ fn contains(block: &Value, kn: bool) -> bool {
 
 impl Compiler {
     pub(super) fn kn_await_value(&mut self, block: &Value) -> Result<Option<usize>> {
+        self.check_kn_conversion_reporter(block)?;
         if !contains(block, self.program.semantics == RuntimeSemantics::KnCurrent) {
             return Ok(None);
         }
@@ -48,6 +49,7 @@ impl Compiler {
     }
 
     fn kn_await_tree(&mut self, block: &Value, depth: usize) -> Result<usize> {
+        self.check_kn_conversion_reporter(block)?;
         ensure!(depth < 256, "KN asynchronous expression exceeds 256 levels");
         let kind = block["type"].as_str().unwrap_or("");
         if extension_reporter(kind) {
