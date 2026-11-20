@@ -88,7 +88,7 @@ function rejectAsyncSyntax(node) {
   ts.forEachChild(node, rejectAsyncSyntax);
 }
 
-function lowerFrontendFeatures(sourceFile) {
+function lowerFrontendFeatures(sourceFile, sourceIdentity) {
   try {
     rejectAsyncSyntax(sourceFile);
     // Validate raw entry/module identifiers before lexical renaming or helper
@@ -107,11 +107,16 @@ function lowerFrontendFeatures(sourceFile) {
       ts.forEachChild(node, validateRawSyntax);
     };
     validateRawSyntax(sourceFile);
-    const classes = lowerTsClasses(lowerTsNullable(lowerTsCollections(lowerTsDestructuring(sourceFile))));
+    // Generated names use the entry-relative module identity, never the machine
+    // path. Keep SourceFile.fileName intact for resolution and diagnostics.
+    const destructured = lowerTsDestructuring(sourceFile, sourceIdentity);
+    const collections = lowerTsCollections(destructured, sourceIdentity);
+    const nullable = lowerTsNullable(collections, sourceIdentity);
+    const classes = lowerTsClasses(nullable, sourceIdentity);
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
       .map(node => node.name.text));
-    const lowered = lowerTsFeatures(lowerTsSequences(lowerTsValues(lowerTsMethods(classes))));
+    const lowered = lowerTsFeatures(lowerTsSequences(lowerTsValues(lowerTsMethods(classes, sourceIdentity))), sourceIdentity);
     if (names.size) {
       const file = ts.getOriginalNode(lowered);
       markClassHelpers(file, names);
@@ -521,7 +526,8 @@ class WorkspaceCompiler {
         ts.ScriptKind.TS,
       );
       rejectParseDiagnostics(moduleSourceFile);
-      moduleSourceFile = lowerFrontendFeatures(moduleSourceFile);
+      moduleSourceFile = lowerFrontendFeatures(moduleSourceFile,
+        path.relative(path.dirname(this.entryPath), resolvedPath).replaceAll("\\", "/"));
       this.replacementSourceFiles.set(resolvedPath, frontendOriginals.get(moduleSourceFile) ?? moduleSourceFile);
       this.objectSourceFiles.push(moduleSourceFile);
       this.typeSourceFiles.set(resolvedPath, ts.getOriginalNode(moduleSourceFile));
@@ -7669,7 +7675,8 @@ export function compileFile(inputPath, host = defaultHost, { target = "kitten-n"
       ts.ScriptKind.TS,
     );
     rejectParseDiagnostics(sourceFile);
-    sourceFile = lowerFrontendFeatures(sourceFile);
+    sourceFile = lowerFrontendFeatures(sourceFile,
+      path.relative(path.dirname(path.resolve(inputPath)), path.resolve(inputPath)).replaceAll("\\", "/"));
     compiler = new WorkspaceCompiler(inputPath, sourceFile, host, compileTarget(target));
     const report = compiler.compile(sourceFile);
     // Preserve target-independent source errors (including helper validation)

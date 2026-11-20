@@ -6,7 +6,7 @@ import ts from "typescript";
  * Errors deliberately have the same shape as CompileError (without importing the
  * compiler, which would introduce a cycle). Run after expression/value lowering.
  */
-export function lowerTsFeatures(sourceFile) {
+export function lowerTsFeatures(sourceFile, sourceIdentity = sourceFile.fileName) {
   const f = ts.factory;
   const printer = ts.createPrinter();
   const fileName = sourceFile.fileName;
@@ -94,10 +94,11 @@ export function lowerTsFeatures(sourceFile) {
 
   const usedNames = new Set();
   walk(sourceFile, node => { if (ts.isIdentifier(node)) usedNames.add(node.text); });
-  // Imported files share the compiler's variable/function namespace. Include a
-  // deterministic file salt so independently lowered modules do not reuse IDs.
+  // Imported files share the compiler's variable/function namespace. Include an
+  // entry-relative file salt so independently lowered modules do not reuse IDs
+  // and relocating the project does not change the generated names.
   let fileHash = 2166136261;
-  for (const character of fileName.replaceAll("\\", "/")) {
+  for (const character of sourceIdentity.replaceAll("\\", "/")) {
     fileHash = Math.imul(fileHash ^ character.charCodeAt(0), 16777619) >>> 0;
   }
   let serial = 0;

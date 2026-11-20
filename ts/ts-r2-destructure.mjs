@@ -3,7 +3,7 @@ import ts from "typescript";
 // Lower the shallow, statically keyed subset before nullable/class passes so
 // ordinary property reads keep their type information and existing checks.
 // The backend still owns object identity, array storage and invocation frames.
-export function lowerTsDestructuring(sourceFile) {
+export function lowerTsDestructuring(sourceFile, sourceIdentity = sourceFile.fileName) {
   const names = new Set();
   const collect = node => {
     if (ts.isIdentifier(node)) names.add(node.text);
@@ -11,7 +11,7 @@ export function lowerTsDestructuring(sourceFile) {
   };
   collect(sourceFile);
   let salt = 2166136261;
-  for (const ch of sourceFile.fileName.replaceAll("\\", "/")) salt = Math.imul(salt ^ ch.charCodeAt(0), 16777619) >>> 0;
+  for (const ch of sourceIdentity.replaceAll("\\", "/")) salt = Math.imul(salt ^ ch.charCodeAt(0), 16777619) >>> 0;
   let serial = 0;
   const fresh = () => {
     let name;
