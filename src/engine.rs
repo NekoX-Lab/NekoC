@@ -9606,13 +9606,12 @@ impl Engine {
             Op::Yield => return Ok(false),
             Op::Wait(e) => {
                 self.tasks[index].wake = self.time + self.eval(e, actor).max(0.0);
-                if self.program.semantics == RuntimeSemantics::Kitten4 {
-                    // K9+f/task_update starts at the end of this update, expires
-                    // no earlier than the next, and disposes at the following
-                    // update's entry. Even wait 0 skips one full update.
-                    self.tasks[index].wait_started = Some(self.scheduler_tick);
-                    self.tasks[index].wait_finished = false;
-                }
+                // Both official runtimes start the task at this update's end,
+                // observe expiry at a later update's end, then dispose its lock
+                // on the following entry. Even wait 0 skips one full update.
+                // KN frame observations and source: docs/kn-r3-scheduling.md.
+                self.tasks[index].wait_started = Some(self.scheduler_tick);
+                self.tasks[index].wait_finished = false;
                 return Ok(false);
             }
             Op::Repeat(e, end) => {

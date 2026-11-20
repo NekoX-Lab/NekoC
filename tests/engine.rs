@@ -535,8 +535,15 @@ fn wait_uses_elapsed_seconds_and_zero_wait_yields() {
             .sprites
             .is_empty()
     );
-    assert_eq!(
+    assert!(
         vm.advance(0.06, 100, Duration::from_secs(1))
+            .unwrap()
+            .sprites
+            .is_empty()
+    );
+    // Expiry is observed at update end; the lock is released on next entry.
+    assert_eq!(
+        vm.advance(0.0, 100, Duration::from_secs(1))
             .unwrap()
             .sprites[0]
             .y,
@@ -729,6 +736,7 @@ fn task_locals_survive_yields_and_procedure_calls_but_redeclarations_reset() {
     let mut vm = Engine::new(Program::compile(&p).unwrap());
     vm.start();
     assert!(frame(&mut vm).logs.is_empty());
+    assert!(frame(&mut vm).logs.is_empty());
     assert_eq!(frame(&mut vm).logs, ["42", "0", "107", "0"]);
 }
 
@@ -874,6 +882,7 @@ fn concurrent_broadcast_payloads_are_per_task_and_received_is_a_frame_pulse() {
     let mut vm = Engine::new(Program::compile(&p).unwrap());
     vm.start();
     assert_eq!(frame(&mut vm).logs, ["true"]);
+    assert!(frame(&mut vm).logs.is_empty());
     assert_eq!(frame(&mut vm).logs, ["false", "甲", "甲", "乙", "乙"]);
     assert_eq!(vm.active_tasks(), 0);
     vm.start();
@@ -974,6 +983,8 @@ fn listener_stop_current_unblocks_sender_and_recursive_broadcast_is_bounded() {
     // Task-limit coverage must not depend on shared CI host wall-clock speed.
     vm.use_virtual_clock();
     vm.start();
+    // This is an instruction/task-cap check, not a wall-clock benchmark.
+    vm.use_virtual_clock();
     let f = vm.advance(0.0, 20, Duration::from_secs(1)).unwrap();
     assert!(f.budget_yield);
     assert_eq!(f.instructions, 20);
@@ -1201,7 +1212,9 @@ fn parameterized_procedures_restore_recursive_arguments_across_yields() {
     ])}}]});
     let mut vm = Engine::new(Program::compile(&p).unwrap());
     vm.start();
-    let logs = (0..5).flat_map(|_| frame(&mut vm).logs).collect::<Vec<_>>();
+    let logs = (0..10)
+        .flat_map(|_| frame(&mut vm).logs)
+        .collect::<Vec<_>>();
     assert_eq!(logs, ["3", "1", "2", "1", "1", "1", "2", "3"]);
     assert_eq!(vm.active_tasks(), 0);
 }
@@ -1362,12 +1375,24 @@ fn timer_stop_does_not_stop_waits_and_reset_restarts_timer() {
     let mut vm = Engine::new(Program::compile(&p).unwrap());
     vm.start();
     vm.advance(0.0, 100, Duration::from_secs(1)).unwrap();
-    assert_eq!(
-        vm.advance(0.1, 100, Duration::from_secs(1)).unwrap().logs,
-        ["0"]
+    assert!(
+        vm.advance(0.1, 100, Duration::from_secs(1))
+            .unwrap()
+            .logs
+            .is_empty()
     );
     assert_eq!(
-        vm.advance(0.1, 100, Duration::from_secs(1)).unwrap().logs,
+        vm.advance(0.0, 100, Duration::from_secs(1)).unwrap().logs,
+        ["0"]
+    );
+    assert!(
+        vm.advance(0.1, 100, Duration::from_secs(1))
+            .unwrap()
+            .logs
+            .is_empty()
+    );
+    assert_eq!(
+        vm.advance(0.0, 100, Duration::from_secs(1)).unwrap().logs,
         ["0.1"]
     );
 }
@@ -1498,8 +1523,7 @@ fn pencraft_imported_mixed_lists_locals_and_procedures_execute() {
 
 #[test]
 fn coalescing_runs_invisible_ticks_but_never_shortens_waits() {
-    // forever { score += 1; wait 0 } has no visible output: coalescing runs it
-    // repeatedly in one frame; the default keeps one tick per frame.
+    // A wait lock ends coalescing; only runnable invisible tails may coalesce.
     let mut p = project(json!({"type":"repeat_forever","statements":{"DO":{
         "type":"change_variables","fields":{"variable":"score","method":"increase"},"inputs":{"value":num(1.0)},
         "next":{"type":"wait","inputs":{"time":num(0.0)}}}}}));
@@ -1510,8 +1534,10 @@ fn coalescing_runs_invisible_ticks_but_never_shortens_waits() {
     let f = vm.advance_with(1.0 / 60.0, 1_000_000, budget, 1).unwrap();
     assert_eq!((f.ticks, vm.numeric_variables()[0]), (1, 1.0));
     let f = vm.advance_with(1.0 / 60.0, 1_000_000, budget, 16).unwrap();
-    // Each iteration yields twice (wait 0, loop end): 16 ticks = 8 more iterations.
-    assert_eq!((f.ticks, vm.numeric_variables()[0]), (16, 9.0));
+    // A wait lock prevents coalescing until its update-end expiry is released.
+    assert_eq!((f.ticks, vm.numeric_variables()[0]), (1, 1.0));
+    let f = vm.advance_with(1.0 / 60.0, 1_000_000, budget, 16).unwrap();
+    assert_eq!((f.ticks, vm.numeric_variables()[0]), (2, 2.0));
 
     // A timed wait is not completed by extra zero-dt ticks.
     let p = project(json!({"type":"wait","inputs":{"time":num(0.1)},"next":movement(10.0)}));
@@ -1521,6 +1547,8 @@ fn coalescing_runs_invisible_ticks_but_never_shortens_waits() {
     let f = vm.advance_with(0.05, 1_000, budget, 16).unwrap();
     assert!(f.sprites.is_empty() && f.active == 1, "wait finished early");
     let f = vm.advance_with(0.06, 1_000, budget, 16).unwrap();
+    assert!(f.sprites.is_empty());
+    let f = vm.advance_with(0.0, 1_000, budget, 16).unwrap();
     assert_eq!(f.sprites[0].y, 10.0);
 
     // A visible change ends the frame: one stroke per tick, one tick per frame.
@@ -1743,6 +1771,7 @@ fn restart_resets_state_and_runs_start_scripts_again() {
     vm.start();
     frame(&mut vm);
     assert_eq!(vm.numeric_variables()[0], 1.0);
+    frame(&mut vm);
     let f = frame(&mut vm);
     // Restart reinitialised variables and re-dispatched the start hat.
     assert!(f.active == 1 && vm.numeric_variables()[0] == 0.0);
@@ -2164,6 +2193,7 @@ fn switching_scenes_stops_old_scripts_and_starts_the_new_scene() {
         2,
         "only scene A's stage and actor are drawn"
     );
+    assert!(!frame(&mut vm).scene_changed);
     let f = frame(&mut vm);
     // Switched: scene A's remaining blocks never run, scene B is active.
     assert!(f.scene_changed && f.scene == "scene-b");
@@ -2178,6 +2208,7 @@ fn switching_scenes_stops_old_scripts_and_starts_the_new_scene() {
     // Slots sorted: a, b, k. Scene A's key hat did not run.
     assert_eq!(vm.numeric_variables(), &[1.0, 1.0, 0.0]);
     assert!(!f.scene_changed);
+    frame(&mut vm);
     frame(&mut vm);
     let f = frame(&mut vm);
     // Back in A: its start script runs again; the actor kept its position.

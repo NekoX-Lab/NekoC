@@ -1,0 +1,857 @@
+{
+  "officialUrl": "https://kn.codemao.cn/editor",
+  "verifiedAt": "2026-11-19T14:45:31.939Z",
+  "browserVersion": "157.0.4341.60",
+  "frameMs": 16,
+  "cases": {
+    "wait-zero": {
+      "sha256": "f652f2ed1e98a73d3ada6f2841fb008b886f1990556e0d3e1cc4a1a27aac1448",
+      "pageErrors": [],
+      "bundles": [
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+          "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+        },
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+          "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+        }
+      ],
+      "frames": [
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 1
+        },
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 2
+        },
+        {
+          "variables": {
+            "trace": "ABab",
+            "ready": 0
+          },
+          "elapsedFrames": 3
+        },
+        {
+          "variables": {
+            "trace": "ABab",
+            "ready": 0
+          },
+          "elapsedFrames": 4
+        },
+        {
+          "variables": {
+            "trace": "ABab",
+            "ready": 0
+          },
+          "elapsedFrames": 5
+        },
+        {
+          "variables": {
+            "trace": "ABab",
+            "ready": 0
+          },
+          "elapsedFrames": 6
+        },
+        {
+          "variables": {
+            "trace": "ABab",
+            "ready": 0
+          },
+          "elapsedFrames": 7
+        },
+        {
+          "variables": {
+            "trace": "ABab",
+            "ready": 0
+          },
+          "elapsedFrames": 8
+        }
+      ],
+      "runtimeErrors": [],
+      "ok": true
+    },
+    "wait-negative": {
+      "sha256": "572366508985a439871d4df47984f7a737246872553be4a89d65040f61c808be",
+      "pageErrors": [],
+      "bundles": [
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+          "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+        },
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+          "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+        }
+      ],
+      "frames": [
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 1
+        },
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 2
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 0
+          },
+          "elapsedFrames": 3
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 0
+          },
+          "elapsedFrames": 4
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 0
+          },
+          "elapsedFrames": 5
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 0
+          },
+          "elapsedFrames": 6
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 0
+          },
+          "elapsedFrames": 7
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 0
+          },
+          "elapsedFrames": 8
+        }
+      ],
+      "runtimeErrors": [],
+      "ok": true
+    },
+    "wait-positive": {
+      "sha256": "a4d601bee3d33b2143a1f4a6898a88c95a916370dc8e0f2e6165aada454d6c72",
+      "pageErrors": [],
+      "bundles": [
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+          "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+        },
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+          "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+        }
+      ],
+      "frames": [
+        {
+          "variables": {
+            "trace": "A",
+            "ready": 0
+          },
+          "elapsedFrames": 1
+        },
+        {
+          "variables": {
+            "trace": "A",
+            "ready": 0
+          },
+          "elapsedFrames": 2
+        },
+        {
+          "variables": {
+            "trace": "A",
+            "ready": 0
+          },
+          "elapsedFrames": 3
+        },
+        {
+          "variables": {
+            "trace": "Aa",
+            "ready": 0
+          },
+          "elapsedFrames": 4
+        },
+        {
+          "variables": {
+            "trace": "Aa",
+            "ready": 0
+          },
+          "elapsedFrames": 5
+        },
+        {
+          "variables": {
+            "trace": "Aa",
+            "ready": 0
+          },
+          "elapsedFrames": 6
+        },
+        {
+          "variables": {
+            "trace": "Aa",
+            "ready": 0
+          },
+          "elapsedFrames": 7
+        },
+        {
+          "variables": {
+            "trace": "Aa",
+            "ready": 0
+          },
+          "elapsedFrames": 8
+        }
+      ],
+      "runtimeErrors": [],
+      "ok": true
+    },
+    "wait-until": {
+      "sha256": "719c82d2f489ccbb5c1ab83f3d193800c72e6620461a4eb16612073b12a5975b",
+      "pageErrors": [],
+      "bundles": [
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+          "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+        },
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+          "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+        }
+      ],
+      "frames": [
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 1
+          },
+          "elapsedFrames": 1
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 1
+          },
+          "elapsedFrames": 2
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 1
+          },
+          "elapsedFrames": 3
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 1
+          },
+          "elapsedFrames": 4
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 1
+          },
+          "elapsedFrames": 5
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 1
+          },
+          "elapsedFrames": 6
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 1
+          },
+          "elapsedFrames": 7
+        },
+        {
+          "variables": {
+            "trace": "ABa",
+            "ready": 1
+          },
+          "elapsedFrames": 8
+        }
+      ],
+      "runtimeErrors": [],
+      "ok": true
+    },
+    "repeat": {
+      "sha256": "bb94dbcdc22a5487cb62d2de0bb31da505f7e34de2b7c4be9146578dc98c06ba",
+      "pageErrors": [],
+      "bundles": [
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+          "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+        },
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+          "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+        }
+      ],
+      "frames": [
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 1
+        },
+        {
+          "variables": {
+            "trace": "ABAB",
+            "ready": 0
+          },
+          "elapsedFrames": 2
+        },
+        {
+          "variables": {
+            "trace": "ABABAB",
+            "ready": 0
+          },
+          "elapsedFrames": 3
+        },
+        {
+          "variables": {
+            "trace": "ABABABab",
+            "ready": 0
+          },
+          "elapsedFrames": 4
+        },
+        {
+          "variables": {
+            "trace": "ABABABab",
+            "ready": 0
+          },
+          "elapsedFrames": 5
+        },
+        {
+          "variables": {
+            "trace": "ABABABab",
+            "ready": 0
+          },
+          "elapsedFrames": 6
+        },
+        {
+          "variables": {
+            "trace": "ABABABab",
+            "ready": 0
+          },
+          "elapsedFrames": 7
+        },
+        {
+          "variables": {
+            "trace": "ABABABab",
+            "ready": 0
+          },
+          "elapsedFrames": 8
+        }
+      ],
+      "runtimeErrors": [],
+      "ok": true
+    },
+    "broadcast": {
+      "sha256": "5f5e90ff46b5eb37d8e04fe11039824cdb7798290d5eb90b6812c8f03b098e10",
+      "pageErrors": [],
+      "bundles": [
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+          "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+        },
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+          "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+        }
+      ],
+      "frames": [
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 1
+        },
+        {
+          "variables": {
+            "trace": "ABR",
+            "ready": 0
+          },
+          "elapsedFrames": 2
+        },
+        {
+          "variables": {
+            "trace": "ABR",
+            "ready": 0
+          },
+          "elapsedFrames": 3
+        },
+        {
+          "variables": {
+            "trace": "ABRr",
+            "ready": 0
+          },
+          "elapsedFrames": 4
+        },
+        {
+          "variables": {
+            "trace": "ABRr",
+            "ready": 0
+          },
+          "elapsedFrames": 5
+        },
+        {
+          "variables": {
+            "trace": "ABRr",
+            "ready": 0
+          },
+          "elapsedFrames": 6
+        },
+        {
+          "variables": {
+            "trace": "ABRr",
+            "ready": 0
+          },
+          "elapsedFrames": 7
+        },
+        {
+          "variables": {
+            "trace": "ABRr",
+            "ready": 0
+          },
+          "elapsedFrames": 8
+        }
+      ],
+      "runtimeErrors": [],
+      "ok": true
+    },
+    "broadcast-wait": {
+      "sha256": "0a7a81d43c32e1e2947bf296fda30b088a7ea104cc2fa9542e2b0921009495d6",
+      "pageErrors": [],
+      "bundles": [
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+          "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+        },
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+          "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+        }
+      ],
+      "frames": [
+        {
+          "variables": {
+            "trace": "A",
+            "ready": 0
+          },
+          "elapsedFrames": 1
+        },
+        {
+          "variables": {
+            "trace": "AR",
+            "ready": 0
+          },
+          "elapsedFrames": 2
+        },
+        {
+          "variables": {
+            "trace": "AR",
+            "ready": 0
+          },
+          "elapsedFrames": 3
+        },
+        {
+          "variables": {
+            "trace": "ARrB",
+            "ready": 0
+          },
+          "elapsedFrames": 4
+        },
+        {
+          "variables": {
+            "trace": "ARrB",
+            "ready": 0
+          },
+          "elapsedFrames": 5
+        },
+        {
+          "variables": {
+            "trace": "ARrB",
+            "ready": 0
+          },
+          "elapsedFrames": 6
+        },
+        {
+          "variables": {
+            "trace": "ARrB",
+            "ready": 0
+          },
+          "elapsedFrames": 7
+        },
+        {
+          "variables": {
+            "trace": "ARrB",
+            "ready": 0
+          },
+          "elapsedFrames": 8
+        }
+      ],
+      "runtimeErrors": [],
+      "ok": true
+    },
+    "broadcast-empty": {
+      "sha256": "d4729c16338dcfb77cc8e4d24ff7de203eb93ea4470022a5cc059d0e33cf639e",
+      "pageErrors": [],
+      "bundles": [
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+          "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+        },
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+          "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+        }
+      ],
+      "frames": [
+        {
+          "variables": {
+            "trace": "A",
+            "ready": 0
+          },
+          "elapsedFrames": 1
+        },
+        {
+          "variables": {
+            "trace": "A",
+            "ready": 0
+          },
+          "elapsedFrames": 2
+        },
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 3
+        },
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 4
+        },
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 5
+        },
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 6
+        },
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 7
+        },
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 8
+        }
+      ],
+      "runtimeErrors": [],
+      "ok": true
+    },
+    "broadcast-overlap": {
+      "sha256": "efc43b87391afc44c788a3ae2d961f3337ce3f9d536055830117007858bb540e",
+      "pageErrors": [],
+      "bundles": [
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+          "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+        },
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+          "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+        }
+      ],
+      "frames": [
+        {
+          "variables": {
+            "trace": "A",
+            "ready": 0
+          },
+          "elapsedFrames": 1
+        },
+        {
+          "variables": {
+            "trace": "AR",
+            "ready": 0
+          },
+          "elapsedFrames": 2
+        },
+        {
+          "variables": {
+            "trace": "AR",
+            "ready": 0
+          },
+          "elapsedFrames": 3
+        },
+        {
+          "variables": {
+            "trace": "ARr",
+            "ready": 0
+          },
+          "elapsedFrames": 4
+        },
+        {
+          "variables": {
+            "trace": "ARr",
+            "ready": 0
+          },
+          "elapsedFrames": 5
+        },
+        {
+          "variables": {
+            "trace": "ARr",
+            "ready": 0
+          },
+          "elapsedFrames": 6
+        },
+        {
+          "variables": {
+            "trace": "ARr",
+            "ready": 0
+          },
+          "elapsedFrames": 7
+        },
+        {
+          "variables": {
+            "trace": "ARr",
+            "ready": 0
+          },
+          "elapsedFrames": 8
+        }
+      ],
+      "runtimeErrors": [],
+      "ok": true
+    },
+    "clone": {
+      "sha256": "6c72252f786520c25aa4bc8927f3c73b3fd476ec108eda056157398e2c8bb6be",
+      "pageErrors": [],
+      "bundles": [
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+          "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+        },
+        {
+          "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+          "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+        }
+      ],
+      "frames": [
+        {
+          "variables": {
+            "trace": "AB",
+            "ready": 0
+          },
+          "elapsedFrames": 1
+        },
+        {
+          "variables": {
+            "trace": "ABK",
+            "ready": 0
+          },
+          "elapsedFrames": 2
+        },
+        {
+          "variables": {
+            "trace": "ABKb",
+            "ready": 0
+          },
+          "elapsedFrames": 3
+        },
+        {
+          "variables": {
+            "trace": "ABKbk",
+            "ready": 0
+          },
+          "elapsedFrames": 4
+        },
+        {
+          "variables": {
+            "trace": "ABKbk",
+            "ready": 0
+          },
+          "elapsedFrames": 5
+        },
+        {
+          "variables": {
+            "trace": "ABKbk",
+            "ready": 0
+          },
+          "elapsedFrames": 6
+        },
+        {
+          "variables": {
+            "trace": "ABKbk",
+            "ready": 0
+          },
+          "elapsedFrames": 7
+        },
+        {
+          "variables": {
+            "trace": "ABKbk",
+            "ready": 0
+          },
+          "elapsedFrames": 8
+        }
+      ],
+      "runtimeErrors": [],
+      "ok": true
+    }
+  },
+  "ok": true,
+  "editorCompat": {
+    "editorUrl": "https://kn.codemao.cn/editor",
+    "checkedAt": "2026-11-19T15:09:00.934Z",
+    "projects": [
+      {
+        "input": "tests/fixtures/kn-r3-sched/broadcast.bcmkn",
+        "sha256": "5f5e90ff46b5eb37d8e04fe11039824cdb7798290d5eb90b6812c8f03b098e10",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 23,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      },
+      {
+        "input": "tests/fixtures/kn-r3-sched/broadcast-empty.bcmkn",
+        "sha256": "d4729c16338dcfb77cc8e4d24ff7de203eb93ea4470022a5cc059d0e33cf639e",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 11,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      },
+      {
+        "input": "tests/fixtures/kn-r3-sched/broadcast-overlap.bcmkn",
+        "sha256": "efc43b87391afc44c788a3ae2d961f3337ce3f9d536055830117007858bb540e",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 21,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      },
+      {
+        "input": "tests/fixtures/kn-r3-sched/broadcast-wait.bcmkn",
+        "sha256": "0a7a81d43c32e1e2947bf296fda30b088a7ea104cc2fa9542e2b0921009495d6",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 23,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      },
+      {
+        "input": "tests/fixtures/kn-r3-sched/clone.bcmkn",
+        "sha256": "6c72252f786520c25aa4bc8927f3c73b3fd476ec108eda056157398e2c8bb6be",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 27,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      },
+      {
+        "input": "tests/fixtures/kn-r3-sched/repeat.bcmkn",
+        "sha256": "bb94dbcdc22a5487cb62d2de0bb31da505f7e34de2b7c4be9146578dc98c06ba",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 22,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      },
+      {
+        "input": "tests/fixtures/kn-r3-sched/wait-negative.bcmkn",
+        "sha256": "572366508985a439871d4df47984f7a737246872553be4a89d65040f61c808be",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 16,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      },
+      {
+        "input": "tests/fixtures/kn-r3-sched/wait-positive.bcmkn",
+        "sha256": "a4d601bee3d33b2143a1f4a6898a88c95a916370dc8e0f2e6165aada454d6c72",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 11,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      },
+      {
+        "input": "tests/fixtures/kn-r3-sched/wait-until.bcmkn",
+        "sha256": "719c82d2f489ccbb5c1ab83f3d193800c72e6620461a4eb16612073b12a5975b",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 20,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      },
+      {
+        "input": "tests/fixtures/kn-r3-sched/wait-zero.bcmkn",
+        "sha256": "f652f2ed1e98a73d3ada6f2841fb008b886f1990556e0d3e1cc4a1a27aac1448",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 22,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      }
+    ],
+    "bundleUrl": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+    "ok": true
+  }
+}
