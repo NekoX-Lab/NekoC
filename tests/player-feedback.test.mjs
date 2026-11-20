@@ -27,3 +27,13 @@ test('diagnostics omit the project, aggregate errors and reset only for an accep
   get('#dismiss').onclick();assert.equal(get('#notice').hidden,true);assert.equal(feedback.resourceErrors.length,2);
   feedback.reset({project:{projectName:'new'}});assert.deepEqual(feedback.resourceErrors,[]);assert.equal(get('#notice').hidden,true);
 });
+test('runtime mode names the actual backend and errors stay readable plain text',()=>{
+  const {feedback,get}=fixture();
+  feedback.mode('wasm');assert.equal(get('#runtime-mode').textContent,'运行模式：WASM · 浏览器内运行');
+  feedback.mode('rust');assert.equal(get('#runtime-mode').textContent,'运行模式：本机 VM');
+  feedback.runtimeError(Error('<img src=x onerror=alert(1)>'));
+  assert.match(get('#notice-text').textContent,/运行错误：<img src=x onerror=alert\(1\)>/);
+  assert.match(get('#notice-text').textContent,/运行已停止.*开始游玩/s);
+  assert.equal(get('#notice').hidden,false);
+  feedback.notice('字符串错误');assert.match(get('#notice-text').textContent,/字符串错误/);
+});

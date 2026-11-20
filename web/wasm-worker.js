@@ -1,10 +1,36 @@
 // wasm 后端 Worker：nekoc-wasm 的 web 绑定。消息格式见 backend.js。
-// wasm/ 由 tools/build-web-wasm.mjs 从 packages/nekoc/dist/web 复制。
+// wasm/ 由 tools/build-pages.mjs 从 packages/nekoc/dist/web 复制。
 import init,{importProject,checkExtensions,Player} from './wasm/nekoc_wasm.js';
 
-const ready=init({module_or_path:new URL('./wasm/nekoc_wasm_bg.wasm',import.meta.url)});
 const players=new Map();
 const errorText=error=>typeof error==='string'?error:error?.message||String(error);
+const progress=(label,completed=null,total=null)=>postMessage({progress:{label,completed,total}});
+const ready=(async()=>{
+  try{
+    // Standalone exports embed bytes before this script; never fetch from file://.
+    let bytes=globalThis.nekoPlayerWasmBytes;
+    if(bytes){progress('正在读取内置 WASM（字节）…',bytes.byteLength,bytes.byteLength);}
+    else{
+      progress('正在下载 WASM…');
+      const response=await fetch(new URL('./wasm/nekoc_wasm_bg.wasm',import.meta.url),{signal:AbortSignal.timeout(60000)});
+      if(!response.ok)throw Error(`下载失败：HTTP ${response.status}`);
+      let total=Number(response.headers.get('content-length'))||null;
+      if(response.body){
+        const reader=response.body.getReader(),chunks=[];let completed=0;
+        for(;;){
+          const {done,value}=await reader.read();if(done)break;
+          chunks.push(value);completed+=value.byteLength;if(total!==null&&completed>total)total=null;
+          progress(total===null?`正在下载 WASM… 已接收 ${completed} 字节`:'正在下载 WASM（字节）…',completed,total);
+        }
+        bytes=new Uint8Array(completed);let offset=0;
+        for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength;}
+      }else bytes=new Uint8Array(await response.arrayBuffer());
+      progress('WASM 下载完成（字节）',bytes.byteLength,bytes.byteLength);
+    }
+    progress('正在编译 / 初始化 WASM…');
+    await init({module_or_path:bytes});postMessage({ready:true});return true;
+  }catch(error){postMessage({error:`WASM 运行时载入失败：${errorText(error)}`});return false;}
+})();
 
 const calls={
   // Same shape as the backend's /api/import-player: report fields plus project.
@@ -21,7 +47,7 @@ function reply(socket,message){
 }
 
 self.onmessage=async({data})=>{
-  await ready;
+  if(!await ready)return;
   if(data.call){
     try{postMessage({call:data.call,value:calls[data.name](data.value)});}
     catch(error){postMessage({call:data.call,error:errorText(error)});}

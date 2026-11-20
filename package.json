@@ -16,5 +16,9 @@
   },
   "dependencies": {
     "typescript": "^5.9.3"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "fflate": "0.8.3"
   }
 }

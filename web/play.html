@@ -14,7 +14,6 @@
     <div id="stage-box"><canvas id="stage" tabindex="0" aria-label="游戏舞台，点击后使用键盘游玩"></canvas><div id="timer" hidden></div></div>
     <div id="welcome" class="welcome"><span class="eyebrow">READY WHEN YOU ARE</span><h2>把作品带到大屏幕。</h2><p>导入 .bcmkn / .bcm，或直接拖到这里</p></div>
     <div id="drop-hint" aria-hidden="true"><span>松开，开始游玩</span><small>.bcmkn / .bcm</small></div>
-    <div id="notice" role="alert" hidden><span id="notice-text"></span><button id="dismiss" aria-label="关闭提示">×</button></div>
     <div id="loading" role="status" hidden><label id="load-label" for="load-progress">正在读取作品…</label><progress id="load-progress" max="1"></progress></div>
   </section>
 
@@ -25,7 +24,9 @@
   </section>
 
   <section class="tile controls-tile">
-    <div class="play-controls"><button id="toggle" class="primary" disabled>▶ 开始游玩</button><button id="restart" disabled title="从头开始">↻ 重玩</button><button id="fullscreen" title="全屏游玩" aria-label="全屏游玩">⛶ <span>全屏</span></button></div>
+    <div class="play-controls"><button id="toggle" class="primary" disabled>▶ 开始游玩</button><button id="stop" disabled title="结束运行；再次开始将从头运行">■ 停止</button><button id="restart" disabled title="从头开始">↻ 重玩</button><button id="fullscreen" title="全屏游玩" aria-label="全屏游玩">⛶ <span>全屏</span></button></div>
+    <span id="runtime-mode" role="status">运行模式：正在连接…</span>
+    <span class="keyboard-hint">需要 WebGL 2；浏览器内运行重作品会占用较多内存，请等待加载完成后开始。</span>
     <span id="status" role="status">选择作品，开始游玩</span>
     <span class="keyboard-hint">点击画面后用键盘游玩</span>
     <button id="record" disabled aria-pressed="false" aria-describedby="record-help">● 录制复现（从头开始）</button>
@@ -49,6 +50,7 @@
       <div class="setting"><label for="coalesce">合并无画面更新</label><select id="coalesce"><option value="0" selected>关闭 · 官方节奏</option><option value="1">开启 · 实验</option></select><small>一次更新内连续执行没有画面变化的轮次（时间不前进）。分步绘制的作品更流畅，但只改变量的循环会跑得更快。</small></div>
     </div>
   </section>
+  <div id="notice" role="alert" hidden><span id="notice-text" tabindex="0" aria-label="播放器提示与错误详情"></span><button id="dismiss" aria-label="关闭提示">×</button></div>
 <dialog id="coverage-dialog" aria-labelledby="report-title">
   <h2 id="report-title">兼容性 / coverage 报告</h2>
   <p>以下是当前作品的导入静态诊断和素材失败记录，不代表运行 coverage 或官方一致性。</p>

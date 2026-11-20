@@ -13,6 +13,7 @@ export class PlayerFeedback {
     };
   }
   notice(message){
+    message=typeof message==='string'?message:message?.message||String(message);
     if(!this.messages.includes(message)){this.messages.push(message);if(this.messages.length>100)this.messages.shift();}
     this.$('#notice-text').textContent=this.messages.join('\n');this.$('#notice').hidden=false;
   }
@@ -22,6 +23,8 @@ export class PlayerFeedback {
     this.$('#coverage').disabled=false;
   }
   resourceError(message){if(!this.resourceErrors.includes(message))this.resourceErrors.push(message);this.notice(message);}
+  runtimeError(error){this.notice(`运行错误：${typeof error==='string'?error:error?.message||String(error)}\n运行已停止。可点击「开始游玩」重试，或重新导入作品。`);}
+  mode(kind){this.$('#runtime-mode').textContent=`运行模式：${kind==='wasm'?'WASM · 浏览器内运行':kind==='rust'?'本机 VM':'正在连接…'}`;}
   progress(label,completed=null,total=null){
     this.$('#loading').hidden=false;this.$('#viewport').setAttribute('aria-busy','true');
     const meter=this.$('#load-progress');

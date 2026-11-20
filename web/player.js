@@ -44,7 +44,7 @@ export class PlayerConnection {
           }
         }catch(error){this.fail(error);}
       };
-      socket.onerror=()=>{if(this.socket===socket)this.fail(Error('运行时连接失败'));};
+      socket.onerror=event=>{if(this.socket===socket)this.fail(event?.error||Error('运行时连接失败'));};
       socket.onclose=()=>{if(this.socket===socket)this.fail(Error('运行时连接已关闭'));};
     });
   }

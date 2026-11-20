@@ -10,13 +10,14 @@ import {ReproRecorder,REPRO_DT} from './repro.js';
 
 const extension=location.protocol==='chrome-extension:'?await import('./extension.js'):null;
 const params=new URLSearchParams(location.search);
-// Exported executables: stage and performance settings only.
+// App mode: stage, compact playback controls and performance settings.
 const app=params.has('app');
 document.body.classList.toggle('native',params.has('native'));
 if(app){document.body.classList.add('app');document.querySelector('#settings').hidden=true;document.querySelector('#settings-toggle').setAttribute('aria-expanded','false');}
 // ?engine=wasm (or the static site's meta tag) runs the VM in this browser.
 const wasm=params.get('engine')==='wasm'||document.querySelector('meta[name=nekoc-engine]')?.content==='wasm';
-const backend=extension?await extension.backend():wasm?wasmBackend():httpBackend(location.origin);
+const bundled=globalThis.nekoPlayerExport;
+let backend,unsubscribeProgress;
 
 const $=selector=>document.querySelector(selector);
 const canvas=$('#stage'),shell=$('#player-shell');
@@ -41,6 +42,8 @@ function syncControls(){
   $('#toggle').disabled=busy||!playable||!!recorder&&(recorder.full||recorder.interrupted);$('#restart').disabled=busy||!playable||!!recorder;
   $('#record').disabled=busy||!playable;$('#record').textContent=recorder?'■ 停止录制并导出 JSON':'● 录制复现（从头开始）';
   $('#record').setAttribute('aria-pressed',String(!!recorder));
+  // A recording must be finalized through its export button, not discarded by stop.
+  $('#stop').disabled=busy||!connection?.ready||!!recorder;
   $('#toggle').textContent=running?'Ⅱ 暂停':connection?.ready?'▶ 继续游玩':'▶ 开始游玩';
   $('#toggle').setAttribute('aria-pressed',String(running));
   for(const id of ['frame-limit','budget','resolution','coalesce'])$(`#${id}`).disabled=busy||!!recorder;
@@ -53,6 +56,7 @@ function pause(message='已暂停'){
 }
 async function closeRuntime(){
   running=false;epoch++;clearKeys();connection?.close();connection=null;
+  clearTimeout(pumpTimer);pumpTimer=0;
   input?.reset();overlay?.reset();
   audio.stop();renderer?.pauseMedia();
   await inFlight;resetMeter();
@@ -91,8 +95,13 @@ async function launch(){
   if(connection?.ready)void connection.requestDevicePermission();
   if(!connection?.ready){
     input?.reset();
+    const next=new PlayerConnection(),devicePermission=next.requestDevicePermission();
+    // A new VM must not inherit other scenes' pen surfaces, transitions or video
+    // state. Keep the stopped final image until this fresh start; resume skips it.
+    for(const animation of canvas.getAnimations?.()||[])animation.cancel();
+    await renderer.load(project,({completed,total})=>feedback.progress('重新加载图片 / 视频…',completed,total));renderer.render();fitStage();
     feedback.progress('正在连接运行时…');
-    const next=new PlayerConnection();connection=next;const devicePermission=next.requestDevicePermission();await next.open(project,backend);void devicePermission;sendCostumes=true;overlay.reset();
+    connection=next;await next.open(project,backend);void devicePermission;sendCostumes=true;overlay.reset();
     // Opt-in observation before any scheduler tick, not an extra simulation frame.
     if(new URLSearchParams(location.search).has('compare'))window.nekoCompareZero=await next.snapshot();
     epoch++;lastFrame=null;totalUpdates=0;
@@ -108,7 +117,7 @@ function focusStage(){
 }
 async function action(work){
   if(busy)return;busy=true;syncControls();
-  try{await work();}catch(error){pause('操作失败 · 可重试或重新导入');notice(error.message);}
+  try{await work();}catch(error){pause('操作失败 · 可重试或重新导入');notice(error);}
   finally{feedback.finish();busy=false;syncControls();}
 }
 async function importFile(file){
@@ -151,7 +160,8 @@ async function advance(dt){
   }catch(error){
     if(token!==epoch)return;
     recorder?.interrupt();
-    epoch++;connection?.close();connection=null;pause('运行已中断');notice(error.message);
+    epoch++;connection?.close();connection=null;input?.reset();overlay?.reset();audio.stop();lastFrame=null;$('#timer').hidden=true;
+    pause(recorder?'录制已中断 · 请停止并导出':'运行已中断 · 可重新开始');feedback.runtimeError(error);
     extension?.reportStatus('lost');
   }
 }
@@ -233,9 +243,13 @@ $('#record').onclick=()=>action(async()=>{
   epoch++;lastFrame=null;totalUpdates=0;sendCostumes=false;overlay.reset();
   await launch();
 });
+$('#stop').onclick=()=>action(async()=>{
+  if(recorder)return;
+  await closeRuntime();lastFrame=null;totalUpdates=0;$('#timer').hidden=true;status('已停止 · 点击开始将从头运行');
+});
 $('#restart').onclick=()=>action(async()=>{
   await closeRuntime();lastFrame=null;$('#timer').hidden=true;
-  await renderer.load(project,({completed,total})=>feedback.progress('重新加载图片 / 视频…',completed,total));renderer.render();fitStage();await launch();
+  await launch();
 });
 $('#settings-toggle').onclick=()=>{
   const open=$('#settings').hidden;$('#settings').hidden=!open;$('#settings-toggle').setAttribute('aria-expanded',String(open));
@@ -280,28 +294,34 @@ try{
   input=new StageInput(canvas,renderer,()=>running&&!busy,notice);
   overlay=new StageOverlay($('#stage-box'),renderer,event=>{if(recorder){recorder.warnings.add('omitted_inputs');notice('录制模式仅接收舞台键鼠输入；问答、云服务和外部输入未录制。');return false;}const accepted=input.push(event);if(accepted)queueMicrotask(()=>{if(running)focusStage();});return accepted;});
   renderer.onError=message=>{if(!busy)pause('渲染提示');feedback.resourceError(message);};
+  feedback.mode(bundled||wasm?'wasm':extension?null:'rust');
+  backend=bundled?await bundled.createBackend():extension?await extension.backend():wasm?wasmBackend():httpBackend(location.origin);
+  feedback.mode(backend.kind);
+  unsubscribeProgress=backend.subscribeProgress?.(({label,completed,total})=>feedback.progress(label,completed,total));
+  await backend.ready;unsubscribeProgress?.();unsubscribeProgress=null;
   // A static wasm page starts empty unless ?src= names a project URL.
-  const source=extension||backend.kind==='rust'?'/api/project':params.get('src');
-  if(source){
+  const source=bundled?null:extension||backend.kind==='rust'?'/api/project':params.get('src');
+  if(bundled||source){
     feedback.progress('正在读取作品…');
-    const value=extension?await extension.loadWork(backend,status):await(async()=>{
+    const value=bundled?await bundled.loadProject():extension?await extension.loadWork(backend,status):await(async()=>{
       const response=await fetch(new URL(source,location.href),{signal:AbortSignal.timeout(60000)});
       if(!response.ok)throw Error(`读取作品失败：HTTP ${response.status}`);
       return response.json();
     })();
     feedback.progress('正在检查作品兼容性…');
     await install(await api('import-player',value));
-    if((extension||app)&&playable)await launch();
+    if(!bundled&&(extension||app)&&playable)await launch();
   }
 }catch(error){notice(`读取作品失败：${error.message}`);status(extension?'连接或载入失败 · 请重试': '读取失败 · 请导入作品重试');extension?.reportStatus('failed');}
 finally{
+  unsubscribeProgress?.();
   feedback.finish();busy=false;syncControls();requestAnimationFrame(loop);
   // Embedded in the online compiler: ready to receive a nekoc-play message.
   if(!extension&&window.parent!==window)window.parent.postMessage({type:'nekoc-player-ready'},location.origin);
 }
 
 // Read-only test/performance snapshot; the standalone page never builds editor DOM.
-window.nekoPlayDiagnostics=()=>({running,busy,playable,recording:!!recorder,settings:{...settings},frame:lastFrame,totalUpdates,drawFps,updateFps,
+window.nekoPlayDiagnostics=()=>({running,busy,playable,recording:!!recorder,mode:backend?.kind,settings:{...settings},frame:lastFrame,totalUpdates,drawFps,updateFps,
   framebuffer:[canvas.width,canvas.height],renderer:{...renderer?.stats},inputQueue:{...input?.queueStats},pending:!!inFlight,projectName:project?.projectName,audio:audio.snapshot()});
 // A detached read, serialized after an outstanding frame. No pause/resume or VM mutation.
 window.nekoPlaySnapshot=async()=>{
