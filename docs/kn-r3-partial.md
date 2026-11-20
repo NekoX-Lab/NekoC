@@ -73,15 +73,36 @@ partial 仍为 **107**；完整语义认证仍为 **0**。
 使用现有 `Cell::deep_clone`，未移植 HateNeko 或官方源码。
 K4 保留原实现，不改变该任务范围之外的语义。
 
-[tests/kn_r3_partial.rs](../tests/kn_r3_partial.rs) 的 5 个测试覆盖共享列表、共享对象及属性、
+[tests/kn_r3_partial.rs](../tests/kn_r3_partial.rs) 的 6 个测试覆盖共享列表、共享对象及属性、
 自复制、目标容器别名、多次复制隔离、空源清空、重启隔离、严格搜索及 NaN；
 每项请求 JIT 开/关，不将开启等同于所有分支进入热 native code。
-修复前测试实际观察首个位置错误为 2、修改第二嵌套列表无传播；修复后 5 项通过。
+前五项修复前实际观察首个位置错误为 2、修改第二嵌套列表无传播。
+
+### 审查修复：对象属性回指根列表
+
+审查确认 `source=[obj]; obj.back=source` 是可正常执行的输入，不能笼统归入“循环图未验证”。
+首次整图复制实现最后 `mem::take` 清空快照根，破坏 `copy[1].back`，
+使其长度和查找 `copy[1]` 的位置都从官方的 `1` 错成 `0`。
+现保留快照根，从其元素浅克隆写入目标；对象回指继续指向完整复制快照，
+不是改指向目标原容器，也没有取消已有循环列表插入检查。
+新增 Rust 回归在对象回指建图、复制和两个观测后，解除源/副本循环并清空列表，
+随后输出 `1,1,0,0`，覆盖 JIT 请求开/关及每台 VM 两次启动。
+
+可复现的官方原生夹具通过同一探针的 `--cycle` 生成，
+与审查员 `dist/r3-review/object-cycle.bcmkn` 字节相同，SHA-256：
+`ccf86fdac2cb9a81512b3f8564767fb69e460a962412805b9b4a98c7860c0c4a`。
+该 42-block 工程先记录图结构观测，再清空源/目标并置完成标记；
+本轮官方与修复后 VM 原生运行的最终五项数值均为 `[1,1,1,1,1]`，VM `active_threads=0`；
+其中 `same_copy` 为回指列表长度，`detached` 为在该列表查复制对象的位置，
+此夹具沿用旧变量名，不将其误读成布尔隔离检查。
+原创观测及编辑器检查归档见 [kn-r3-partial-cycle-official.json](kn-r3-partial-cycle-official.json)。
 
 ## 复现
 
 ```bash
 NEKOC_NODE_MODULES=D:/AppData/Local/Temp/opencode/nekoc-kitenn/node_modules node tools/compat/kn-r3-partial-probe.mjs
+NEKOC_NODE_MODULES=D:/AppData/Local/Temp/opencode/nekoc-kitenn/node_modules node tools/compat/kn-r3-partial-probe.mjs --cycle
+NEKOC_NODE_MODULES=D:/AppData/Local/Temp/opencode/nekoc-kitenn/node_modules node tools/editor-compat.mjs dist/r3-knpartial/object-cycle.bcmkn --channel msedge --out dist/r3-knpartial/cycle-editor.json
 NEKOC_NODE_MODULES=D:/AppData/Local/Temp/opencode/nekoc-kitenn/node_modules node tools/editor-compat.mjs dist/r3-knpartial/lists.bcmkn --channel msedge --out dist/r3-knpartial/editor-compat.json
 bash E:/nekoc-wt/_cargo.sh test --test kn_r3_partial
 node tools/compat/kn-catalog-status.mjs --snapshot docs/kn-block-coverage.md
@@ -89,8 +110,8 @@ node tools/compat/kn-catalog-status.mjs --snapshot docs/kn-block-coverage.md
 
 ## 未验证及风险
 
-- 不认证整项完整支持：循环图、JS 特殊对象/原型、稀疏数组、错误 UI、列表更新事件和持久化未验证。
-- VM 的循环列表仍有既有拒绝策略；不据 `deep_clone` 的防环能力声称支持官方循环图。
+- 不认证整项完整支持：除上述对象回指根列表外的循环拓扑、JS 特殊对象/原型、稀疏数组、错误 UI、列表更新事件和持久化未验证。
+- VM 的循环列表仍有既有拒绝策略；本次已验证的对象回指不推广为所有官方循环图支持。
 - 搜索非法列表仍走 VM 的错误策略，非官方警告后返回；输入求值顺序和全部原生组合未验证。
 - 不对 K4 复制语义作新结论；新实现严格限 KN。
 - 线上发布变化可能使模块导出定位失效；探针缺失导出即失败，不把未完成实测记为成功。

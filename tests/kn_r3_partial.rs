@@ -164,6 +164,35 @@ fn repeated_copies_use_fresh_graphs_and_empty_copy_clears_existing_alias() {
 }
 
 #[test]
+fn copy_preserves_object_back_reference_to_snapshot_root() {
+    let back = |object| json!({"type":"_object_get","inputs":{"obj":object,"key":{"type":"text","fields":{"TEXT":"back"}}}});
+    let set_back = |object, value| json!({"type":"_object_set","inputs":{"obj":object,"key":{"type":"text","fields":{"TEXT":"back"}},"value":value}});
+    run(
+        &project(vec![
+            set("object", json!({"type":"_object_literal","inputs":{}})),
+            append(list("source"), variable("object")),
+            set_back(variable("object"), list("source")),
+            copy("source", "copy"),
+            set("nested", length(back(item("copy", 1.0)))),
+            set(
+                "alias",
+                json!({"type":"list_index_of","inputs":{"list":back(item("copy", 1.0)),"list_item_value":item("copy", 1.0)}}),
+            ),
+            // Break both cycles before logging or restarting the VM.
+            set_back(variable("object"), num(0.0)),
+            set_back(item("copy", 1.0), num(0.0)),
+            json!({"type":"delete_list_item","fields":{"item":"all"},"inputs":{"list":list("source")}}),
+            json!({"type":"delete_list_item","fields":{"item":"all"},"inputs":{"list":list("copy")}}),
+            log(variable("nested")),
+            log(variable("alias")),
+            log(length(list("source"))),
+            log(length(list("copy"))),
+        ]),
+        &["1", "1", "0", "0"],
+    );
+}
+
+#[test]
 fn list_search_uses_strict_equality_and_first_reference_match() {
     let nan = json!({"type":"math_arithmetic","fields":{"type":"divide"},"inputs":{"A":num(0.0),"B":num(0.0)}});
     let text = json!({"type":"text","fields":{"TEXT":"1"}});

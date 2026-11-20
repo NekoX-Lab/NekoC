@@ -21,6 +21,47 @@ export function validateReport(r) {
   if (JSON.stringify(r.domain.search?.map(({ label, index, contains }) => [label, index, contains])) !== JSON.stringify(expected)) throw new Error("Incomplete strict-search evidence");
 }
 
+export function validateCycleReport(r) {
+  if (r.error || r.pageErrors?.length !== 0 || !r.mainBundle?.sha256 ||
+      !r.runtimeBundle?.sha256 || r.domain?.version !== "0.27.4" ||
+      ["same_copy", "detached", "copied_second_length", "source_length", "done"].some(key => r.variables?.[key] !== 1)) {
+    throw new Error("Incomplete object-cycle evidence");
+  }
+}
+
+// Reproduce the reviewer's original 42-block native fixture byte-for-byte.
+export function objectCycleProject(template) {
+  let serial = 0;
+  const b = (type, inputs = {}, fields = {}) => ({ id: `review-${++serial}`, type, inputs, fields });
+  const list = name => b("pure_list_get", {}, { list: name });
+  const n = value => b("math_number", {}, { NUM: String(value) });
+  const item = () => b("list_item", { list: list("copy"), list_index: n(1) }, { item: "any" });
+  const length = value => b("list_length", { list: value });
+  const set = (name, value) => b("variables_set", { value }, { variable: name });
+  const get = name => b("variables_get", {}, { variable: name });
+  const text = value => b("text", {}, { TEXT: value });
+  const back = value => b("_object_get", { obj: value, key: text("back") });
+  const blocks = [
+    set("nested", b("_object_literal")),
+    b("list_append", { list: list("source"), list_item_value: get("nested") }),
+    b("_object_set", { obj: get("nested"), key: text("back"), value: list("source") }),
+    b("list_copy", { list: list("source"), target_list: list("copy") }),
+    set("same_copy", length(back(item()))),
+    set("detached", b("list_index_of", { list: back(item()), list_item_value: item() })),
+    set("copied_second_length", length(list("source"))),
+    set("source_length", length(list("copy"))),
+    b("delete_list_item", { list: list("source") }, { item: "all" }),
+    b("delete_list_item", { list: list("copy") }, { item: "all" }),
+  ];
+  const p = project(template);
+  // The review generator built all four case bodies before chaining this one.
+  serial = 137;
+  const chain = [b("on_running_group_activated"), ...blocks, set("done", n(1))];
+  for (let i = 1; i < chain.length; i++) chain[i - 1].next = chain[i];
+  Object.values(p.actors.actorsDict)[0].nekoBlockJsonList = [chain[0]];
+  return p;
+}
+
 export function project(template) {
   const p = structuredClone(template), actor = Object.keys(p.actors.actorsDict)[0];
   let serial = 0;
@@ -60,9 +101,10 @@ export function project(template) {
 async function main() {
   const out = path.join(root, "dist/r3-knpartial");
   await fs.mkdir(out, { recursive: true });
-  const p = project(JSON.parse(await fs.readFile(path.join(root, "samples/kitten-n-0.27.4.bcmkn"), "utf8")));
+  const cycle = process.argv.includes("--cycle");
+  const p = (cycle ? objectCycleProject : project)(JSON.parse(await fs.readFile(path.join(root, "samples/kitten-n-0.27.4.bcmkn"), "utf8")));
   const source = JSON.stringify(p, null, 2) + "\n";
-  await fs.writeFile(path.join(out, "lists.bcmkn"), source);
+  await fs.writeFile(path.join(out, cycle ? "object-cycle.bcmkn" : "lists.bcmkn"), source);
   if (process.argv.includes("--generate")) return;
   const r = { checkedAt: new Date().toISOString(), sha256: createHash("sha256").update(source).digest("hex"), pageErrors: [] };
   const browser = await loadPlaywright().chromium.launch({ headless: true, channel: "msedge" });
@@ -133,11 +175,11 @@ async function main() {
       }
       return { version: bcm.getBcm().version, copied, search };
     });
-    validateReport(r);
+    (cycle ? validateCycleReport : validateReport)(r);
     r.ok = true;
   } catch (e) { r.error = String(e); r.ok = false; }
   finally { await browser.close(); }
-  await fs.writeFile(path.join(out, "official.json"), JSON.stringify(r, null, 2) + "\n");
+  await fs.writeFile(path.join(out, cycle ? "cycle-official.json" : "official.json"), JSON.stringify(r, null, 2) + "\n");
   console.log(JSON.stringify(r, null, 2));
   if (!r.ok) process.exitCode = 1;
 }

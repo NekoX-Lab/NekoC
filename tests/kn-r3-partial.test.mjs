@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import test from "node:test";
 import { createHash } from "node:crypto";
-import { project, validateReport } from "../tools/compat/kn-r3-partial-probe.mjs";
+import { objectCycleProject, project, validateCycleReport, validateReport } from "../tools/compat/kn-r3-partial-probe.mjs";
 import { inventory } from "../tools/compat/kn-catalog-status.mjs";
 import { fileURLToPath } from "node:url";
 
@@ -33,6 +33,32 @@ test("r3 official archive keeps complete native, local-call and editor evidence"
     const invalid = structuredClone(r);
     mutate(invalid);
     assert.throws(() => validateReport(invalid));
+  }
+});
+
+test("r3 object-cycle native fixture and evidence preserve the snapshot root", () => {
+  const template = JSON.parse(fs.readFileSync(new URL("../samples/kitten-n-0.27.4.bcmkn", import.meta.url)));
+  const source = JSON.stringify(objectCycleProject(template), null, 2) + "\n";
+  const r = JSON.parse(fs.readFileSync(new URL("../docs/kn-r3-partial-cycle-official.json", import.meta.url)));
+  assert.equal(createHash("sha256").update(source).digest("hex"), "ccf86fdac2cb9a81512b3f8564767fb69e460a962412805b9b4a98c7860c0c4a");
+  assert.equal(r.sha256, createHash("sha256").update(source).digest("hex"));
+  validateCycleReport(r);
+  assert.equal(r.ok, true);
+  assert.equal(r.editorCompat.sha256, r.sha256);
+  assert.equal(r.editorCompat.blockCount, 42);
+  assert.equal(r.editorCompat.ok, true);
+  assert.deepEqual(r.editorCompat.issues, []);
+  assert.deepEqual(r.editorCompat.pageErrors, []);
+  assert.equal(r.editorCompat.bundleUrl, r.mainBundle.url);
+  for (const mutate of [
+    r => { r.variables.same_copy = 0; },
+    r => { r.variables.detached = 0; },
+    r => { r.variables.done = 0; },
+    r => { r.pageErrors.push("error"); },
+  ]) {
+    const invalid = structuredClone(r);
+    mutate(invalid);
+    assert.throws(() => validateCycleReport(invalid));
   }
 });
 

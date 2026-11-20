@@ -111,7 +111,7 @@ const risks = {
   get_voice_volume: "仅默认权限 pending、拒绝 0、显式停用录音 NaN 与可选浏览器采样；每次读等待下一 update，真实无设备错误与完整平台差异未验证",
 };
 const limitations = {
-  list_copy: "官方0.27.4原生夹具及局部域函数核对深拷贝共享引用、自复制与源隔离，见 docs/kn-r3-partial.md；循环图、特殊JS对象、错误UI及持久化未验证",
+  list_copy: "官方0.27.4原生夹具及局部域函数核对深拷贝共享引用、自复制、源隔离及对象回指快照根，见 docs/kn-r3-partial.md；其他循环拓扑、特殊JS对象、错误UI及持久化未验证",
   list_index_of: "官方0.27.4局部域函数核对严格相等、首个位置、NaN及引用身份，见 docs/kn-r3-partial.md；非法列表的VM降级、输入求值顺序及完整原生组合未验证",
   list_is_exist: "官方0.27.4局部域函数核对严格相等、NaN及引用身份，见 docs/kn-r3-partial.md；非法列表的VM降级、输入求值顺序及完整原生组合未验证",
   convert_type: "常见类型/空值/列表对象的官方0.27.4主路径配对，见 docs/kn-partial2-timers.md；未验证边界：callable原型、Symbol、稀疏数组、孤立UTF-16及错误UI",

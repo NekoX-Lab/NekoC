@@ -1,0 +1,36 @@
+{
+  "checkedAt": "2026-11-20T18:43:52.927Z",
+  "sha256": "ccf86fdac2cb9a81512b3f8564767fb69e460a962412805b9b4a98c7860c0c4a",
+  "pageErrors": [],
+  "runtimeBundle": {
+    "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+    "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+  },
+  "mainBundle": {
+    "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+    "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+  },
+  "variables": {
+    "same_copy": 1,
+    "detached": 1,
+    "copied_second_length": 1,
+    "source_length": 1,
+    "same_self_copy": 0,
+    "done": 1
+  },
+  "domain": { "version": "0.27.4" },
+  "ok": true,
+  "editorCompat": {
+    "editorUrl": "https://kn.codemao.cn/editor",
+    "checkedAt": "2026-11-20T18:44:00.672Z",
+    "fixture": "dist/r3-knpartial/object-cycle.bcmkn",
+    "sha256": "ccf86fdac2cb9a81512b3f8564767fb69e460a962412805b9b4a98c7860c0c4a",
+    "editorVersion": "0.27.4",
+    "projectVersion": "0.27.4",
+    "blockCount": 42,
+    "issues": [],
+    "pageErrors": [],
+    "bundleUrl": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+    "ok": true
+  }
+}

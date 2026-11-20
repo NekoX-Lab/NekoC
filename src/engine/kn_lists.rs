@@ -9,5 +9,7 @@ pub(super) fn copy_items(source: &List) -> Vec<Cell> {
     let Cell::List(snapshot) = Cell::List(source.clone()).deep_clone() else {
         unreachable!()
     };
-    std::mem::take(&mut *snapshot.borrow_mut())
+    // Object properties can point back to this root. Keep its contents alive
+    // and shallow-clone the elements, or those back-references become empty.
+    snapshot.borrow().clone()
 }
