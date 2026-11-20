@@ -1,5 +1,5 @@
 use anyhow::{Result, bail};
-use clap::{Parser, Subcommand};
+use clap::{CommandFactory, FromArgMatches, Parser, Subcommand};
 use std::path::PathBuf;
 use std::str::FromStr;
 
@@ -118,16 +118,16 @@ enum Command {
     },
     Run {
         input: PathBuf,
-        /// Headless 60 Hz updates (also accepted as --frames).
-        #[arg(long, alias = "frames", default_value_t = 1)]
-        ticks: usize,
+        /// Headless 60 Hz updates (default: 1; repro packages set their own count).
+        #[arg(long, alias = "frames")]
+        ticks: Option<usize>,
         /// Use the old KN JSON interpreter and its original snapshot/trace.
         #[arg(long)]
         legacy_runtime: bool,
         /// Fixed Engine PRNG seed (default: 1).
         #[arg(long, conflicts_with = "legacy_runtime")]
         seed: Option<u64>,
-        /// Replay frame-indexed nekoc-input-v1 host inputs.
+        /// Replay nekoc-input-v1 host inputs or verify a nekoc-repro-v1 recording.
         #[arg(long, conflicts_with = "legacy_runtime")]
         input_script: Option<PathBuf>,
         #[command(flatten)]
@@ -357,7 +357,20 @@ fn parse_mouse_coordinates(value: &str) -> std::result::Result<(f64, f64), Strin
 }
 
 fn main() -> Result<()> {
-    let cli = Cli::parse();
+    let matches = Cli::command().get_matches();
+    // In particular, an explicit --cloud-user anonymous is still a cloud
+    // override and must not silently accompany a deterministic package.
+    let explicit_cloud = matches.subcommand_matches("run").is_some_and(|args| {
+        [
+            "cloud_file",
+            "cloud_memory",
+            "cloud_namespace",
+            "cloud_user",
+        ]
+        .iter()
+        .any(|name| args.value_source(name) == Some(clap::parser::ValueSource::CommandLine))
+    });
+    let cli = Cli::from_arg_matches(&matches)?;
 
     match cli.command {
         Command::Inspect { input, out } => {
@@ -549,24 +562,43 @@ fn main() -> Result<()> {
                 .map(nekoc::runtime::RuntimeEvent::from)
                 .collect::<Vec<_>>();
             let report = if legacy_runtime {
-                let snapshot =
-                    nekoc::runtime::run_project_with_events(&project.value, &events, ticks)?;
+                let snapshot = nekoc::runtime::run_project_with_events(
+                    &project.value,
+                    &events,
+                    ticks.unwrap_or(1),
+                )?;
                 nekoc::runtime::snapshot_to_json(&snapshot)
             } else {
                 let script = input_script
-                    .map(|path| -> Result<nekoc::input::InputScript> {
-                        let text = std::fs::read_to_string(path)?;
-                        Ok(serde_json::from_str(text.trim_start_matches('\u{feff}'))?)
-                    })
+                    .as_deref()
+                    .map(nekoc::repro::Script::read_file)
                     .transpose()?;
-                nekoc::cli_run::run_with_input(
-                    &project.value,
-                    ticks,
-                    &events,
-                    seed.unwrap_or(1),
-                    &cloud,
-                    script.as_ref(),
-                )?
+                match script {
+                    Some(nekoc::repro::Script::Repro(package)) => nekoc::repro::replay(
+                        &project.value,
+                        &package,
+                        &nekoc::repro::ReplayOptions {
+                            ticks,
+                            seed,
+                            has_events: !events.is_empty(),
+                            has_cloud: explicit_cloud,
+                        },
+                    )?,
+                    legacy => {
+                        let script = match &legacy {
+                            Some(nekoc::repro::Script::Legacy(script)) => Some(script),
+                            _ => None,
+                        };
+                        nekoc::cli_run::run_with_input(
+                            &project.value,
+                            ticks.unwrap_or(1),
+                            &events,
+                            seed.unwrap_or(1),
+                            &cloud,
+                            script,
+                        )?
+                    }
+                }
             };
             if let Some(expect) = expect {
                 let expected: serde_json::Value = serde_json::from_slice(&std::fs::read(&expect)?)?;

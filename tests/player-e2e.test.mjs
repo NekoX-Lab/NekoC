@@ -99,7 +99,9 @@ test('standalone player browser E2E', {skip:!process.env.NEKOC_PLAYER_E2E,timeou
     await t.test('indeterminate fetch, resource progress, aggregate failures and unsupported coverage',async()=>{
       let release;const gate=new Promise(resolve=>{release=resolve;});
       await page.route('**/api/project',async route=>{await gate;await route.continue();});
-      await page.goto(`${origin}/play`,{waitUntil:'domcontentloaded'});
+      // play.js awaits this deliberately gated fetch at module top level;
+      // DOMContentLoaded may wait for it. Observe the UI before releasing it.
+      await page.goto(`${origin}/play`,{waitUntil:'commit'});
       await page.locator('#loading').waitFor({state:'visible'});
       assert.equal(await page.locator('#load-progress').getAttribute('value'),null);release();await ready();await page.unroute('**/api/project');
       const response=await page.request.post(`${origin}/api/import-player`,{data:await(await page.request.get(`${origin}/api/project`)).json()});
@@ -111,7 +113,7 @@ test('standalone player browser E2E', {skip:!process.env.NEKOC_PLAYER_E2E,timeou
       await page.route('**/api/import-player',route=>route.fulfill({json:report}));
       let releaseAsset;const assetGate=new Promise(resolve=>{releaseAsset=resolve;});
       await page.route('**/bad-*.png',async route=>{await assetGate;await route.fulfill({status:404,body:'missing'});});
-      await page.goto(`${origin}/play`,{waitUntil:'domcontentloaded'});
+      await page.goto(`${origin}/play`,{waitUntil:'commit'});
       await page.waitForFunction(()=>document.querySelector('#load-label').textContent.includes('加载图片'));
       assert.ok(Number(await page.locator('#load-progress').getAttribute('max'))>=2);releaseAsset();await ready();
       const notice=await page.locator('#notice-text').textContent();assert.match(notice,/坏图 A/);assert.match(notice,/坏图 B/);

@@ -6,6 +6,7 @@ import {StageInput} from './input.js';
 import {StageOverlay} from './overlay.js';
 import {PlayerFeedback} from './player-feedback.js';
 import {httpBackend,wasmBackend} from './backend.js';
+import {ReproRecorder,REPRO_DT} from './repro.js';
 
 const extension=location.protocol==='chrome-extension:'?await import('./extension.js'):null;
 const params=new URLSearchParams(location.search);
@@ -23,6 +24,7 @@ const feedback=new PlayerFeedback();
 let renderer,input,overlay,sendCostumes=false,project=null,playable=false,busy=true,running=false,connection=null,inFlight=null,observing=false,epoch=0;
 let lastTick=0,nextDue=0,lastFrame=null,roundtripMs=0,updates=0,draws=0,totalUpdates=0,pumpTimer=0;
 let sampleStart=performance.now(),lastMonitor=0,drawFps=0,updateFps=0;
+let recorder=null;
 const audio=new ProjectAudio(notice,id=>input?.push({kind:'audio_done',id}));
 const settings={limit:60,budget:12,resolution:0,coalesce:0};
 const choices={limit:[0,30,60,120,240,480,1000,-1],budget:[2,4,8,12,16],resolution:[0,.5,1,2],coalesce:[0,1]};
@@ -35,11 +37,13 @@ const api=(path,data)=>backend.api(path,data);
 function notice(message){feedback.notice(message);}
 function status(message){$('#status').textContent=message;}
 function syncControls(){
-  $('#import').disabled=busy;$('#import').textContent=busy?'载入中…':'＋ 导入作品';
-  $('#toggle').disabled=busy||!playable;$('#restart').disabled=busy||!playable;
+  $('#import').disabled=busy||!!recorder;$('#import').textContent=busy?'载入中…':'＋ 导入作品';
+  $('#toggle').disabled=busy||!playable||!!recorder&&(recorder.full||recorder.interrupted);$('#restart').disabled=busy||!playable||!!recorder;
+  $('#record').disabled=busy||!playable;$('#record').textContent=recorder?'■ 停止录制并导出 JSON':'● 录制复现（从头开始）';
+  $('#record').setAttribute('aria-pressed',String(!!recorder));
   $('#toggle').textContent=running?'Ⅱ 暂停':connection?.ready?'▶ 继续游玩':'▶ 开始游玩';
   $('#toggle').setAttribute('aria-pressed',String(running));
-  for(const id of ['frame-limit','budget','resolution','coalesce'])$(`#${id}`).disabled=busy;
+  for(const id of ['frame-limit','budget','resolution','coalesce'])$(`#${id}`).disabled=busy||!!recorder;
   shell.classList.toggle('running',running);
 }
 function clearKeys(){input?.release();}
@@ -80,6 +84,10 @@ async function install(report){
 }
 async function launch(){
   if(!playable)return;
+  if(recorder&&(recorder.interrupted||!connection?.ready||!connection.repro)){
+    recorder.interrupt();pause('录制已中断 · 请停止并导出');return;
+  }
+  if(document.hidden){pause('已暂停 · 页面切到后台');return;}
   if(connection?.ready)void connection.requestDevicePermission();
   if(!connection?.ready){
     input?.reset();
@@ -89,9 +97,10 @@ async function launch(){
     if(new URLSearchParams(location.search).has('compare'))window.nekoCompareZero=await next.snapshot();
     epoch++;lastFrame=null;totalUpdates=0;
   }
+  if(document.hidden){pause('已暂停 · 页面切到后台');return;}
   clearKeys();resetMeter();running=true;lastTick=performance.now();nextDue=lastTick;queueMicrotask(pump);
-  audio.resume();renderer.pauseMedia(false);extension?.reportStatus('connected');
-  status('运行中');focusStage();syncControls();
+  if(!recorder){audio.resume();renderer.pauseMedia(false);}extension?.reportStatus('connected');
+  status(recorder?'录制中 · 固定 60 Hz / 种子 1':'运行中');focusStage();syncControls();
 }
 function focusStage(){
   const control=$('#stage-box').querySelector('.neko-ask input,.neko-ask button,.neko-stage-dialog button');
@@ -103,7 +112,7 @@ async function action(work){
   finally{feedback.finish();busy=false;syncControls();}
 }
 async function importFile(file){
-  if(!file)return;
+  if(!file||recorder)return;
   await action(async()=>{
     pause('正在导入…');
     feedback.progress(`正在读取 ${file.name}…`);
@@ -120,23 +129,28 @@ async function importValue(value){
 }
 // A same-origin page (the online compiler) can hand over a project object.
 window.addEventListener('message',event=>{
-  if(event.origin!==location.origin||event.data?.type!=='nekoc-play'||app)return;
+  if(event.origin!==location.origin||event.data?.type!=='nekoc-play'||app||recorder)return;
   void action(async()=>{pause('正在导入…');await importValue(event.data.project);});
 });
 async function advance(dt){
   const token=epoch,start=performance.now();
   try{
     // Costume geometry is sent once per connection, after the renderer decoded it.
-    const costumes=sendCostumes?renderer.costumeInfo(sensesColor(project)):undefined;sendCostumes=false;
-    const buffer=await connection.frame({dt,...input.take(),costumes,videos:renderer.videoInfo(),budget_ms:settings.budget,coalesce:settings.coalesce===1,utc_offset:-new Date().getTimezoneOffset()});
+    const costumes=sendCostumes&&!recorder?renderer.costumeInfo(sensesColor(project)):undefined;sendCostumes=false;
+    const accepted=recorder?recorder.prepare(input.take()):null;
+    const buffer=await connection.frame(accepted||{dt,...input.take(),costumes,videos:renderer.videoInfo(),budget_ms:settings.budget,coalesce:settings.coalesce===1,utc_offset:-new Date().getTimezoneOffset()});
     if(token!==epoch)return;
+    // Commit only acknowledged frames; a disconnect exports the last confirmed prefix.
+    if(recorder){const confirmed=await connection.reproStatus();if(token!==epoch)return;recorder.commit(accepted,confirmed);}
     roundtripMs=performance.now()-start;
     // Draw pen deltas now; the stage is composited once on the next display frame.
     const {frame,lines}=decodeFrame(buffer);renderer.apply(frame,lines,false);overlay.apply(frame);lastFrame=frame;
-    audio.apply(frame);connection?.applyFrame(frame);
+    if(!recorder)audio.apply(frame);connection?.applyFrame(frame);
     updates++;totalUpdates++;if(renderer.changed)draws++;
+    if(recorder?.full)pause('录制已达上限 · 请停止并导出');
   }catch(error){
     if(token!==epoch)return;
+    recorder?.interrupt();
     epoch++;connection?.close();connection=null;pause('运行已中断');notice(error.message);
     extension?.reportStatus('lost');
   }
@@ -160,8 +174,8 @@ function monitor(now){
 // the refresh rate (or a project that yields between compute and draw) is no longer
 // capped at one round trip per animation frame. Only one request is ever in flight.
 function step(now,continuation=false){
-  const dt=Math.min((now-lastTick)/1000,.25);lastTick=now;
-  const interval=settings.limit>0?1000/settings.limit:0;
+  const dt=recorder?REPRO_DT:Math.min((now-lastTick)/1000,.25);lastTick=now;
+  const interval=recorder?1000/60:settings.limit>0?1000/settings.limit:0;
   // A continuation finishes work the last update ran out of budget for: it is not a
   // new paced update, so it neither waits for the limit nor delays the next one.
   if(!continuation)nextDue=interval?Math.max(nextDue+interval,now):now;
@@ -173,8 +187,8 @@ function pump(){
   clearTimeout(pumpTimer);pumpTimer=0;
   // "Follow screen" keeps exactly one update per display frame.
   if(!running||busy||inFlight||observing)return;
-  if(lastFrame?.budget_yield){step(performance.now(),true);return;}
-  if(!settings.limit)return;
+  if(!recorder&&lastFrame?.budget_yield){step(performance.now(),true);return;}
+  if(!recorder&&!settings.limit)return;
   const now=performance.now(),wait=nextDue-now;
   if(wait<=.5)step(now);
   // Nested timers clamp to 4ms; shorter waits need a task that is not throttled.
@@ -190,6 +204,35 @@ function loop(now){
 $('#import').onclick=()=>$('#file').click();
 $('#file').onchange=async event=>{const file=event.target.files[0];event.target.value='';await importFile(file);};
 $('#toggle').onclick=()=>action(async()=>{if(running)pause();else await launch();});
+$('#record').onclick=()=>action(async()=>{
+  if(recorder){
+    running=false;await inFlight;
+    const bundle=recorder.package(input.queueStats);recorder=null;await closeRuntime();
+    const url=URL.createObjectURL(new Blob([JSON.stringify(bundle,null,2)],{type:'application/json'}));
+    const link=document.createElement('a');link.href=url;link.download='neko-repro.json';link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),1000);
+    // Restore initial visual hit-test state before a new normal session.
+    await renderer.load(project);renderer.render();fitStage();lastFrame=null;
+    status(`已导出 ${bundle.timeline.length} 帧${bundle.diagnostics.interrupted?'（中断前已确认片段）':''}`);return;
+  }
+  if(playerExtensions.schemas().length)throw Error('复现录制暂不支持远程扩展，请先停用扩展');
+  await closeRuntime();
+  await renderer.load(project,({completed,total})=>feedback.progress('准备确定性录制…',completed,total));renderer.render();fitStage();
+  renderer.pauseMedia();
+  input.mouse={x:0,y:0};
+  const next=new PlayerConnection();connection=next;
+  next.onFailure=error=>{
+    if(connection!==next||!recorder)return;
+    recorder.interrupt();epoch++;pause('录制已中断 · 请停止并导出');notice(error.message);
+  };
+  try{
+    const ready=await next.open(project,backend,{seed:'1'});
+    recorder=new ReproRecorder(ready.repro,await next.reproStatus(),input.queueStats);
+    if(!next.ready)throw Error('录制会话已断开');
+  }catch(error){next.close();connection=null;throw error;}
+  epoch++;lastFrame=null;totalUpdates=0;sendCostumes=false;overlay.reset();
+  await launch();
+});
 $('#restart').onclick=()=>action(async()=>{
   await closeRuntime();lastFrame=null;$('#timer').hidden=true;
   await renderer.load(project,({completed,total})=>feedback.progress('重新加载图片 / 视频…',completed,total));renderer.render();fitStage();await launch();
@@ -235,7 +278,7 @@ new ResizeObserver(()=>{
 try{
   renderer=new StageRenderer(canvas);renderer.resolutionScale=settings.resolution;
   input=new StageInput(canvas,renderer,()=>running&&!busy,notice);
-  overlay=new StageOverlay($('#stage-box'),renderer,event=>{const accepted=input.push(event);if(accepted)queueMicrotask(()=>{if(running)focusStage();});return accepted;});
+  overlay=new StageOverlay($('#stage-box'),renderer,event=>{if(recorder){recorder.warnings.add('omitted_inputs');notice('录制模式仅接收舞台键鼠输入；问答、云服务和外部输入未录制。');return false;}const accepted=input.push(event);if(accepted)queueMicrotask(()=>{if(running)focusStage();});return accepted;});
   renderer.onError=message=>{if(!busy)pause('渲染提示');feedback.resourceError(message);};
   // A static wasm page starts empty unless ?src= names a project URL.
   const source=extension||backend.kind==='rust'?'/api/project':params.get('src');
@@ -258,7 +301,7 @@ finally{
 }
 
 // Read-only test/performance snapshot; the standalone page never builds editor DOM.
-window.nekoPlayDiagnostics=()=>({running,busy,playable,settings:{...settings},frame:lastFrame,totalUpdates,drawFps,updateFps,
+window.nekoPlayDiagnostics=()=>({running,busy,playable,recording:!!recorder,settings:{...settings},frame:lastFrame,totalUpdates,drawFps,updateFps,
   framebuffer:[canvas.width,canvas.height],renderer:{...renderer?.stats},inputQueue:{...input?.queueStats},pending:!!inFlight,projectName:project?.projectName,audio:audio.snapshot()});
 // A detached read, serialized after an outstanding frame. No pause/resume or VM mutation.
 window.nekoPlaySnapshot=async()=>{

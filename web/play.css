@@ -72,6 +72,8 @@ h1{font-size:17px;font-weight:650;margin-top:4px;white-space:nowrap;overflow:hid
 .play-controls{display:grid;grid-template-columns:1fr auto auto;gap:8px}
 #status{font-size:13px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .keyboard-hint{font-size:12px;color:var(--muted)}
+#record[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+#record-help{font-size:11px;line-height:1.55;color:var(--muted)}
 
 /* Timings */
 .timings-tile{grid-area:timings;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px}

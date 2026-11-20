@@ -27,6 +27,7 @@ pub mod optimizer;
 pub mod pack;
 pub mod player;
 pub mod project;
+pub mod repro;
 pub mod runtime;
 pub mod scenario;
 pub mod source_audit;

@@ -175,6 +175,7 @@ pub struct ExtensionOffer {
 pub struct Handshake {
     pub project: Json,
     pub extensions: Option<ExtensionOffer>,
+    pub repro: Option<crate::repro::Config>,
 }
 
 impl Handshake {
@@ -183,6 +184,7 @@ impl Handshake {
         Self {
             project,
             extensions: None,
+            repro: None,
         }
     }
 
@@ -194,6 +196,11 @@ impl Handshake {
         self
     }
 
+    pub fn with_repro(mut self, config: crate::repro::Config) -> Self {
+        self.repro = Some(config);
+        self
+    }
+
     /// 解析线上的握手文本：要么直接是作品 JSON，要么是
     /// `{"nekoc_extension_handshake":1,"project":…,"extensions":[…],"extension_api_versions":[…]}`。
     pub fn parse(text: &str) -> Result<Self> {
@@ -202,8 +209,35 @@ impl Handshake {
 
     pub fn from_json(mut value: Json) -> Result<Self> {
         if value["nekoc_extension_handshake"] != 1 {
+            ensure!(
+                value.get("nekoc_repro").is_none(),
+                "nekoc_repro requires nekoc_extension_handshake: 1"
+            );
             return Ok(Self::new(value));
         }
+        let repro = if value.get("nekoc_repro").is_some() {
+            let config: crate::repro::Config = serde_json::from_value(value["nekoc_repro"].take())
+                .context("invalid nekoc_repro configuration")?;
+            config.seed_value()?;
+            ensure!(
+                value
+                    .as_object()
+                    .is_some_and(|object| object.keys().all(|key| {
+                        matches!(
+                            key.as_str(),
+                            "nekoc_extension_handshake"
+                                | "project"
+                                | "extensions"
+                                | "extension_api_versions"
+                                | "nekoc_repro"
+                        )
+                    })),
+                "unknown repro handshake field"
+            );
+            Some(config)
+        } else {
+            None
+        };
         let schemas = serde_json::from_value(value["extensions"].take())?;
         let api_versions = if value.get("extension_api_versions").is_some() {
             serde_json::from_value(value["extension_api_versions"].take())?
@@ -216,6 +250,7 @@ impl Handshake {
                 schemas,
                 api_versions,
             }),
+            repro,
         })
     }
 }
@@ -236,6 +271,13 @@ pub fn error_message(error: &anyhow::Error) -> String {
 pub struct Player {
     engine: Engine,
     ready: Value,
+    repro: Option<ReproSession>,
+}
+
+#[derive(Default)]
+struct ReproSession {
+    frame_count: u32,
+    budget_yields: u32,
 }
 
 impl Player {
@@ -245,11 +287,22 @@ impl Player {
     }
 
     /// 同 [`Player::load`]，但在作品开始运行之前先调用 `setup`，
-    /// 宿主可以在这里接云变量后端之类的能力。
+    /// 宿主可以在这里接云变量后端之类的能力。确定性录制会话不调用 setup，
+    /// 避免云账号、外部输入或宿主时钟影响录制。
     pub fn load_with(
         handshake: Handshake,
         setup: impl FnOnce(&mut Engine) -> Result<()>,
     ) -> Result<Self> {
+        if let Some(config) = &handshake.repro {
+            config.seed_value()?;
+            ensure!(
+                handshake
+                    .extensions
+                    .as_ref()
+                    .is_none_or(|offer| offer.schemas.is_empty()),
+                "repro sessions cannot use extensions"
+            );
+        }
         let mut registry = ExtensionRegistry::new();
         let mut extension_api_version = None;
         if let Some(offer) = handshake.extensions {
@@ -281,34 +334,67 @@ impl Player {
                 registry.register_remote(schema)?;
             }
         }
-        check_project_shape(&handshake.project)?;
-        let program = Program::compile_with_extensions(&handshake.project, &registry)?;
-        Self::start_with(program, extension_api_version, setup)
+        let (project, repro) = if let Some(config) = handshake.repro {
+            // Match /api/import for both raw CLI works and already-imported Web
+            // projects. Reimporting canonical KN data is deliberately stable.
+            let mut source = handshake.project;
+            crate::repro::normalize_browser_numbers(&mut source)?;
+            let (mut project, _) = import(source)?;
+            // The browser also serializes the import response before sending
+            // its handshake; normalize converter-created numbers as well.
+            crate::repro::normalize_browser_numbers(&mut project)?;
+            let metadata = crate::repro::Metadata {
+                runner: crate::repro::Runner::default(),
+                work_sha256: crate::repro::canonical_sha256(&project)?,
+                seed: config.seed,
+                dt: crate::repro::DT,
+            };
+            (project, Some(metadata))
+        } else {
+            (handshake.project, None)
+        };
+        check_project_shape(&project)?;
+        let program = Program::compile_with_extensions(&project, &registry)?;
+        Self::start_with(program, extension_api_version, repro, setup)
     }
 
     /// 从已经编译好的程序开始运行（宿主自己负责检查和编译时用）。
     pub fn start(program: Program, setup: impl FnOnce(&mut Engine) -> Result<()>) -> Result<Self> {
-        Self::start_with(program, None, setup)
+        Self::start_with(program, None, None, setup)
     }
 
     fn start_with(
         program: Program,
         extension_api_version: Option<u32>,
+        repro: Option<crate::repro::Metadata>,
         setup: impl FnOnce(&mut Engine) -> Result<()>,
     ) -> Result<Self> {
         let stats = program.stats();
         let mut engine = Engine::new(program);
         // Audio, speech and device output go to the client inside each frame.
         engine.use_browser_audio();
-        setup(&mut engine)?;
+        if let Some(metadata) = &repro {
+            engine.use_virtual_clock();
+            engine.set_random_seed(crate::repro::parse_seed(&metadata.seed)?);
+            // The interpreter is shared with wasm; native JIT optimization must
+            // not change scheduling or instruction-budget boundaries.
+            engine.disable_jit();
+        } else {
+            setup(&mut engine)?;
+        }
         engine.start();
+        let mut ready = json!({
+            "ready": true,
+            "stats": stats,
+            "extension_api_version": extension_api_version,
+        });
+        if let Some(metadata) = &repro {
+            ready["repro"] = serde_json::to_value(metadata)?;
+        }
         Ok(Self {
             engine,
-            ready: json!({
-                "ready": true,
-                "stats": stats,
-                "extension_api_version": extension_api_version,
-            }),
+            ready,
+            repro: repro.map(|_| ReproSession::default()),
         })
     }
 
@@ -324,7 +410,21 @@ impl Player {
     /// 处理握手之后的一条文本消息：调试快照请求或帧请求。
     pub fn handle(&mut self, text: &str) -> Result<Reply> {
         let payload = crate::json::from_str(text)?;
+        if payload.get("repro_status").is_some() {
+            ensure!(
+                payload["repro_status"] == true
+                    && payload.as_object().is_some_and(|object| object.len() == 1),
+                "expected only {{repro_status:true}}"
+            );
+            return Ok(Reply::Text(
+                json!({ "repro_status": self.repro_status()? }).to_string(),
+            ));
+        }
         if payload["debug_snapshot"] == true {
+            ensure!(
+                self.repro.is_none() || payload.as_object().is_some_and(|object| object.len() == 1),
+                "repro debug request cannot include other fields"
+            );
             return Ok(Reply::Text(
                 json!({ "snapshot": self.engine.debug_snapshot() }).to_string(),
             ));
@@ -334,7 +434,12 @@ impl Player {
 
     /// 按线上的帧请求 JSON 推进一帧，返回编码好的帧。
     pub fn frame_json(&mut self, payload: &Value) -> Result<Vec<u8>> {
-        self.frame(&FrameInput::from_json(payload)?)
+        let input = if self.repro.is_some() {
+            crate::repro::Input::from_request(payload)?.to_frame_input()?
+        } else {
+            FrameInput::from_json(payload)?
+        };
+        self.frame(&input)
     }
 
     /// 应用输入、推进一帧，返回编码好的帧（格式见 [`decode_frame`]）。
@@ -348,11 +453,41 @@ impl Player {
     /// 应用输入、推进一帧，返回未编码的帧。用完交给 [`Player::recycle`]
     /// 可以复用画笔线段缓冲区。
     pub fn step(&mut self, input: &FrameInput) -> Result<Frame> {
+        if let Some(repro) = &mut self.repro {
+            ensure!(
+                (repro.frame_count as usize) < crate::repro::MAX_FRAMES,
+                "repro exceeds 36000 frames"
+            );
+            crate::repro::Input::from_frame_input(input)?;
+            input.apply(&mut self.engine)?;
+            let frame = self.engine.advance_with(
+                crate::repro::DT,
+                crate::repro::INSTRUCTION_BUDGET,
+                Duration::from_secs(5),
+                1,
+            )?;
+            repro.frame_count += 1;
+            repro.budget_yields += u32::from(frame.budget_yield);
+            return Ok(frame);
+        }
         input.apply(&mut self.engine)?;
         // Opt-in: keep running ticks that produced no visible change (max 16 per frame).
         let ticks = if input.coalesce { 16 } else { 1 };
         self.engine
             .advance_with(input.dt, usize::MAX, input.budget, ticks)
+    }
+
+    /// A detached digest only: no frame advancement, queue draining or raw data.
+    pub fn repro_status(&self) -> Result<crate::repro::Status> {
+        let repro = self
+            .repro
+            .as_ref()
+            .context("repro_status requires a repro session")?;
+        Ok(crate::repro::Status {
+            state_sha256: crate::repro::canonical_sha256(&self.engine.debug_snapshot())?,
+            frame_count: repro.frame_count,
+            budget_yields: repro.budget_yields,
+        })
     }
 
     pub fn recycle(&mut self, frame: Frame) {
