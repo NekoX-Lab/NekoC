@@ -56,22 +56,27 @@ fn alpha_clamps_infinities_instead_of_rejecting_all_nonfinite_numbers() {
 }
 
 #[test]
-fn already_closed_does_not_reset_alpha_and_open_is_never_claimed_successful() {
+fn already_closed_preserves_alpha_and_failed_open_reports_unavailable() {
     let mut capture = OfflineCapture::default();
     capture.set_alpha(Some(37.5));
     assert_eq!(
         capture.set_camera(CameraSwitch::Off),
-        Ok(Deferred {
+        Deferred {
             value: (),
             notice: None
-        })
+        }
     );
     assert_eq!(capture.camera_alpha(), 0.375);
     assert_eq!(
         capture.set_camera(CameraSwitch::On),
-        Err(Unsupported::Camera)
+        Deferred {
+            value: (),
+            notice: Some(Notice::CameraUnavailable)
+        }
     );
     assert_eq!(capture.camera_alpha(), 0.375);
+    capture.set_camera(CameraSwitch::Off);
+    assert_eq!(capture.camera_alpha(), 0.6);
 }
 
 #[test]

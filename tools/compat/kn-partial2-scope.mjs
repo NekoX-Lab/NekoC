@@ -21,7 +21,7 @@ export const skippedGroups = [
     types: ["ai_chat_answer", "ai_chat_ask", "ai_text_actor", "ai_text_photo", "ai_text_result", "ai_text_result_check", "new_conversation", "set_system_preset"] },
   { label: "检测/模型/身体识别", evidence: "kn-offline-round3.md、kn-async-services.md、kn-panel-ai.md",
     types: ["bump_into_body_part", "check_emotion", "check_face_shape", "check_gender", "check_tilt_direction_of_face", "enable_face_detect_by_actor", "enable_face_detect_by_photo", "enable_object_detect_by_actor", "enable_object_detect_by_photo", "evaluate_actor_style", "evaluate_camera", "evaluate_photo", "face_to_body_part", "get_appearance_of_part", "get_evaluate_class_accuracy", "get_evaluate_class_name", "get_face_detection_result", "get_object_detection_result", "get_position_of_body_part", "get_tilt_angle_of_face", "move_to_body_part", "recognize_body_part", "recognize_gesture"] },
-  { label: "摄像头", evidence: "kn-panel-capture.md",
+  { label: "摄像头", evidence: "kn-panel-capture.md、kn-r3-camera.md",
     types: ["open_close_webcam", "open_hide_camera", "set_camera_alpha", "set_webcam_alpha"] },
   { label: "麦克风/语音", evidence: "kn-panel-capture.md、kn-remaining-official.md",
     types: ["get_voice_answer", "get_voice_volume", "voice_recognition"] },

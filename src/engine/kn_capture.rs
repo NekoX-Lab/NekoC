@@ -1,4 +1,4 @@
-//! KN 摄像头/语音的显式离线子集；证据见 docs/kn-panel-capture.md。
+//! KN 摄像头/语音的显式离线子集；证据见 docs/kn-panel-capture.md、docs/kn-r3-camera.md。
 //! 本模块不申请权限、不打开设备，也不制造音量或识别成功结果。
 //! 返回 Deferred 表示官方 Promise 边界；主调度器必须异步恢复线程。
 
@@ -55,6 +55,7 @@ impl Language {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Notice {
     IgnoredAlpha,
+    CameraUnavailable,
     RecordBusy,
     LoginRequired,
 }
@@ -69,7 +70,6 @@ pub(super) struct Deferred<T> {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum Unsupported {
-    Camera,
     Microphone,
     Recognition,
 }
@@ -92,16 +92,20 @@ impl Default for Profile {
     }
 }
 
-/// 仅代表从未打开过视频流的离线摄像头状态。两个面板操作共享此实例。
+/// 没有摄像头后端的离线状态。两个面板操作共享此实例。
 /// alpha 是状态控制值，不表示宿主有摄像头或画面已经渲染。
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct OfflineCapture {
     camera_alpha: f64,
+    camera_failed: bool,
 }
 
 impl Default for OfflineCapture {
     fn default() -> Self {
-        Self { camera_alpha: 0.6 }
+        Self {
+            camera_alpha: 0.6,
+            camera_failed: false,
+        }
     }
 }
 
@@ -123,15 +127,26 @@ impl OfflineCapture {
         Deferred { value: (), notice }
     }
 
-    pub(super) fn set_camera(&mut self, switch: CameraSwitch) -> Result<Deferred<()>, Unsupported> {
-        match switch {
-            // 从未开启/已经关闭时 turnOff 不重置 alpha。
-            CameraSwitch::Off => Ok(Deferred {
-                value: (),
-                notice: None,
-            }),
-            CameraSwitch::On => Err(Unsupported::Camera),
-        }
+    pub(super) fn set_camera(&mut self, switch: CameraSwitch) -> Deferred<()> {
+        // Official turnOn catches missing-device/permission failures and resolves
+        // normally; CAMERA_STATUS_CHANGE STOP is not a project stop. See
+        // docs/kn-r3-camera.md for source locations and controlled browser probes.
+        let notice = match switch {
+            CameraSwitch::On => {
+                self.camera_failed = true;
+                Some(Notice::CameraUnavailable)
+            }
+            CameraSwitch::Off => {
+                // NO_SUPPORT/NO_PERMISSION are not TURN_OFF: even a failed open
+                // makes the next close reset alpha. An already-closed camera does not.
+                if self.camera_failed {
+                    self.camera_alpha = 0.6;
+                }
+                self.camera_failed = false;
+                None
+            }
+        };
+        Deferred { value: (), notice }
     }
 
     // Only an explicit record-disabled host profile can use this helper. The VM

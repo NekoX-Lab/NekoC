@@ -1,5 +1,7 @@
 # KN 摄像头与语音：离线子集及接线边界
 
+> 摄像头后续更新：`turn_on` 的无后端分支已改为可恢复提示并异步续行；权限拒绝/无设备错误及失败后关闭重置 alpha 的官方证据见 [kn-r3-camera.md](kn-r3-camera.md)。本文下方“开启明确 unsupported”是历史交付范围，不再是当前行为。
+
 > 后续更新：`get_voice_volume` 已新增显式本地宿主采样路径，见 [kn-local.md](kn-local.md)。下文“默认 unsupported”描述原 capture 子集的历史交付范围，不能再作为当前编译拒绝契约；官方 Promise/权限证据及 record-disabled 边界仍有效。
 
 ## 交付状态

@@ -8,7 +8,7 @@ pub(super) enum Command {
     Ranking,
     GlobalAnimation(usize),
     CaptureAlpha(usize),
-    CaptureClose,
+    CaptureCamera(kn_capture::CameraSwitch),
     Recognize(kn_capture::Language),
     AiRejected(kn_ai::RejectedCommand, Option<usize>),
 }
@@ -47,6 +47,7 @@ pub struct GlobalAnimationRequest {
 #[serde(rename_all = "snake_case")]
 pub enum PanelNotice {
     IgnoredCameraAlpha,
+    CameraUnavailable,
     RecognitionLoginRequired,
     RecordingBusy,
     AiOffline,
@@ -100,14 +101,10 @@ impl Compiler {
                 );
                 Command::CaptureAlpha(self.kn_panel_arg(b, "camera_alpha")?)
             }
-            "open_hide_camera" | "open_close_webcam" => {
-                ensure!(
-                    kn_capture::CameraSwitch::parse(field(b, "camera_status"))
-                        == Some(kn_capture::CameraSwitch::Off),
-                    "KN camera turn_on requires a camera backend"
-                );
-                Command::CaptureClose
-            }
+            "open_hide_camera" | "open_close_webcam" => Command::CaptureCamera(
+                kn_capture::CameraSwitch::parse(field(b, "camera_status"))
+                    .context("unsupported KN camera_status; expected turn_on or turn_off")?,
+            ),
             "voice_recognition" => Command::Recognize(
                 kn_capture::Language::parse(field(b, "type"))
                     .context("unsupported KN recognition language")?,
@@ -262,11 +259,9 @@ impl Engine {
                 self.kn_panel_notice(completion.notice);
                 Ok(self.defer_kn_panel(index))
             }
-            Command::CaptureClose => {
-                self.kn_panel
-                    .capture
-                    .set_camera(kn_capture::CameraSwitch::Off)
-                    .map_err(|error| anyhow::anyhow!("unsupported KN camera: {error:?}"))?;
+            Command::CaptureCamera(switch) => {
+                let completion = self.kn_panel.capture.set_camera(switch);
+                self.kn_panel_notice(completion.notice);
                 Ok(self.defer_kn_panel(index))
             }
             Command::Recognize(language) => {
@@ -327,6 +322,7 @@ impl Engine {
     fn kn_panel_notice(&mut self, notice: Option<kn_capture::Notice>) {
         let notice = match notice {
             Some(kn_capture::Notice::IgnoredAlpha) => PanelNotice::IgnoredCameraAlpha,
+            Some(kn_capture::Notice::CameraUnavailable) => PanelNotice::CameraUnavailable,
             Some(kn_capture::Notice::LoginRequired) => PanelNotice::RecognitionLoginRequired,
             Some(kn_capture::Notice::RecordBusy) => PanelNotice::RecordingBusy,
             None => return,
