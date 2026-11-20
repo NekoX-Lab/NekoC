@@ -92,5 +92,12 @@ impl Engine {
             4..=6 => next.clamp(0.0, 100.0),
             _ => next,
         };
+        // Official a1xw/jt.get_effect_filter enables the filter even when
+        // set_twist clamps its angle to zero. Its 20px padding changes the
+        // shared filter rectangle; clear, not angle=0, disables it.
+        // Source locations and paired pixels: docs/r3-k4effects.md.
+        if effect.scope == 5 {
+            a.k4_twist_enabled = true;
+        }
     }
 }

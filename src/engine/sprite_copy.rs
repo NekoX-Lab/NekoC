@@ -16,6 +16,7 @@ impl Sprite {
             visible: self.visible,
             opacity: self.opacity,
             effects: self.effects,
+            k4_twist_enabled: self.k4_twist_enabled,
             size_x: self.size_x,
             size_y: self.size_y,
             flip_x: self.flip_x,
@@ -112,6 +113,7 @@ mod tests {
         source.visible = false;
         source.opacity = 0.375;
         source.effects = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0];
+        source.k4_twist_enabled = true;
         source.size_x = -80.0;
         source.size_y = 125.0;
         source.flip_x = true;

@@ -578,7 +578,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
       if(a.soft_mesh!=null)validateSoftMesh(a.soft_mesh);
       if(a.id===this.sceneId){changed ||= a.style!==this.backdrop||JSON.stringify(a)!==JSON.stringify(this.backgroundState);this.backdrop=a.style;this.backgroundState=a;continue;}
       const index=this.spriteIndices.get(a.id),old=index===undefined?null:this.sprites[index];
-      changed ||= !old||['style','x','y','direction','scale','visible','opacity','size_x','size_y','rotation_type'].some(k=>a[k]!==old[k])||String(a.effects)!==String(old.effects)||JSON.stringify(a.soft_mesh)!==JSON.stringify(old.soft_mesh);
+      changed ||= !old||['style','x','y','direction','scale','visible','opacity','size_x','size_y','rotation_type','k4_twist_enabled'].some(k=>a[k]!==old[k])||String(a.effects)!==String(old.effects)||JSON.stringify(a.soft_mesh)!==JSON.stringify(old.soft_mesh);
       if(index===undefined){this.spriteIndices.set(a.id,this.sprites.length);this.sprites.push(a);}else this.sprites[index]=a;
     }
     this.changed = changed || !!frame.clear || lines.length>0 || stamps.length>0;
@@ -919,10 +919,12 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     this.stats.drawCalls++;batch.count=0;
   }
 
-  drawTexture(texture,x,y,width,height,angle=0,tint=[1,1,1,1],effects=null,texSize=null,repeatUV=null,filterCenter=null,packedTint=false) {
-    const batchable=this.textureBatchActive&&!this.k4Filtering&&!repeatUV&&!packedTint&&!effects?.some((value,i)=>i!==1&&value!==0);
+  drawTexture(texture,x,y,width,height,angle=0,tint=[1,1,1,1],effects=null,texSize=null,repeatUV=null,filterCenter=null,packedTint=false,twistEnabled=false) {
+    // An enabled neutral K4 twist still needs its padded filter surface. Flush
+    // preceding actors/cached stamps before switching framebuffer for that pass.
+    const batchable=this.textureBatchActive&&!this.k4Filtering&&!(this.kitten4&&twistEnabled)&&!repeatUV&&!packedTint&&!effects?.some((value,i)=>i!==1&&value!==0);
     if(!batchable&&this.textureBatch?.count)this.flushTextureBatch();
-    if(this.kitten4&&effects&&(effects[3]>=1||effects[5]>0||effects[7]>=1)&&!this.k4Filtering)return this.drawK4SpatialTexture(texture,x,y,width,height,angle,tint,effects,texSize,repeatUV,filterCenter);
+    if(this.kitten4&&effects&&(effects[3]>=1||effects[5]>0||effects[7]>=1||twistEnabled)&&!this.k4Filtering)return this.drawK4SpatialTexture(texture,x,y,width,height,angle,tint,effects,texSize,repeatUV,filterCenter,twistEnabled);
     if(this.sceneTransform){const t=this.sceneTransform;x+=t.x;y-=t.y;tint=[tint[0],tint[1],tint[2],tint[3]*t.alpha];}
     if(batchable){this.queueTexture(texture,x,y,width,height,angle,tint);return;}
     const gl=this.gl,u=this.uniform,e=effects||NO_EFFECTS;
@@ -947,7 +949,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     for(const [x,y]of mesh.vertices){const px=(this.width/2+x)*sx,py=(this.height/2-y)*sy;left=Math.min(left,px);right=Math.max(right,px);top=Math.min(top,py);bottom=Math.max(bottom,py);}
     left=Math.floor(left)-1;right=Math.ceil(right)+1;top=Math.floor(top)-1;bottom=Math.ceil(bottom)+1;
     // Keep offstage geometry in the filter input, as with ordinary sprites.
-    const pad=a.effects?.[5]>0?20*Math.max(sx,sy):0;
+    const pad=a.effects?.[5]>0||a.k4_twist_enabled?20*Math.max(sx,sy):0;
     if(right+pad<=0||bottom+pad<=0||left-pad>=this.canvas.width||top-pad>=this.canvas.height)return;
     const gl=this.gl,limit=gl.getParameter(gl.MAX_TEXTURE_SIZE);
     if(right-left>limit||bottom-top>limit)throw Error('Soft mesh exceeds GPU texture limit');
@@ -960,14 +962,15 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,canvas);
     // Effects operate on the deformed raster. This is an independent partial
     // implementation, not a claim of official triangle-edge/subpixel parity.
-    this.drawTexture(texture,(left+right)/2/sx-this.width/2,this.height/2-(top+bottom)/2/sy,canvas.width/sx,canvas.height/sy,0,[1,1,1,a.opacity??1],a.effects,[canvas.width,canvas.height],null,{x:a.x,y:a.y});
+    this.drawTexture(texture,(left+right)/2/sx-this.width/2,this.height/2-(top+bottom)/2/sy,canvas.width/sx,canvas.height/sy,0,[1,1,1,a.opacity??1],a.effects,[canvas.width,canvas.height],null,{x:a.x,y:a.y},false,a.k4_twist_enabled);
   }
 
-  drawK4SpatialTexture(texture,x,y,width,height,angle,tint,e,texSize,repeatUV,filterCenter){
+  drawK4SpatialTexture(texture,x,y,width,height,angle,tint,e,texSize,repeatUV,filterCenter,twistEnabled=false){
     const gl=this.gl,sx=this.canvas.width/this.width,sy=this.canvas.height/this.height;
     const inherited=this.sceneTransform;
     if(inherited){filterCenter??={x,y};x+=inherited.x;y-=inherited.y;tint=[...tint.slice(0,3),tint[3]*inherited.alpha];}
-    const c=Math.cos(angle),s=Math.sin(angle),w=Math.abs(width),h=Math.abs(height),pad=e[5]>0?20:0;
+    // Zero angle is still an enabled, padded native filter (a1xw/jt).
+    const c=Math.cos(angle),s=Math.sin(angle),w=Math.abs(width),h=Math.abs(height),pad=e[5]>0||twistEnabled?20:0;
     const halfX=(Math.abs(c)*w+Math.abs(s)*h)/2,halfY=(Math.abs(s)*w+Math.abs(c)*h)/2;
     // Filter input is not stage-clipped: a twist can bring offstage pixels back
     // into view. Native background TilingSprites keep the same 20px padding.
@@ -1036,7 +1039,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
       if(e[0]!==0)colorPass(0,e[0]);
       if(e[2]!==0)colorPass(2,e[2]);
       for(const [kind,amount]of [[0,e[3]],[1,e[5]],[2,e[7]]]){
-        if(!(amount>0))continue;
+        if(!(amount>0)&&!(kind===1&&twistEnabled))continue;
         const twist=kind===1,ascii=kind===2;
         // Saturation precedes ASCII in the native filter chain.
         if(ascii&&e[6]>0){
@@ -1123,7 +1126,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
         // Background is a stage-sized TilingSprite; scale changes its tile
         // transform, not the stage rectangle (It.set_scale / St).
         const a=backgroundState,base=scale??1,sx=base*(a?.scale??100)/100*(a?.size_x??100)/100,sy=base*(a?.scale??100)/100*(a?.size_y??100)/100;
-        if(sx&&sy)this.drawTexture(backdrop.texture,0,0,this.width,this.height,0,[1,1,1,a?.opacity??1],a?.effects,null,[this.width/(backdrop.width*sx),this.height/(backdrop.height*sy)]);
+        if(sx&&sy)this.drawTexture(backdrop.texture,0,0,this.width,this.height,0,[1,1,1,a?.opacity??1],a?.effects,null,[this.width/(backdrop.width*sx),this.height/(backdrop.height*sy)],null,false,a?.k4_twist_enabled);
       }else this.drawTexture(backdrop.texture,0,0,this.width,this.height);
     }
     // Media isn't duplicated into the leaving scene. Cross-scene video z-order
@@ -1140,7 +1143,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
       const image=this.spriteImage(a);
       if(image&&a.soft_mesh&&image.source){this.drawSoftMesh(a,image);continue;}
       if(image){const {x,y,width,height,angle}=actorGeometry(a,image,this.kitten4);
-        this.drawTexture(image.texture,x,y,width,height,angle,[1,1,1,a.opacity??1],a.effects,[image.width,image.height],null,{x:a.x,y:a.y});}
+        this.drawTexture(image.texture,x,y,width,height,angle,[1,1,1,a.opacity??1],a.effects,[image.width,image.height],null,{x:a.x,y:a.y},false,a.k4_twist_enabled);}
     }
     }finally{this.flushTextureBatch();this.textureBatchActive=false;this.sceneTransform=null;this.sceneScreenshot=false;}
   }

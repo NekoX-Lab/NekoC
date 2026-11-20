@@ -70,7 +70,7 @@ test('baseline proves actual shader regressions rather than only post-fix screen
 test('screen-space passes dispatch only for K4 spatial filters and guard recursion',()=>{
   const r={kitten4:true,k4Filtering:false,drawK4SpatialTexture:(...args)=>args};
   const fx=[0,0,0,9,0,0,0,0];
-  assert.deepEqual(StageRenderer.prototype.drawTexture.call(r,'texture',1,2,3,4,0,[1,1,1,1],fx,[3,4]),['texture',1,2,3,4,0,[1,1,1,1],fx,[3,4],null,null]);
+  assert.deepEqual(StageRenderer.prototype.drawTexture.call(r,'texture',1,2,3,4,0,[1,1,1,1],fx,[3,4]),['texture',1,2,3,4,0,[1,1,1,1],fx,[3,4],null,null,false]);
   // KN continues through the existing shader; a missing GL context proves it
   // did not incorrectly enter the K4-only dispatch above.
   assert.throws(()=>StageRenderer.prototype.drawTexture.call({...r,kitten4:false},'texture',1,2,3,4,0,[1,1,1,1],fx),TypeError);

@@ -4,7 +4,7 @@ import { readFile, stat } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { effectTypes, effectScopes, partialEffects11Fixtures, selectEffects11Cases } from '../tools/compat/k4-effects-11-fixtures.mjs';
 const hash=b=>createHash('sha256').update(b).digest('hex');
-test('round 11 five setter/changer aliases retain actual VM full-canvas evidence',async()=>{
+test('round 11 five setter/changer aliases retain historical VM full-canvas evidence',async()=>{
   // Recorded against 7b057f2; r3-render.test.mjs compares that frozen renderer
   // with the current batching/cache implementation. Never relabel old captures.
   const renderer='eb5f51230e59c5fc695cd489e173282803d568d3b0b3eb54b623692679e028a3';

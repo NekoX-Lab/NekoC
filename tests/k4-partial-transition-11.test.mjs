@@ -6,7 +6,7 @@ import { transition10Fixtures } from '../tools/compat/k4-partial-transition-10.m
 import { recordTransition11 } from '../tools/compat/k4-partial-transition-11.mjs';
 import { StageRenderer } from '../web/renderer.js';
 const hash=b=>createHash('sha256').update(b).digest('hex');
-test('round 11 closes the original slide/distort inherited-filter negatives at tolerance 8',async()=>{
+test('round 11 historical evidence closes the original slide/distort inherited-filter negatives at tolerance 8',async()=>{
   // Historical round-11 identity; current pixel preservation is exercised by
   // r3-render.test.mjs against this exact source revision (7b057f2).
   const renderer='eb5f51230e59c5fc695cd489e173282803d568d3b0b3eb54b623692679e028a3';
