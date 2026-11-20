@@ -80,7 +80,11 @@ test('hat emits detached scalar/list events only for registered hats',async()=>{
   s.close();assert.throws(()=>s.emit(hat.opcode));
 });
 
-test('timeouts abort only their own calls, finish once, and ignore late fulfillment/rejection',async()=>{
+test('timeouts abort only their own calls, finish once, and ignore late fulfillment/rejection',async t=>{
+  // Exercise deadline ordering without depending on host scheduling latency.
+  let now=0;
+  t.mock.method(performance,'now',()=>now);
+  t.mock.timers.enable({apis:['setTimeout']});
   for(const settleWithError of [false,true]){
     let settle,signal,count=0;
     const s=new ExtensionRegistry({timeoutMs:15}).register(v2,([x],context)=>{
@@ -89,7 +93,7 @@ test('timeouts abort only their own calls, finish once, and ignore late fulfillm
     }).session();
     const requests=[{id:1,opcode:v2.opcode,arguments:[1]},{id:2,opcode:v2.opcode,arguments:[2]}];
     s.update(requests);await flush();assert.deepEqual(s.drain(),[{kind:'extension_result',id:2,value:2}]);
-    await wait(35);assert.equal(signal.aborted,true);
+    now+=35;t.mock.timers.tick(35);await flush();assert.equal(signal.aborted,true);
     const results=s.drain();assert.equal(results.length,1);assert.equal(results[0].id,1);assert.match(results[0].error,/timed out/);
     settle(settleWithError?Error('late rejection'):1);await flush();s.update(requests);await flush();
     assert.equal(count,2);assert.deepEqual(s.drain(),[]);s.close();

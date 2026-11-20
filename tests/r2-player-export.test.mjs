@@ -124,7 +124,7 @@ test('real offline WASM fresh sessions clear every scene pen surface but pause a
   // Keep an owned generated fixture for the required independent editor check.
   await mkdir(path.join(root,'dist/r2-review'),{recursive:true});await writeFile(path.join(root,'dist/r2-review/scene-stop.bcmkn'),JSON.stringify(work));
   await exportPlayer({input,out});
-  const browser=await loadPlaywright().chromium.launch({headless:true,channel:process.env.NEKOC_BROWSER_CHANNEL||'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});t.after(()=>browser.close());
+  const browser=await loadPlaywright().chromium.launch({headless:true,...(process.env.NEKOC_BROWSER_CHANNEL?{channel:process.env.NEKOC_BROWSER_CHANNEL}:process.platform==='win32'?{channel:'msedge'}:{}),args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox']});t.after(()=>browser.close());
   const context=await browser.newContext({viewport:{width:1280,height:800}});await context.setOffline(true);
   const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto(pathToFileURL(path.join(out,'index.html')).href);await page.waitForFunction(()=>globalThis.nekoPlayDiagnostics&&!nekoPlayDiagnostics().busy);
@@ -161,7 +161,7 @@ test('real CLI export runs WASM frames over file:// and nested static hosting, i
       const data=await readFile(path.join(out,name));res.writeHead(200,{'content-type':name.endsWith('.html')?'text/html':name.endsWith('.css')?'text/css':'text/javascript'});res.end(data);
     }catch{res.writeHead(404);res.end();}
   });
-  const browser=await loadPlaywright().chromium.launch({headless:true,channel:process.env.NEKOC_BROWSER_CHANNEL||'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+  const browser=await loadPlaywright().chromium.launch({headless:true,...(process.env.NEKOC_BROWSER_CHANNEL?{channel:process.env.NEKOC_BROWSER_CHANNEL}:process.platform==='win32'?{channel:'msedge'}:{}),args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox']});
   t.after(()=>browser.close());
   for(const url of [pathToFileURL(path.join(out,'index.html')).href,pathToFileURL(path.join(extracted,'index.html')).href,`${origin}/nested/game/index.html`,pathToFileURL(path.join(kn,'index.html')).href]){
     const context=await browser.newContext({viewport:{width:1280,height:800}});const page=await context.newPage(),errors=[],requests=[];
@@ -185,5 +185,44 @@ test('real CLI export runs WASM frames over file:// and nested static hosting, i
     await page.locator('#stop').click();assert.equal(await page.locator('#notice').isVisible(),false);
     assert.deepEqual(errors,[]);assert.ok(!requests.some(request=>/^https?:/.test(request)&&!request.startsWith(origin)),requests.join('\n'));
     await context.close();
+    // PR #94 + r3-mobile integration: use the actual packaged export-entry,
+    // file:// offline directory / extracted ZIP and nested static hosting.
+    for(const viewport of [{width:390,height:844},{width:844,height:390},{width:768,height:1024},{width:1024,height:768}]){
+      const mobile=await browser.newContext({viewport,isMobile:true,hasTouch:true});
+      try{
+        if(url.startsWith('file:'))await mobile.setOffline(true);
+        const page=await mobile.newPage(),errors=[],requests=[];
+        page.on('pageerror',error=>errors.push(error.message));page.on('request',request=>requests.push(request.url()));
+        const ready=()=>page.waitForFunction(()=>globalThis.nekoPlayDiagnostics&&!nekoPlayDiagnostics().busy);
+        await page.goto(url);await ready();
+        assert.equal(await page.locator('#stop').isVisible(),true);
+        await page.locator('#toggle').tap();await page.waitForFunction(()=>nekoPlayDiagnostics().totalUpdates>=2);
+        await page.locator('#virtual-toggle').tap();
+        await page.locator('[data-key="37"]').tap();
+        const cdp=await mobile.newCDPSession(page),box=await page.locator('[data-key="32"]').boundingBox();
+        await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{id:1,x:box.x+box.width/2,y:box.y+box.height/2}]});
+        assert.equal(await page.locator('[data-key="32"]').getAttribute('aria-pressed'),'true');
+        await page.locator('#stop').click();await ready();
+        await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+        assert.equal(await page.locator('#virtual-controls [aria-pressed="true"]').count(),0);
+        assert.equal(await page.evaluate(()=>nekoPlayDiagnostics().running),false);
+        await page.locator('#toggle').tap();await page.waitForFunction(()=>nekoPlayDiagnostics().totalUpdates>=2);
+        await page.locator('#record').tap();await ready();
+        await page.waitForFunction(()=>nekoPlayDiagnostics().recording&&nekoPlayDiagnostics().totalUpdates>=2);
+        assert.equal(await page.locator('#stop').isDisabled(),true);
+        await page.locator('[data-key="90"]').tap();
+        const updates=await page.evaluate(()=>nekoPlayDiagnostics().totalUpdates);
+        await page.waitForFunction(count=>nekoPlayDiagnostics().totalUpdates>=count+2,updates);
+        await page.locator('#toggle').tap();await ready();
+        await page.waitForFunction(()=>!nekoPlayDiagnostics().pending);
+        const downloading=page.waitForEvent('download');await page.locator('#record').tap();
+        const stream=await(await downloading).createReadStream(),chunks=[];
+        for await(const chunk of stream)chunks.push(chunk);
+        const bundle=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        assert.deepEqual(bundle.timeline.flatMap(f=>f.input.events).filter(e=>e.kind==='key'&&e.key==='90').map(e=>e.down),[true,false]);
+        assert.ok(!requests.some(request=>/^https?:/.test(request)&&!request.startsWith(origin)),requests.join('\n'));
+        assert.deepEqual(errors,[]);
+      }finally{await mobile.close();}
+    }
   }
 });

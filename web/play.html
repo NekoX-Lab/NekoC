@@ -11,7 +11,7 @@
   </header>
 
   <section id="viewport" class="tile" aria-label="游玩区域">
-    <div id="stage-box"><canvas id="stage" tabindex="0" aria-label="游戏舞台，点击后使用键盘游玩"></canvas><div id="timer" hidden></div></div>
+    <div id="stage-box"><canvas id="stage" tabindex="0" aria-label="游戏舞台，可触摸或使用键盘游玩"></canvas><div id="timer" hidden></div></div>
     <div id="welcome" class="welcome"><span class="eyebrow">READY WHEN YOU ARE</span><h2>把作品带到大屏幕。</h2><p>导入 .bcmkn / .bcm，或直接拖到这里</p></div>
     <div id="drop-hint" aria-hidden="true"><span>松开，开始游玩</span><small>.bcmkn / .bcm</small></div>
     <div id="loading" role="status" hidden><label id="load-label" for="load-progress">正在读取作品…</label><progress id="load-progress" max="1"></progress></div>
@@ -27,8 +27,23 @@
     <div class="play-controls"><button id="toggle" class="primary" disabled>▶ 开始游玩</button><button id="stop" disabled title="结束运行；再次开始将从头运行">■ 停止</button><button id="restart" disabled title="从头开始">↻ 重玩</button><button id="fullscreen" title="全屏游玩" aria-label="全屏游玩">⛶ <span>全屏</span></button></div>
     <span id="runtime-mode" role="status">运行模式：正在连接…</span>
     <span class="keyboard-hint">需要 WebGL 2；浏览器内运行重作品会占用较多内存，请等待加载完成后开始。</span>
+    <button id="virtual-toggle" aria-expanded="false" aria-controls="virtual-controls">显示虚拟按键</button>
+    <div id="virtual-controls" hidden role="group" aria-label="虚拟游戏按键">
+      <div class="direction-pad" role="group" aria-label="方向键">
+        <button data-key="38" aria-label="向上" aria-pressed="false">↑</button>
+        <button data-key="37" aria-label="向左" aria-pressed="false">←</button>
+        <button data-key="40" aria-label="向下" aria-pressed="false">↓</button>
+        <button data-key="39" aria-label="向右" aria-pressed="false">→</button>
+      </div>
+      <div class="action-pad" role="group" aria-label="操作键">
+        <button data-key="32" aria-label="空格键" aria-pressed="false">空格</button>
+        <button data-key="13" aria-label="回车键" aria-pressed="false">回车</button>
+        <button data-key="90" aria-label="Z 键" aria-pressed="false">Z</button>
+        <button data-key="88" aria-label="X 键" aria-pressed="false">X</button>
+      </div>
+    </div>
     <span id="status" role="status">选择作品，开始游玩</span>
-    <span class="keyboard-hint">点击画面后用键盘游玩</span>
+    <span class="keyboard-hint">触摸画面，或用键盘 / 虚拟按键游玩</span>
     <button id="record" disabled aria-pressed="false" aria-describedby="record-help">● 录制复现（从头开始）</button>
     <small id="record-help">固定种子、60 Hz；停止后导出键鼠 JSON。音频完成、真实时间、云服务、外部设备及素材感知不保证复现；包不含作品或账户信息。</small>
     <button id="coverage" disabled aria-haspopup="dialog">兼容性 / coverage 报告</button>
