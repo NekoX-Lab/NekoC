@@ -203,7 +203,7 @@ export function inventory(root, reference, engineSource) {
   if (!compiler.includes("graph::check(workspace_data)?;") ||
       !compiler.includes("graph::nest(id, blocks, connections)") ||
       !graph.includes("crate::json::Json::new(crate::json::clone_value(&blocks[id]))") ||
-      !graph.includes('for key in ["next", "inputs", "statements"]')) {
+      !graph.includes('for key in ["next", "inputs", "statements", "parent_id"]')) {
     throw new Error("Re-audit bcmkn_compiler::graph before classifying readable types");
   }
   const evidence = primaryDispatch(engine);

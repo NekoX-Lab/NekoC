@@ -134,7 +134,9 @@ pub(super) fn nest(
         let object = nested
             .as_object_mut()
             .context("workspace block must be an object")?;
-        for key in ["next", "inputs", "statements"] {
+        // Rebuilt fields may hold arbitrary deep input JSON. Dispose of every
+        // old value explicitly before insertion, including parent_id metadata.
+        for key in ["next", "inputs", "statements", "parent_id"] {
             if let Some(old) = object.remove(key) {
                 crate::json::discard(old);
             }

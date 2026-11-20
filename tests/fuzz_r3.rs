@@ -246,6 +246,35 @@ fn deep_connection_extensions_are_borrowed_without_recursive_clone_or_drop() {
     assert!(bcmkn_compiler::workspace_data_to_neko_blocks(&w).is_err());
 }
 
+#[test]
+fn rebuilt_workspace_fields_discard_deep_old_values_on_default_thread_stack() {
+    // Use an ordinary spawned thread, not expanded() or a custom stack size.
+    std::thread::spawn(|| {
+        for key in ["parent_id", "next", "inputs", "statements"] {
+            let mut old = Json::new(Value::Null);
+            for _ in 0..30_000 {
+                old = Json::new(Value::Array(vec![old.into_value()]));
+            }
+            let mut w = Json::new(json!({"blocks":{
+                "a":{"type":"self_pen_up"},"b":{"type":"self_pen_down"}},
+                "connections":{"a":{"b":{"type":"next"}}}}));
+            w["blocks"]["b"][key] = old.into_value();
+            let roots = bcmkn_compiler::workspace_data_to_neko_blocks(&w).unwrap();
+            assert_eq!(roots.len(), 1);
+            assert_eq!(roots[0]["parent_id"], "");
+            assert_eq!(roots[0]["next"]["parent_id"], "a", "{key}");
+            assert_eq!(roots[0]["next"]["type"], "self_pen_down");
+            for removed in ["next", "inputs", "statements"] {
+                assert!(roots[0]["next"].get(removed).is_none());
+            }
+            // Rebuilding only edits a stack-safe clone, never the input field.
+            assert!(w["blocks"]["b"][key].is_array());
+        }
+    })
+    .join()
+    .unwrap();
+}
+
 fn text_literal(text: &str) -> Value {
     json!({"type":"text","fields":{"TEXT":text}})
 }
