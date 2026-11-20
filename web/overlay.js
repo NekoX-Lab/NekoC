@@ -34,11 +34,12 @@ const STYLE = `
 .neko-bubble.k4.think::before{left:calc(12 * var(--neko-unit));bottom:calc(-30 * var(--neko-unit));width:calc(26 * var(--neko-unit));height:calc(20 * var(--neko-unit))}
 .neko-bubble.k4.think::after{left:calc(-3 * var(--neko-unit));bottom:calc(-46 * var(--neko-unit));width:calc(16 * var(--neko-unit));height:calc(12 * var(--neko-unit))}
 .neko-bubble.k4.think.flipped::before{left:auto;right:calc(12 * var(--neko-unit))}.neko-bubble.k4.think.flipped::after{left:auto;right:calc(-3 * var(--neko-unit))}
-.neko-ask.k4-choice{left:calc(10 * var(--neko-unit));right:calc(10 * var(--neko-unit));bottom:calc(10 * var(--neko-unit));padding:0;display:block;border:0;border-radius:calc(9 * var(--neko-unit));box-shadow:none;font-family:"Microsoft YaHei",sans-serif;filter:drop-shadow(calc(2.12132 * var(--neko-unit)) calc(2.12132 * var(--neko-unit)) 0 #00000026)}
+.neko-ask.k4-choice{left:calc(10 * var(--neko-unit));right:calc(10 * var(--neko-unit));bottom:calc(10 * var(--neko-unit));padding:0;display:block;border:0;border-radius:calc(9 * var(--neko-unit));box-shadow:none;font-family:"Microsoft YaHei",sans-serif;touch-action:none;filter:drop-shadow(calc(2.12132 * var(--neko-unit)) calc(2.12132 * var(--neko-unit)) 0 #00000026)}
 .neko-ask.k4-choice p{position:absolute;bottom:100%;left:0;width:calc(600 * var(--neko-unit));height:var(--choice-height);box-sizing:border-box;padding:0 calc(16 * var(--neko-unit));display:flex;align-items:center;border-radius:calc(6 * var(--neko-unit)) calc(6 * var(--neko-unit)) 0 0;background:#fff;font-size:calc(22 * var(--neko-unit));color:#000;white-space:nowrap;overflow:hidden;opacity:.9999}
-.neko-ask.k4-choice .choices{display:grid;grid-template-columns:repeat(2,1fr);gap:0;outline:calc(1 * var(--neko-unit)) solid #d8d8d8;border-radius:inherit}
-.neko-ask.k4-choice .choices button{height:var(--choice-height);padding:0;border:calc(1 * var(--neko-unit)) solid #d8d8d8;background:#fff;color:#000;border-radius:calc(9 * var(--neko-unit));font-size:calc(22 * var(--neko-unit));font-weight:normal;opacity:.9999}
-.neko-ask.k4-choice .choices button:hover{background:#297eff;color:#fff}`;
+.neko-ask.k4-choice p[hidden]{display:none}
+.neko-ask.k4-choice .choices{display:grid;grid-template-columns:repeat(var(--choice-columns),minmax(0,1fr));gap:0;outline:calc(1 * var(--neko-unit)) solid #d8d8d8;border-radius:inherit}
+.neko-ask.k4-choice .choices button{box-sizing:border-box;min-width:0;height:var(--choice-height);padding:0;border:calc(1 * var(--neko-unit)) solid #d8d8d8;background:#fff;color:#000;border-radius:calc(9 * var(--neko-unit));font-size:calc(22 * var(--neko-unit));font-weight:normal;white-space:pre;opacity:.9999}
+.neko-ask.k4-choice .choices button:hover,.neko-ask.k4-choice .choices button:active,.neko-ask.k4-choice .choices button[data-hover="true"]{background:#297eff;color:#fff}`;
 
 // KN saves each monitor's top-left corner in stage pixels (variablesDict[id].position);
 // the official player draws it there instead of stacking widgets in a corner.
@@ -74,13 +75,38 @@ export class StageOverlay {
     this.root.append(this.monitors); box.append(this.root);
     this.bubbles = new Map(); this.ask = null; this.askId = null; this.monitorKey = '';
     this.stageDialog = null; this.ranking = null;
+    // Hit-test release coordinates, never a captured pointer/touch target.
+    // StageInput uses this hook only for a gesture it already owns.
+    renderer.choiceAt = (x,y) => this.choiceAt?.(x,y);
+    box.addEventListener('pointermove',event=>{this.choiceAt?.(event.clientX,event.clientY);});
+    box.addEventListener('pointerdown',event=>{
+      if(!event.isPrimary||event.button!==0)return;
+      this.choiceReleased=false;
+      this.choiceStart={id:event.pointerId,panel:this.ask?.classList.contains('k4-choice')&&this.ask.contains(event.target)?this.ask:null};
+      this.choiceAt?.(event.clientX,event.clientY);
+    },true);
+    for(const type of ['pointerup','pointercancel'])box.addEventListener(type,event=>{
+      const start=this.choiceStart;
+      if(!start||start.id!==event.pointerId)return;
+      this.choiceStart=null;
+      // Removing an implicitly captured touch target can retarget its up to
+      // the replacement panel. It must not answer a different question.
+      if(start.panel&&start.panel!==this.ask){
+        this.choiceReleased=true;event.preventDefault();event.stopImmediatePropagation();
+      }
+    },true);
+    for(const type of ['mouseup','click'])box.addEventListener(type,event=>{
+      if(this.choiceReleased&&(type!=='click'||event.detail!==0)){
+        event.preventDefault();event.stopImmediatePropagation();
+      }
+    },true);
   }
   reset() {
     const restore=this.root.contains(document.activeElement);
     for (const bubble of this.bubbles.values()) bubble.remove();
     this.bubbles.clear(); this.monitors.replaceChildren(); this.monitorKey = '';
     this.renderer.cloudListViews?.clear();
-    this.ask?.remove(); this.ask = null; this.askId = null;
+    this.ask?.remove(); this.ask = null; this.askId = null; this.choiceAt = null;
     this.stageDialog?.remove(); this.stageDialog = null;
     this.ranking?.remove(); this.ranking = null;
     if(restore)this.renderer.canvas?.focus({preventScroll:true});
@@ -188,30 +214,55 @@ export class StageOverlay {
   }
   showAsk(ask) {
     const restore=this.ask?.contains(document.activeElement);
-    this.ask?.remove(); this.ask = null; this.askId = ask?.id ?? null;
+    this.ask?.remove(); this.ask = null; this.askId = ask?.id ?? null; this.choiceAt = null;
     if (!ask) {if(restore)this.renderer.canvas?.focus({preventScroll:true});return;}
     const panel = document.createElement('div'); panel.className = 'neko-ask';
     panel.setAttribute('role','group');panel.setAttribute('aria-label',ask.question||'回答问题');
     const question = document.createElement('p'); question.textContent = ask.question; panel.append(question);
-    const send = (text, choice) => { if (this.askId !== ask.id) return; if(this.onAnswer({ kind: 'answer', id: ask.id, text, ...(choice ? { choice } : {}) })===false)return; panel.remove(); this.ask = null; };
+    let sent = false;
+    const send = (text, choice) => { if (sent || this.ask !== panel || this.askId !== ask.id) return; if(this.onAnswer({ kind: 'answer', id: ask.id, text, ...(choice ? { choice } : {}) })===false)return; sent = true; panel.remove(); this.ask = null; this.choiceAt = null; };
     if (ask.choices) {
       if (this.renderer.kitten4) {
         panel.classList.add('k4-choice');
-        for (const type of ['pointerdown','pointerup','mousedown','mouseup','touchstart','touchend','keydown','keyup']) panel.addEventListener(type, event => event.stopPropagation());
+        for (const type of ['pointerdown','pointerup','mousedown','mouseup','touchstart','touchend','keydown','keyup','click']) panel.addEventListener(type, event => event.stopPropagation());
         const height = this.renderer.height * .0888;
         panel.style.setProperty('--choice-height', `calc(${height} * var(--neko-unit))`);
-        const rows = Math.ceil(ask.choices.length / 2);
+        // Official cn.on_stage_resize/show: only wide stages use two columns.
+        const columns = this.renderer.width > this.renderer.height ? 2 : 1;
+        panel.style.setProperty('--choice-columns', String(columns));
+        const rows = Math.ceil(ask.choices.length / columns);
         this.askDistance = rows * height + 10;
         panel.style.transform = `translateY(calc(${this.askDistance} * var(--neko-unit)))`;
         const actor = this.renderer.sprites.find(a => a.id === ask.sprite);
-        if (actor?.visible) question.hidden = true;
+        if (actor?.visible || !ask.question) question.hidden = true;
         question.style.lineHeight = 'calc(28 * var(--neko-unit))';
       }
       const list = document.createElement('div'); list.className = 'choices';
+      const buttons = [];
+      if(this.renderer.kitten4){
+        const choiceAt=(x,y)=>{
+          if(this.ask!==panel||!Number.isFinite(x)||!Number.isFinite(y))return;
+          const hit=document.elementFromPoint(x,y);
+          const i=buttons.findIndex(button=>button===hit||button.contains(hit));
+          for(let j=0;j<buttons.length;j++)buttons[j].dataset.hover=String(j===i);
+          if(i<0)return;
+          return ()=>{if(this.ask===panel){this.choiceReleased=true;send(ask.choices[i],i+1);}};
+        };
+        this.choiceAt=choiceAt;
+        // Touch keeps its start target. Pointer coordinates also work with
+        // implicit capture; pointercancel deliberately has no selection path.
+        panel.onpointerup=event=>{if(event.isPrimary&&event.button===0)choiceAt(event.clientX,event.clientY)?.();};
+      }
       ask.choices.forEach((label, i) => {
-        const button = document.createElement('button'); button.type = 'button'; button.textContent = label || `选项 ${i + 1}`;
-        if (this.renderer.kitten4) button.style.lineHeight = 'calc(28 * var(--neko-unit))';
-        button.onclick = () => send(label, i + 1); list.append(button);
+        const button = document.createElement('button'); button.type = 'button';
+        buttons.push(button);
+        // Official ask_and_choose truncates the displayed UTF-16 string, but
+        // the answer callback keeps the original value and one-based index.
+        button.textContent = this.renderer.kitten4 ? (label.length > 19 ? label.substring(0, 19) + '…' : label) : label || `选项 ${i + 1}`;
+        if (this.renderer.kitten4) {
+          button.style.lineHeight = 'calc(28 * var(--neko-unit))';
+        }
+        button.onclick = event => { if (!this.renderer.kitten4 || event.detail === 0) send(label, i + 1); }; list.append(button);
       });
       panel.append(list);
       this.focusControl(list.querySelector('button'));
