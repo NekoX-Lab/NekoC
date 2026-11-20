@@ -190,6 +190,16 @@ enum Command {
         #[arg(long)]
         out: PathBuf,
     },
+    /// Export a self-contained browser player directory or ZIP (no server needed).
+    ExportPlayer {
+        input: PathBuf,
+        /// New output directory, or a .zip file. Existing paths are never overwritten.
+        #[arg(long)]
+        out: PathBuf,
+        /// wasm-bindgen web bindings directory (default: packages/nekoc/dist/web).
+        #[arg(long)]
+        wasm_dir: Option<PathBuf>,
+    },
     AnalyzeIr {
         input: PathBuf,
         #[arg(long)]
@@ -663,6 +673,13 @@ fn main() -> Result<()> {
         Command::Unpack { input, out } => {
             let project = nekoc::project::load_project(&input)?.value;
             std::fs::write(&out, nekoc::json::to_vec(&nekoc::pack::unpack(&project)?)?)?;
+        }
+        Command::ExportPlayer {
+            input,
+            out,
+            wasm_dir,
+        } => {
+            nekoc::player_export::export(&input, &out, wasm_dir.as_deref())?;
         }
         Command::BenchImport {
             inputs,

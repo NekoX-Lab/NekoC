@@ -26,6 +26,8 @@ mod kn_actor_target;
 pub mod optimizer;
 pub mod pack;
 pub mod player;
+#[cfg(not(target_arch = "wasm32"))]
+pub mod player_export;
 pub mod project;
 pub mod repro;
 pub mod runtime;
