@@ -1,5 +1,6 @@
 // Ordered VM deltas. Resource properties are shared, playback positions are not.
 // Source evidence and the deliberately non-identical offline TTS: docs/audio.md.
+// Device-failure completion and local stall deadlines: docs/r3-knsound.md.
 export class ProjectAudio {
   constructor(onError=()=>{},onDone=()=>{}) {
     this.onError=onError;this.onDone=onDone;this.voices=new Map();this.settings=new Map();
@@ -39,20 +40,50 @@ export class ProjectAudio {
   }
   play(voice) {
     const generation=voice.generation;
-    void voice.element.play().catch(error=>{
-      if(!voice.wanted||this.paused||generation!==voice.generation||error.name==='AbortError')return;
+    const attempt=++voice.attempt;
+    voice.progressAt=performance.now();voice.lastTime=voice.element.currentTime;voice.blocked=false;
+    const failed=error=>{
+      if(!voice.wanted||this.paused||generation!==voice.generation||attempt!==voice.attempt||error.name==='AbortError')return;
+      voice.blocked=error.name==='NotAllowedError';
       this.onError(error.name==='NotAllowedError'?'点击舞台或按键以启用声音':`音频播放失败：${error.message}`);
       if(error.name!=='NotAllowedError')this.finish(voice);
-    });
+    };
+    try{Promise.resolve(voice.element.play()).catch(failed);}catch(error){failed(error);}
+  }
+  checkProgress() {
+    if(this.paused)return;
+    const now=performance.now();
+    for(const voice of this.voices.values()){
+      if(!voice.wanted||voice.blocked)continue;
+      if(voice.element.ended){this.finish(voice);continue;}
+      if(voice.lastTime!==voice.element.currentTime){
+        voice.lastTime=voice.element.currentTime;voice.progressAt=now;
+      }else if(now-voice.progressAt>=15000){
+        // Local liveness fallback, not an estimate of the sound's duration.
+        // Some unavailable devices/decoders never resolve play() or emit error.
+        this.onError('音频连续 15 秒无播放进度，已结束此次播放');this.finish(voice);
+      }
+    }
+    const speech=this.speech.values().next().value;
+    if(speech?.started){
+      speech.progressAt??=now;
+      if(now-speech.progressAt>=60000){
+        // Web Speech has no media clock. Only time the head of the queue;
+        // start/boundary/mark events refresh it. Cancel the shared device queue.
+        this.onError('语音连续 60 秒无播放进度，已清理语音队列');this.cancelSpeech(true);
+      }
+    }
   }
   finish(voice) {
     voice.wanted=false;voice.generation++;
+    voice.element?.pause();
     for(const id of voice.waits.splice(0))this.complete(id);
     if([...this.voices.values()].some(v=>v!==voice&&v.id===voice.id&&!v.wanted))this.release(voice);
   }
   apply(frame) {
     if(frame.reset){const paused=this.paused;this.stop();this.paused=paused;if(!paused)globalThis.speechSynthesis?.resume();}
     this.flushCompletions();
+    this.checkProgress();
     const commands=frame.audio_commands||[],speech=frame.speech_commands||[];
     for(const command of frame.k4_media||[])if(command.kind==='midi')this.playMidi(command);
     for(let i=0;i<=commands.length;i++) {
@@ -66,7 +97,9 @@ export class ProjectAudio {
           const id=this.resourceId(resource),config=this.config(resource),key=rate?'playbackRate':'volume';
           config[key]=clamp((change?config[key]:0)+value,rate?.05:0,rate?4:1);
           // Retain one idle voice, but do not start playback for a property edit.
-          if(![...this.voices.values()].some(voice=>voice.id===id))this.createVoice(resource);
+          if(![...this.voices.values()].some(voice=>voice.id===id)){
+            try{this.createVoice(resource);}catch(error){this.onError(`音频不可用：${error.message}`);}
+          }
           for(const voice of this.voices.values())if(voice.id===id)voice.element[key]=config[key];
         }
         continue;
@@ -95,7 +128,11 @@ export class ProjectAudio {
         oldest.element.pause();this.finish(oldest);this.release(oldest);
         if(!this.limitReported){this.limitReported=true;this.onError('同时播放声音超过 128，已停止最早的声音');}
       }
-      voice??=this.createVoice(resource);
+      if(!voice){
+        try{voice=this.createVoice(resource);}catch(error){
+          this.onError(`音频不可用：${error.message}`);if(command.wait)this.complete(command.wait);continue;
+        }
+      }
       voice.waits=command.wait?[command.wait]:[];
       voice.element.currentTime=0;voice.wanted=true;voice.generation++;
       this.bindEvents(voice,resource);
@@ -108,7 +145,7 @@ export class ProjectAudio {
     element.preload='auto';Object.assign(element,this.config(resource));
     // K4 Howler rate changes alter both duration and pitch.
     element.preservesPitch=false;
-    const voice={id,element,wanted:false,waits:[],generation:0};
+    const voice={id,element,wanted:false,waits:[],generation:0,attempt:0,blocked:false};
     let key=id;while(this.voices.has(key))key=`${id}#${++this.serial}`;
     this.voices.set(key,voice);
     this.bindEvents(voice,resource);
@@ -135,19 +172,30 @@ export class ProjectAudio {
     if(!globalThis.speechSynthesis||!globalThis.SpeechSynthesisUtterance){
       this.onError('此浏览器不支持离线语音合成');done();return;
     }
-    const utterance=new SpeechSynthesisUtterance(command.text);item.utterance=utterance;
-    const [per,speed,pitch,volume]=command.config||[0,10,10,10];
-    // KN's remote voice IDs/scale have no exact local equivalent. This is an
-    // explicit offline fallback, not an emulation of the authenticated service.
-    utterance.rate=command.kitten4?.8:clamp(speed/10,.1,10);
-    utterance.pitch=command.kitten4?1:clamp(pitch/10,0,2);
-    utterance.volume=command.kitten4?1:clamp(volume/10,0,1);
-    utterance.lang=command.kitten4&&command.language?command.language:(/[^\u0000-\u00ff]/.test(command.text)?'zh-CN':'en-GB');
-    const voices=speechSynthesis.getVoices();
-    if(!command.kitten4&&voices[per])utterance.voice=voices[per];
-    utterance.onend=done;utterance.onerror=()=>{if(!this.speech.has(item))return;this.onError('语音合成失败');done();};
-    if(!command.text){done();return;}
-    if(!this.paused){item.started=true;speechSynthesis.speak(utterance);}
+    try {
+      const utterance=new SpeechSynthesisUtterance(command.text);item.utterance=utterance;
+      const [per,speed,pitch,volume]=command.config||[0,10,10,10];
+      // KN's remote voice IDs/scale have no exact local equivalent. This is an
+      // explicit offline fallback, not an emulation of the authenticated service.
+      utterance.rate=command.kitten4?.8:clamp(speed/10,.1,10);
+      utterance.pitch=command.kitten4?1:clamp(pitch/10,0,2);
+      utterance.volume=command.kitten4?1:clamp(volume/10,0,1);
+      utterance.lang=command.kitten4&&command.language?command.language:(/[^\u0000-\u00ff]/.test(command.text)?'zh-CN':'en-GB');
+      const voices=speechSynthesis.getVoices();
+      if(!command.kitten4&&voices[per])utterance.voice=voices[per];
+      utterance.onstart=utterance.onboundary=utterance.onmark=()=>{
+        if(this.speech.has(item))item.progressAt=performance.now();
+      };
+      utterance.onend=done;utterance.onerror=()=>{if(!this.speech.has(item))return;this.onError('语音合成失败');done();};
+      if(!command.text){done();return;}
+      if(!this.paused)this.startSpeech(item);
+    }catch(error){this.onError(`语音合成不可用：${error.message}`);done();}
+  }
+  startSpeech(item) {
+    item.started=true;
+    if(this.speech.values().next().value===item)item.progressAt=performance.now();
+    try{globalThis.speechSynthesis.speak(item.utterance);}
+    catch(error){this.onError(`语音合成失败：${error.message}`);item.done();}
   }
   cancelSpeech(notify) {
     for(const item of [...this.speech]){if(notify)item.done();else this.speech.delete(item);}
@@ -195,11 +243,12 @@ export class ProjectAudio {
     oscillator.start(now);oscillator.stop(stop);
     if(this.paused)context.suspend().catch(()=>{});else context.resume().catch(()=>{});
   }
-  pause(){this.paused=true;for(const voice of this.voices.values())voice.element.pause();this.midiContext?.suspend?.().catch(()=>{});globalThis.speechSynthesis?.pause();}
+  pause(){this.paused=true;for(const voice of this.voices.values()){voice.attempt++;voice.element.pause();}this.midiContext?.suspend?.().catch(()=>{});globalThis.speechSynthesis?.pause();}
   resume(){
     this.paused=false;for(const voice of this.voices.values())if(voice.wanted)this.play(voice);this.midiContext?.resume?.().catch(()=>{});
+    for(const item of this.speech)item.progressAt=undefined;
     globalThis.speechSynthesis?.resume();
-    for(const item of this.speech)if(!item.started&&item.utterance){item.started=true;speechSynthesis.speak(item.utterance);}
+    for(const item of this.speech)if(!item.started&&item.utterance)this.startSpeech(item);
   }
   stop(){
     this.completions.clear();
