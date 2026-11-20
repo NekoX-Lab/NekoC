@@ -559,6 +559,10 @@ fn serve_with_cloud(initial: Json, port: u16, cloud: CloudSession) -> Result<()>
                     "text/javascript",
                     include_bytes!("../../web/app.js").as_slice(),
                 )),
+                "/health-report.js" => Some((
+                    "text/javascript",
+                    include_bytes!("../../web/health-report.js").as_slice(),
+                )),
                 "/renderer.js" => Some((
                     "text/javascript",
                     include_bytes!("../../web/renderer.js").as_slice(),
@@ -653,6 +657,12 @@ fn serve_with_cloud(initial: Json, port: u16, cloud: CloudSession) -> Result<()>
                 "/api/import-player" => {
                     let cached = imports.import(payload)?;
                     return Ok(("application/json".into(), cached.response.clone()));
+                }
+                "/api/health-report" => {
+                    // Read-only snapshot check: never stop a VM or replace the
+                    // server project while the editor refreshes its report.
+                    let (_, report) = import_project(payload)?;
+                    report["health_report"].clone()
                 }
                 "/api/export" => {
                     // Export the submitted editor snapshot without stopping a live VM

@@ -1,0 +1,58 @@
+# 导入作品体检
+
+Web Studio 导入 KN `.bcmkn` 或 K4 `.bcm` 后，显示与 CLI 共用的作品体检。
+这是一份**静态导入诊断**，不是完整兼容认证，不会启动作品、联网请求服务或申请设备权限。
+
+## 五个维度
+
+| 类别 | 含义 | 不代表什么 |
+| --- | --- | --- |
+| 能保留导出 | KN 保留原始 JSON；K4 保留原生保真元数据并检查 `from_neko` 可还原 | 不保证结构正确、素材可访问或官方编辑器接受 |
+| 能执行 | 当前默认 VM 的整件作品静态编译成功，可以尝试执行 | 不保证运行期无错，不涵盖游离积木、不保证设备或网络成功路径 |
+| 语义近似 | 已知受限实现，例如离线翻译失败分支、AI 匿名拒绝、K4 设备占位 | 不等同真实服务成功或完整官方行为 |
+| 尚未验证 | 未逐积木核验字段、分支与官方语义，或本次未实际播放 | 不是通过；列表为空也不推断通过 |
+| 不支持 | 结构错误、VM 编译失败或明确缺失的能力，如摄像头开启 | 不妨碍原始数据保留和导出 |
+
+分类是独立能力维度，不是互斥的作品评级。条数统计的是报告条目，不是“支持积木数”或百分比。
+每个实际积木有场景、所有者（角色/舞台/过程）、ID、类型、影响及依据。
+全局问题或缺失 ID 用 `—` 表示；全局过程没有唯一场景时不虚构场景。
+
+## 使用
+
+```bash
+nekoc check work.bcmkn --report
+nekoc check work.bcm --report --json
+nekoc check work.json --report > health.txt
+```
+
+`--report` 用于作品文件，默认中文文本；加 `--json` 输出 `schema_version: 1` 的结构化体检对象。
+存在“不支持”条目时退出码为 1；只有近似/未验证时为 0，**0 仅表示未检出明确阻断，不能解释为完全通过**。
+不带 `--report` 的原有 `check`（包括 TS 类型检查和 JSON 格式）不变。
+体检模式不接受只适用于前端检查的 `--target`、`--template` 和 `--no-types`。
+
+导入响应新增 `health_report`，保留原有 `validation`、`fast_runtime_ready` 和 `script_diagnostics`。
+`POST /api/health-report` 接收当前规范项目或原生 K4 JSON，返回同一体检对象；它不替换服务端项目、不停止 VM。
+Web 下载直接使用报告的 `text` 字段，与 CLI 文本一致。项目编辑后旧体检须标为过期，重新体检后才可导出。
+点击条目定位所有者并高亮积木 ID；无法展开的输入/影子块至少保留 ID 定位提示。
+
+## 依据与限制
+
+- 结构验证来自 `src/validate.rs`，静态编译与逐脚本首个错误来自 `src/bcmkn.rs`；不会为体检重复编译每个积木。
+- 精确错误 ID 优先按编译错误中 ID 位置的 JSON 引号 token 匹配（如 `at block "id"` 或 `("id")`），不匹配所有者名称等任意字符串。无法解析则回退到脚本入口，标记 `location_precision: "script"` 并声明。
+- 所有场景、角色和全局过程均清点；一个脚本的首个错误会遮蔽后续编译错误，后续积木继续列为尚未验证。
+- 已知限制是显式、非穷尽的清单；未列入清单的类型一律尚未验证，不根据名称前缀猜测支持。新增设备/服务后需要同步更新限制。
+- 摄像头、翻译、AI 和账户限制分别引用已有的 `docs/kn-panel-capture.md`、`docs/kn-panel-services.md`、`docs/kn-panel-ai.md`、`docs/kn-async-services.md`，这些文档包含历史官方源码/实测范围。本功能未重新核验最新官方播放器。
+- K4 占位分类依据适配器 `src/kitten4.rs::is_stub`；不是官方行为认证。其他 K4 语义保守列为未验证。
+- `bcm_translator_text_execution_block` 是保留 mutation 描述的旧版占位类型，区别于网络翻译 `translate` / `translate_result`；本地 VM 无此分派，单列不支持。即使原数据标记 `disabled` 也不认证为可执行。
+- 未验证素材下载、真实播放、完整调度、设备权限、真实 AI/翻译后端、官方像素/音频结果；不使用第三方运行时作为官方行为证据。
+- 未编辑运行引擎、TS 前端或作品生成逻辑。本报告不会向导出的作品写入体检字段。
+
+回归：`tests/r2_health.rs` 和 `tests/r2-health.test.mjs`。第三方语料只从外部路径读取，报告及本地验证产物放被忽略的 `dist/`。
+
+指定语料的只读回归（先构建本地 CLI）：
+
+```bash
+NEKOC_HEALTH_CORPUS=E:/nekoc/dist/pickcat-corpus/kn node --test tests/r2-health-corpus.test.mjs
+```
+
+297168191 检查摄像头开启限制，303456318 检查实际存在的 `bcm_translator_text_execution_block`，不是把它误认成网络翻译积木。

@@ -140,6 +140,36 @@ main.bento{flex:1;display:grid;grid-template-columns:270px minmax(360px,1fr) 460
 #logs p.error{color:var(--warn)}
 #logs .muted{font:12px "Microsoft YaHei",sans-serif;color:var(--muted)}
 
+/* Import health: separate dimensions, neutral counts, bounded/paged detail. */
+.health-report{flex-shrink:0}
+.health-report .section-head{flex-wrap:wrap;margin-bottom:10px}
+.health-actions{display:flex;gap:6px;flex-wrap:wrap}
+.health-status,.health-note,.health-warning{font-size:12px;line-height:1.6;overflow-wrap:anywhere}
+.health-note{color:var(--ink-2);margin:6px 0}
+.health-warning{color:var(--warn)}
+.health-summary{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.health-count,.health-badge{background:var(--tile-2);color:var(--ink-2);border-radius:7px;padding:5px 7px;font-size:11px}
+.health-count[aria-pressed=true]{outline:2px solid var(--ink);outline-offset:1px}
+.health-approximate,.health-unverified,.health-unknown{background:#fff1d4;color:#795116}
+.health-unsupported{background:#fbe4df;color:#983a25}
+.health-pagination{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;line-height:1.5;margin:10px 0}
+.health-pagination>span{flex:1;min-width:130px}
+.health-list{list-style:none;margin:0;padding:2px;max-height:420px;overflow:auto;overscroll-behavior:contain}
+.health-item+.health-item{margin-top:8px}
+.health-entry{display:block;width:100%;text-align:left;background:var(--tile-2);padding:12px;font-size:12px;line-height:1.6;overflow-wrap:anywhere;border:1px solid var(--line)}
+.health-entry:hover:not(:disabled){border-color:var(--muted)}
+.health-entry:disabled{opacity:1}
+.health-entry>span:not(.health-badge),.health-entry>code{display:block}
+.health-entry .health-code{margin:6px 0;color:var(--ink-2)}
+.health-entry code{white-space:pre-wrap;font:11px/1.6 ui-monospace,Consolas,monospace}
+.health-impact{margin-top:6px}
+.health-evidence{color:var(--ink-2)}
+.health-jump{font-weight:600;margin-top:6px}
+.health-empty{font-size:12px;padding:8px;line-height:1.6}
+.health-location:not([hidden]){display:flex;flex-direction:column;gap:3px;flex-shrink:0;margin:0 18px 12px;padding:10px 12px;background:#fff1d4;border-radius:10px;font-size:12px;line-height:1.5;overflow-wrap:anywhere;max-height:190px;overflow:auto}
+.health-id{background:#ffe09a;color:#513900;font:12px/1.6 ui-monospace,Consolas,monospace;align-self:flex-start}
+.health-block-target{outline:3px solid #a96d00!important;outline-offset:3px}
+
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);border-radius:12px;background:var(--ink);color:#fff;padding:12px 18px;font-size:13px;display:none;max-width:80vw}
 #toast.show{display:block}
 .error-text{color:var(--warn)!important}

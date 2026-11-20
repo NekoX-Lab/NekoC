@@ -84,6 +84,9 @@ enum Command {
     Check {
         /// TS/JS 源文件或 .bcmkn / .bcm / JSON 作品
         input: PathBuf,
+        /// 作品体检报告（.bcmkn/.bcm/.json）；可配合 --json
+        #[arg(long, conflicts_with_all = ["target", "no_types", "template"])]
+        report: bool,
         /// 检查的编译目标
         #[arg(long, default_value = "kitten-n", value_parser = ["kitten-n", "kitten4"])]
         target: String,
@@ -615,10 +618,35 @@ fn execute(cli: Cli, explicit_cloud: bool) -> Result<()> {
         }
         Command::Check {
             input,
+            report,
             target,
             no_types,
             template,
-        } => run_check(&input, json, !no_types, template.as_deref(), &target)?,
+        } => {
+            if report {
+                if !matches!(
+                    input.extension().and_then(|extension| extension.to_str()),
+                    Some("bcmkn" | "bcm" | "json")
+                ) {
+                    bail!(
+                        "--report requires a .bcmkn, .bcm or .json project; use check without --report for TS/JS sources"
+                    );
+                }
+                let project = nekoc::project::load_project(&input)?;
+                let (_, imported) = nekoc::player::import(project.value)?;
+                let health = &imported["health_report"];
+                if json {
+                    println!("{}", serde_json::to_string(health)?);
+                } else {
+                    print!("{}", health["text"].as_str().unwrap_or_default());
+                }
+                if health["summary"]["unsupported"].as_u64().unwrap_or(0) > 0 {
+                    std::process::exit(1);
+                }
+            } else {
+                run_check(&input, json, !no_types, template.as_deref(), &target)?;
+            }
+        }
         Command::Build {
             input,
             out,

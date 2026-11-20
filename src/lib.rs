@@ -11,6 +11,7 @@ pub mod device;
 pub mod diff;
 pub mod engine;
 pub mod extensions;
+pub mod health;
 pub mod import_bench;
 pub mod import_perf;
 pub mod input;
