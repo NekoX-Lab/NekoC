@@ -5274,7 +5274,6 @@ pub struct Engine {
     cloud: cloud::State,
     scheduler_tick: u64,
     wait_clock_ms: f64,
-    wait_clock_error: f64,
     k4_frames: u64,
     k4_shake_clock: k4_shake::Clock,
     k4_media: k4_media::State,
@@ -5771,7 +5770,6 @@ impl Engine {
             video_above_pen: false,
             scheduler_tick: 0,
             wait_clock_ms: 0.0,
-            wait_clock_error: 0.0,
             k4_frames: 0,
             k4_shake_clock: k4_shake::Clock::default(),
             k4_media: k4_media::State::default(),
@@ -5953,7 +5951,6 @@ impl Engine {
         self.initialize_legacy_physics();
         self.time = 0.0;
         self.wait_clock_ms = 0.0;
-        self.wait_clock_error = 0.0;
         self.k4_frames = 0;
         self.k4_shake_clock.reset();
         self.k4_media.reset();
@@ -10391,12 +10388,10 @@ impl Engine {
             self.timer += dt;
         }
         self.time += dt;
-        // Compensated logical milliseconds avoid cumulative second-clock drift.
-        // No deadline epsilon: genuinely positive sub-ms lifetimes stay positive.
-        let delta_ms = dt * 1000.0 - self.wait_clock_error;
-        let next_ms = self.wait_clock_ms + delta_ms;
-        self.wait_clock_error = (next_ms - self.wait_clock_ms) - delta_ms;
-        self.wait_clock_ms = next_ms;
+        // Match KN ClockImpl.update's ordinary millisecond accumulation, including
+        // its floating-point boundaries. Compensation or epsilon changes the
+        // official expiry frame for fractional steps such as 1000 / 60 ms.
+        self.wait_clock_ms += dt * 1000.0;
         self.tick_kn_timers();
         self.received.clear();
         self.clone_counts.clear();

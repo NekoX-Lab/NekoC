@@ -46,6 +46,17 @@ test("continuous wait precision observations bind 1200 updates and editor-checke
     assert.deepEqual(observed.pageErrors, []);
     assert.deepEqual(observed.runtimeErrors, []);
     assert.equal(observed.ready.length, 1200);
+    if (name === "hz60" || name === "fraction") {
+      const native = observed.nativeClockVerification;
+      assert.equal(native.ok, true);
+      assert.equal(native.clockMode, "native-deterministic");
+      assert.equal(native.sha256, observed.sha256);
+      assert.equal(native.frameCount, 1200);
+      assert.deepEqual(native.ready, observed.ready);
+      assert.deepEqual(native.pageErrors, []);
+      assert.deepEqual(native.runtimeErrors, []);
+      assert.deepEqual(native.bundles, observed.bundles);
+    }
     const editor = report.editorCompat.projects.find(p => p.input === input);
     assert.equal(editor.sha256, observed.sha256);
     assert.equal(editor.ok, true);
@@ -57,4 +68,7 @@ test("continuous wait precision observations bind 1200 updates and editor-checke
   assert.equal(report.cases.tiny.ready[3], 1);
   assert.equal(report.cases.tiny.ready[4], 1);
   assert.equal(report.cases.tiny.ready[5], 2);
+  assert.equal(report.cases.hz60.ready[15], 3);
+  assert.equal(report.cases.hz60.ready[16], 4);
+  assert.equal(report.cases.fraction.ready[8], 2);
 });

@@ -12,7 +12,11 @@ fn continuous_positive_waits_match_official_millisecond_clock() {
             std::fs::read(format!("tests/fixtures/kn-r3-sched/precision/{name}.bcmkn")).unwrap();
         assert_eq!(format!("{:x}", Sha256::digest(&bytes)), case["sha256"]);
         let project: Value = serde_json::from_slice(&bytes).unwrap();
-        for jit in [false, true] {
+        for (jit, default_sixty_hz) in [(false, false), (true, false), (false, true), (true, true)]
+        {
+            if default_sixty_hz && name != "hz60" {
+                continue;
+            }
             let mut vm = Engine::new(Program::compile(&project).unwrap());
             if !jit {
                 vm.disable_jit();
@@ -29,18 +33,21 @@ fn continuous_positive_waits_match_official_millisecond_clock() {
                 } else {
                     case["frameMs"].as_f64().unwrap()
                 };
-                let update = vm
-                    .advance(dt_ms / 1000.0, 100_000, Duration::from_secs(1))
-                    .unwrap();
+                let dt = if default_sixty_hz && frame != 0 {
+                    1.0 / 60.0
+                } else {
+                    dt_ms / 1000.0
+                };
+                let update = vm.advance(dt, 100_000, Duration::from_secs(1)).unwrap();
                 assert!(!update.budget_yield);
                 assert_eq!(
                     vm.variable_value("ready").number(),
                     ready.as_f64().unwrap(),
-                    "{name}, frame {}, jit={jit}",
+                    "{name}, frame {}, jit={jit}, default_sixty_hz={default_sixty_hz}",
                     frame + 1
                 );
             }
-            // A new start resets both the compensated clock and per-task epoch.
+            // A new start resets both the logical clock and per-task epoch.
             vm.start();
             vm.advance(0.0, 100_000, Duration::from_secs(1)).unwrap();
             assert_eq!(vm.variable_value("ready").number(), 1.0);

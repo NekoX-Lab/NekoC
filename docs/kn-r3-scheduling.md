@@ -68,14 +68,17 @@ bash E:/nekoc-wt/_cargo.sh test --test kn_r3_sched
 
 短时间反复 start 不能覆盖累计时间误差。原先 `wake = time + seconds`
 与秒时钟逐帧累加采用不同浮点路径，32 ms 循环在第 1005 帧会比官方少一次。
-KN 现单独使用补偿累加的逻辑毫秒时钟，并像官方 `task_update` 一样比较
+KN 现单独使用与官方 `ClockImpl.update` 相同的普通逐帧累加毫秒时钟
+（`current_time += ms_per_update`，源码偏移 975357），并像官方 `task_update` 一样比较
 `lifetime <= now - start`，不把截止秒数再加到较大的绝对秒时钟上，也不添加
 epsilon 或把微小正 lifetime 截断成零。K4 的原有 wake 判定不变；reporter
-调用保存/恢复 KN 等待状态，start 重置时钟和补偿项。初始化、观察到期、
+调用保存/恢复 KN 等待状态，start 重置时钟。初始化、观察到期、
 下一入口释放三个阶段保持不变。这只改善浮点模型，并不承诺无限时长或
-任意 f64 步长都可无损表示。
+任意 f64 步长都可无损表示。第一次精度修订采用的补偿求和虽然令整数
+毫秒探针通过，却改变了小数步长的舍入路径；本次复审删除补偿项和补偿
+更新，使普通正等待到期帧与官方一致，而非自行提高时钟数值精度。
 
-`docs/kn-r3-wait-precision.json` 归档 5 个原创探针各 1200 次官方更新的
+`docs/kn-r3-wait-precision.json` 归档 7 个原创探针各 1200 次官方更新的
 完整 `ready` 序列（恒空的 trace 不重复存储）、输入散列、浏览器和 bundle
 信息及编辑器检查结果。每个探针只 start 一次，不按 8 帧重置：
 
@@ -83,8 +86,17 @@ epsilon 或把微小正 lifetime 截断成零。K4 的原有 wake 判定不变�
 - `below` / `above`：32 ms 上下各 1e-9 ms，严格核对边界，不用 epsilon 吞掉差异。
 - `tiny`：1e-12 秒正等待，步长循环为 `[0, 0, 1e-8]` ms，零 dt 不会令其到期。
 - `variable`：32 ms 等待，步长循环为 `[7, 9, 0, 16, 5, 11]` ms。
+- `hz60`：50 ms 等待，`1000/60` ms/update；第 16 帧仍为 3，第 17 帧为 4。
+- `fraction`：0.2 ms 等待，0.1 ms/update；第 9 帧仍为 2。
+
+新增两例除受控逻辑时间观察外，另以官方原生 `ClockImpl.now/update` 的
+确定性累加路径各采样 1200 帧，完整 ready 序列须一致才能归档；记录保存在
+`nativeClockVerification`。原生模式仅配置 `ms_per_update`、首帧时钟原点和
+墙钟查询来源 `performance.now()`，不替换 `now/update`、等待或调度实现。
+第一帧逻辑时间为 0；这不是固定 warp 墙钟数值，也不扩大前述 warp 保证。
 
 Rust 对解释器和默认 JIT 配置逐帧比较，并检查再次 start 的初始状态；
+60 Hz 用例同时检查 `dt=(1000/60)/1000` 和直接 `dt=1.0/60.0` 两种输入。
 这不是每条路径都实际进入 native 代码的证明。所有新增作品均通过官方
 编辑器 `ok: true`、无 issues/pageErrors，Node 回归绑定生成器与归档字节。
 

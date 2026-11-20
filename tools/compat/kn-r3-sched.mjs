@@ -56,7 +56,7 @@ export async function projects() {
 export async function precisionProjects() {
   const base = (await projects())["wait-positive"];
   const cases = {};
-  for (const [name, seconds] of Object.entries({ long: 0.032, below: 0.031999999999, above: 0.032000000001, tiny: 1e-12, variable: 0.032 })) {
+  for (const [name, seconds] of Object.entries({ long: 0.032, below: 0.031999999999, above: 0.032000000001, tiny: 1e-12, variable: 0.032, hz60: 0.05, fraction: 0.0002 })) {
     const p = structuredClone(base);
     p.projectName = `NekoC r3-knsched precision ${name}`;
     const actor = Object.values(p.actors.actorsDict)[0];
@@ -66,8 +66,9 @@ export async function precisionProjects() {
   return cases;
 }
 
-export async function observe(browser, source, frames = 8, frameMs = 16) {
-  const page = await browser.newPage(), result = { sha256: hash(source), pageErrors: [], bundles: [] };
+export async function observe(browser, source, frames = 8, frameMs = 16, nativeClock = false) {
+  if (nativeClock && Array.isArray(frameMs)) throw new Error("Native deterministic clock needs a constant frame step");
+  const page = await browser.newPage(), result = { sha256: hash(source), pageErrors: [], bundles: [], clockMode: nativeClock ? "native-deterministic" : "controlled" };
   page.on("pageerror", e => result.pageErrors.push(String(e)));
   try {
     await page.route(/\/(main|crc_libs)\.[\w-]+\.js(?:\?.*)?$/, async route => {
@@ -97,16 +98,22 @@ export async function observe(browser, source, frames = 8, frameMs = 16) {
     await page.addStyleTag({ content: "#DialogContainer{display:none!important}" });
     const complete = page.getByText(/^完成$/).last();
     if (await complete.isVisible()) await complete.dispatchEvent("click");
-    await page.evaluate(({ limit, frameMs }) => {
+    await page.evaluate(({ limit, frameMs, nativeClock }) => {
       const { bcm, runtime } = window.__r3Handles, core = runtime.get_instance().getHeart().core;
       const manager = core.get_runtime_manager().run_mgr, update = manager.update;
       const trace = window.__r3Sched = { frames: [], runtimeErrors: [] };
       core.get_event_bus().error.runtime.immediate.sub(e => trace.runtimeErrors.push(String(e?.error?.message || e?.error || e)));
-      // Supply a clock, not an alternative scheduler. One update is 16 ms.
+      // Supply logical time, not a scheduler or wait implementation. Native mode
+      // retains ClockImpl.now/update and its ordinary += ms_per_update path.
       const NativeDate = Date;
       let now = 0;
-      manager.clock.now = () => now;
-      manager.clock.update = () => {};
+      if (nativeClock) {
+        manager.clock.ms_per_update = frameMs;
+        manager.clock.wall_clock_now = () => performance.now();
+      } else {
+        manager.clock.now = () => now;
+        manager.clock.update = () => {};
+      }
       manager.update = function(...args) {
         if (trace.frames.length >= limit) return;
         if (trace.frames.length) now += Array.isArray(frameMs) ? frameMs[(trace.frames.length - 1) % frameMs.length] : frameMs;
@@ -116,6 +123,7 @@ export async function observe(browser, source, frames = 8, frameMs = 16) {
           static now() { return 946684800000 + now; }
         };
         try {
+          if (nativeClock && !trace.frames.length) manager.clock.current_time = -frameMs;
           const result = update.apply(this, args);
           if (core.get_runtime_data().is_running()) trace.frames.push({
             variables: Object.fromEntries(Object.entries(bcm.variablesDict).map(([id, v]) => [id, manager.get_variable(id, undefined, v.currentEntityId)])),
@@ -124,7 +132,7 @@ export async function observe(browser, source, frames = 8, frameMs = 16) {
           return result;
         } finally { window.Date = NativeDate; }
       };
-    }, { limit: frames, frameMs });
+    }, { limit: frames, frameMs, nativeClock });
     await page.getByText(/^开始$/).last().dispatchEvent("click");
     await page.waitForFunction(limit => window.__r3Sched.frames.length >= limit || window.__r3Sched.runtimeErrors.length, frames, { timeout: 30000 });
     Object.assign(result, await page.evaluate(() => window.__r3Sched));
@@ -154,6 +162,16 @@ async function main() {
             c.frames.some((f, i) => f.elapsedFrames !== i + 1 || f.variables.trace !== "")) throw new Error(`Unpaired precision evidence: ${name}`);
         c.ready = c.frames.map(f => f.variables.ready);
         delete c.frames;
+        if (name === "hz60" || name === "fraction") {
+          const native = c.nativeClockVerification;
+          if (!native?.ok || native.clockMode !== "native-deterministic" || native.sha256 !== c.sha256 ||
+              native.frames.length !== c.ready.length || native.pageErrors.length || native.runtimeErrors.length ||
+              native.frames.some((f, i) => f.elapsedFrames !== i + 1 || f.variables.trace !== "" || f.variables.ready !== c.ready[i]))
+            throw new Error(`Native clock observation differs: ${name}`);
+          native.frameCount = native.frames.length;
+          native.ready = native.frames.map(f => f.variables.ready);
+          delete native.frames;
+        }
         checked.input = `tests/fixtures/kn-r3-sched/precision/${name}.bcmkn`;
       }
       await fs.writeFile(path.join(root, "docs/kn-r3-wait-precision.json"), JSON.stringify({ ...report, editorCompat: editor }, null, 2) + "\n");
@@ -167,8 +185,14 @@ async function main() {
     const report = { verifiedAt: new Date().toISOString(), browserVersion: browser.version(), cases: {} };
     try {
       for (const name of Object.keys(cases)) {
-        const frameMs = name === "variable" ? [7, 9, 0, 16, 5, 11] : name === "tiny" ? [0, 0, 1e-8] : 16;
-        const observation = await observe(browser, await fs.readFile(path.join(dir, `${name}.bcmkn`), "utf8"), 1200, frameMs);
+        const frameMs = name === "variable" ? [7, 9, 0, 16, 5, 11] : name === "tiny" ? [0, 0, 1e-8] : name === "hz60" ? 1000 / 60 : name === "fraction" ? 0.1 : 16;
+        const source = await fs.readFile(path.join(dir, `${name}.bcmkn`), "utf8");
+        const observation = await observe(browser, source, 1200, frameMs);
+        if (name === "hz60" || name === "fraction") {
+          observation.nativeClockVerification = await observe(browser, source, 1200, frameMs, true);
+          if (JSON.stringify(observation.frames) !== JSON.stringify(observation.nativeClockVerification.frames) || !observation.nativeClockVerification.ok)
+            observation.ok = false;
+        }
         report.cases[name] = { ...observation, frameMs };
         console.log(name, observation.ok, observation.frames.length);
       }
