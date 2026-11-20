@@ -52,10 +52,16 @@ This avoids treating the host API itself as a semantic failure. It is only a
 small synchronous oracle and does not claim equivalence for general async
 behavior.
 
-The baseline currently contains 224 matches, 20 compile errors, and 1 known
+The baseline currently contains 222 matches, 22 compile errors, and 1 known
 differences among the 245 original probes. A later frontend change may turn a
 compile error into a match; update only the relevant baseline entry and its
 evidence after confirming both Node and VM results.
+
+The JS/TS support contract rejects `core-015` (logical assignment) and
+`core-157` (array spread) rather than accepting incomplete lowering. The BigInt
+and generator probes (`core-190`, `core-205`) retain compile-error status with
+the original-AST diagnostic fragments. See `docs/js-support.md` and the
+`ts-unsupported-r2-tsdiag` diagnostic tests for reasons and alternatives.
 
 The Map and Set probes (`core-181`, `core-182`) now match Node. Collection
 behavior, reference identity, SameValueZero and iteration regressions are in

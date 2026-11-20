@@ -143,6 +143,7 @@ test("bonus", () => { expect(bonus(3)).toBe(30); });
 
 - Full API: docs/api.md
 - Syntax details: docs/syntax.md
+- JS/TS support contract and tested alternatives: docs/js-support.md
 - Type declarations (source of truth for signatures): ts/nekoc.d.ts
 - Runner options: docs/cli-run.md
 - Example: samples/stage_demo.nk.ts
