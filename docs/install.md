@@ -1,5 +1,9 @@
 # 安装预编译版
 
+只检查 TypeScript / 导出 `.bcmkn`：优先看[只用编译器](compiler-only.md)，
+Node.js 22+ 配合 `npx --package=@fttawa/nekoc nekoc build hello.ts` 即可。
+本文的平台包提供完整原生 CLI 和 Web Studio 后端。
+
 不需要 Rust。到 GitHub **Releases** 下载对应系统的包和同一 Release 的 `SHA256SUMS.txt`。
 
 | 系统 | 文件 |
