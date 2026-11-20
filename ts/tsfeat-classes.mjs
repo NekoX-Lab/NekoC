@@ -394,6 +394,11 @@ export function lowerTsClasses(input) {
     }
     if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.EqualsToken) preserveClass(node,
       checker.getTypeAtLocation(node.right), checker.getTypeAtLocation(node.left));
+    if (ts.isBinaryExpression(node) && [ts.SyntaxKind.AmpersandAmpersandEqualsToken, ts.SyntaxKind.BarBarEqualsToken, ts.SyntaxKind.QuestionQuestionEqualsToken].includes(node.operatorToken.kind)) {
+      const left = unwrap(node.left);
+      if ((ts.isPropertyAccessExpression(left) || ts.isElementAccessExpression(left)) && classOf(left.expression)) fail(node,
+        "Logical class field assignments are not supported", "use an explicit if statement to preserve short-circuit evaluation");
+    }
     if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) preserveClass(node,
       checker.getTypeAtLocation(node.expression), checker.getTypeAtLocation(node));
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {

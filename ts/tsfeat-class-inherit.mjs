@@ -728,6 +728,10 @@ export function lowerClassInheritance(input) {
     }
     if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
       const left = unwrap(node.left), a = access(left);
+      // Neither the global path for statics nor the heap path for instance
+      // fields may eagerly evaluate the skipped RHS of a logical assignment.
+      if (a && !a.pair && [ts.SyntaxKind.AmpersandAmpersandEqualsToken, ts.SyntaxKind.BarBarEqualsToken, ts.SyntaxKind.QuestionQuestionEqualsToken].includes(node.operatorToken.kind)) fail(node,
+        "Logical class field assignments are not supported", "use an explicit if statement to preserve short-circuit evaluation");
       if (a?.pair) {
         if (!ts.isExpressionStatement(node.parent)) fail(node, "Value-producing accessor assignments are not supported", "use a standalone assignment and read separately");
         const rhs = transformed(node.right, self, owner);
@@ -741,6 +745,11 @@ export function lowerClassInheritance(input) {
       const operand = unwrap(node.operand), a = access(operand);
       if (a?.pair) {
         if (!ts.isExpressionStatement(node.parent)) fail(node, "Value-producing accessor updates are not supported", "update in a standalone statement");
+        // JS ++/-- applies ToNumeric, unlike +=. Rewriting a string getter as
+        // old + 1 would concatenate and can also change the setter's domain.
+        if (!(checker.getTypeAtLocation(operand).flags & ts.TypeFlags.NumberLike)) fail(operand,
+          "Accessor updates require statically numeric getters; implicit conversion is not supported",
+          "use a number-valued accessor or convert explicitly before assigning");
         return updateAccessor(operand, a, node.operator === ts.SyntaxKind.PlusPlusToken ? "+" : "-", number(1), self, owner);
       }
     }
