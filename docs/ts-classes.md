@@ -175,7 +175,12 @@ setter；接收者和旧值保存在独立调用状态，递归不会覆盖。�
 支持 super.p 和 super.p = value 直接调用祖先访问器。
 
 访问器赋值/更新限独立语句；逻辑复合赋值 &&=/||=/??= 使用显式 if。
+访问器 ++/-- 要求 getter 的静态结果为数值；字符串、布尔值和 any 等
+隐式数值转换会报错，避免把 ++ 错编译成字符串拼接。请使用数值访问器，
+或显式转换后赋值；字符串访问器的 += 仍保留文本拼接语义。
+`number & Brand` 等品牌数值子类型仍按数值处理，支持独立 ++/--。
 字段、方法与访问器之间的继承覆盖暂不支持，使用不同成员名。
+访问器覆盖祖先方法也会定位报错，即使 getter 返回可调用函数也不例外。
 
 ## static
 
@@ -192,6 +197,9 @@ static 字段降低成隐藏全局变量，static 方法是没有 this 首参的
 明确拒绝 static 成员里的 this、static 继承访问（Sub.inheritedStatic）、
 static getter/setter 及 static 块。改用显式声明类名、普通静态方法和
 初始化函数。
+静态和实例字段的逻辑复合赋值 `&&=` / `||=` / `??=` 也明确拒绝；请改写为
+显式 if 后赋值，以保留右侧表达式的短路求值及副作用。可空类型的 `??=`
+若已由 nullable 前端降低为条件赋值，则沿用该路径。
 
 ## 拒绝范围
 
@@ -239,6 +247,8 @@ static getter/setter 及 static 块。改用显式声明类名、普通静态方
   JIT 中逐条一致。既有 289 条 JS 差分用例继续运行。
 - `tests/ts-classes-inherit-safety.test.mjs`：默认参数、class 声明时序、
   静态初始化间接读取、super/虚调用/访问器的让出捕获，以及未使用类回归。
+- `tests/ts-r3-class.test.mjs`：继承和 super 的求值顺序、访问器更新、
+  static 初始化、instanceof 收窄及方法回调等支持/拒绝边界。
 
 生成的 class 示例还须执行 `node tools/editor-compat.mjs <作品.bcmkn>`，只有
 `ok: true` 视为通过编辑器兼容检查；这不替代运行语义及完整分享发布链路验证。

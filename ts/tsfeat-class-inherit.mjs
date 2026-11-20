@@ -136,7 +136,11 @@ export function lowerClassInheritance(input) {
       if (findAccessor(r.parent, name) || findMethod(r.parent, name)) fail(field.node, "Fields cannot replace inherited accessors or methods", "override the method or accessor explicitly");
       r.allFields.set(name, field);
     }
-    for (const name of r.accessors.keys()) if (r.parent?.allFields.has(name)) fail(r.node, "Accessors cannot replace inherited data fields", "use a different property name");
+    for (const [name, pair] of r.accessors) {
+      const member = (pair.get ?? pair.set).node;
+      if (r.parent?.allFields.has(name)) fail(member, "Accessors cannot replace inherited data fields", "use a different property name");
+      if (findMethod(r.parent, name)) fail(member, "Accessors cannot replace inherited methods", "use a different property name or override the method with an ordinary method");
+    }
     for (const [name, m] of r.methods) if (r.parent?.allFields.has(name) || findAccessor(r.parent, name)) fail(m.node, "Methods cannot replace inherited fields or accessors", "use a distinct member name");
     for (const child of r.children) visitTree(child);
     r.post = nextId;
@@ -203,7 +207,7 @@ export function lowerClassInheritance(input) {
   };
   for (const r of records) if (!r.abstract) for (const m of allMethods(r).values()) if (m.abstract) fail(r.node,
     "Non-abstract class must implement abstract member " + m.name, "implement the member or mark the class abstract");
-  const inheritanceErrors = new Set([2415, 2416, 2425, 2515, 2610, 2611, 2653]);
+  const inheritanceErrors = new Set([2415, 2416, 2423, 2425, 2515, 2610, 2611, 2653]);
   for (const diagnostic of program.getSemanticDiagnostics(file)) if (inheritanceErrors.has(diagnostic.code)) {
     const node = ts.getTokenAtPosition(file, diagnostic.start ?? 0);
     fail(node, `TS${diagnostic.code}: ${ts.flattenDiagnosticMessageText(diagnostic.messageText, " " )}`,
@@ -676,6 +680,13 @@ export function lowerClassInheritance(input) {
   const id = text => f.createIdentifier(text);
   const call = (name, args) => f.createCallExpression(id(name), undefined, args);
   const number = n => f.createNumericLiteral(n);
+  const numericType = type => {
+    if (type.flags & ts.TypeFlags.NumberLike) return true;
+    if (type.isUnion()) return type.types.every(numericType);
+    // A numeric intersection (number & Brand) narrows number, rather than
+    // requiring ToNumeric. Do not mistake an ordinary branded object for it.
+    return type.isIntersection() && type.types.some(numericType);
+  };
   const prop = (value, name) => f.createElementAccessExpression(value, f.createStringLiteral(name));
   const transformed = (node, self, owner) => ts.visitNode(node, visitor(self, owner));
   const expressionText = (node, self, owner) => print(transformed(node, self, owner));
@@ -728,6 +739,10 @@ export function lowerClassInheritance(input) {
     }
     if (ts.isBinaryExpression(node) && node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment && node.operatorToken.kind <= ts.SyntaxKind.LastAssignment) {
       const left = unwrap(node.left), a = access(left);
+      // Neither the global path for statics nor the heap path for instance
+      // fields may eagerly evaluate the skipped RHS of a logical assignment.
+      if (a && !a.pair && [ts.SyntaxKind.AmpersandAmpersandEqualsToken, ts.SyntaxKind.BarBarEqualsToken, ts.SyntaxKind.QuestionQuestionEqualsToken].includes(node.operatorToken.kind)) fail(node,
+        "Logical class field assignments are not supported", "use an explicit if statement to preserve short-circuit evaluation");
       if (a?.pair) {
         if (!ts.isExpressionStatement(node.parent)) fail(node, "Value-producing accessor assignments are not supported", "use a standalone assignment and read separately");
         const rhs = transformed(node.right, self, owner);
@@ -741,6 +756,11 @@ export function lowerClassInheritance(input) {
       const operand = unwrap(node.operand), a = access(operand);
       if (a?.pair) {
         if (!ts.isExpressionStatement(node.parent)) fail(node, "Value-producing accessor updates are not supported", "update in a standalone statement");
+        // JS ++/-- applies ToNumeric, unlike +=. Rewriting a string getter as
+        // old + 1 would concatenate and can also change the setter's domain.
+        if (!numericType(checker.getTypeAtLocation(operand))) fail(operand,
+          "Accessor updates require statically numeric getters; implicit conversion is not supported",
+          "use a number-valued accessor or convert explicitly before assigning");
         return updateAccessor(operand, a, node.operator === ts.SyntaxKind.PlusPlusToken ? "+" : "-", number(1), self, owner);
       }
     }
