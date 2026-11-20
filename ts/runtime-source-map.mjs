@@ -4,7 +4,7 @@ import ts from "typescript";
 // as user locations. Reparsed text, even a unique identical AST node, cannot
 // establish provenance: a different, unused function may contain that text.
 // Such nodes remain block-only until the lowering supplies a precise origin.
-export function runtimeSourceLocation(node, originalFiles, helperOrigins, resolve) {
+export function runtimeSourceLocation(node, originalFiles, helperOrigins, resolve, sourceIdentity) {
   if (!node) return null;
   const origin = helperOrigins.get(node) ?? helperOrigins.get(ts.getOriginalNode(node));
   const file = origin?.file ?? node.getSourceFile?.();
@@ -14,5 +14,5 @@ export function runtimeSourceLocation(node, originalFiles, helperOrigins, resolv
   if (file.text !== original.text) return null;
   const offset = origin?.offset ?? node.getStart(file);
   const { line, character } = original.getLineAndCharacterOfPosition(offset);
-  return { file: original.fileName, line: line + 1, column: character + 1 };
+  return { file: sourceIdentity(original.fileName), line: line + 1, column: character + 1 };
 }

@@ -22,7 +22,7 @@ test("r2-srcmap uses filenames and one-based coordinates across sprites and reco
     const report = compile(prefix + source);
     const block = allBlocks(report).find(b => b.type === "set_sprite_style");
     assert.deepEqual(report.sourceMap[block.id], {
-      file: path.resolve("r2-srcmap.ts").replaceAll("\\", "/"),
+      file: "r2-srcmap.ts",
       line: prefix ? 5 : 3, column: 5,
     });
     assert.ok(Object.values(report.sourceMap).every(l => l.file && l.line > 0 && l.column > 0));
@@ -34,7 +34,7 @@ test("r2-srcmap retains the imported function's file and location", () => {
     'export function bad() {\n  setStyle(99);\n}');
   const block = allBlocks(report).find(b => b.type === "set_sprite_style");
   assert.deepEqual(report.sourceMap[block.id], {
-    file: path.resolve("r2-srcmap-lib.ts").replaceAll("\\", "/"), line: 2, column: 3,
+    file: "r2-srcmap-lib.ts", line: 2, column: 3,
   });
 });
 
@@ -51,6 +51,9 @@ test("r2-srcmap does not mistake printed helper coordinates for original source"
   const original = parse('\n\nsetStyle(99);\n');
   const generated = parse('const generated = 0;\nsetStyle(99);\nsetStyle(123);');
   const files = new Map([[file, original]]);
+  assert.deepEqual(runtimeSourceLocation(original.statements[0], files, new WeakMap(), path.resolve,
+    name => path.relative(path.dirname(file), name).replaceAll("\\", "/")),
+    { file: "r2-srcmap.ts", line: 3, column: 1 });
   assert.equal(runtimeSourceLocation(generated.statements[1], files, new WeakMap(), path.resolve), null);
   assert.equal(runtimeSourceLocation(generated.statements[2], files, new WeakMap(), path.resolve), null);
   files.set(file, parse('setStyle(99);\nsetStyle(99);'));
@@ -77,7 +80,7 @@ test("r2-srcmap inline return reporters retain definition origins across nested 
         `export function bad() {\n  ${nested ? 'return inner();' : body}\n}\n${nested ? `function inner() {\n  ${body}\n}` : ''}`);
       const block = allBlocks(report).find(b => b.type === (body.includes('listItem') ? 'list_item' : 'text_select'));
       assert.deepEqual(report.sourceMap[block.id], {
-        file: path.resolve("r2-srcmap-lib.ts").replaceAll("\\", "/"), line: nested ? 5 : 2, column: 10,
+        file: "r2-srcmap-lib.ts", line: nested ? 5 : 2, column: 10,
       });
     }
   }
@@ -120,4 +123,35 @@ test("r2-srcmap player connection and notice retain the complete runtime diagnos
   feedback.notice(message);
   assert.equal(elements.get("#notice-text").textContent, message);
   assert.equal(elements.get("#notice").hidden, false);
+});
+
+test("r2-srcmap persists entry-relative module identities across relocated native and virtual roots", () => {
+  const reports = [];
+  for (const root of [path.resolve("dist/alice/project"), path.resolve("dist/机器 B/deeper/project"), "/virtual"]) {
+    const entry = path.resolve(root, "src/main.ts");
+    const files = new Map([
+      [entry, 'import { left } from "../left/util";\nimport { right } from "../right/util";\nonStart(() => { left(); right(); setStyle(99); });'],
+      [path.resolve(root, "left/util.ts"), 'export function left() {\n  setStyle(97);\n}'],
+      [path.resolve(root, "right/util.ts"), 'export function right() {\n\n  setStyle(98);\n}'],
+    ]);
+    const report = compileFile(entry, { readFile: name => files.get(name) });
+    const locations = Object.values(report.sourceMap);
+    assert.deepEqual([...new Set(locations.map(l => l.file))].sort(), ["../left/util.ts", "../right/util.ts", "main.ts"]);
+    const styles = allBlocks(report).filter(b => b.type === "set_sprite_style");
+    assert.deepEqual(styles.map(b => report.sourceMap[b.id]), [
+      { file: "../left/util.ts", line: 2, column: 3 },
+      { file: "../right/util.ts", line: 3, column: 3 },
+      { file: "main.ts", line: 3, column: 34 },
+    ]);
+    for (const location of locations) {
+      assert.equal(path.isAbsolute(location.file), false);
+      assert.equal(location.file.includes("\\"), false);
+    }
+    // The diagnostic report's `source` is a host path, not persisted in .bcmkn.
+    const { source: hostSource, ...artifact } = report;
+    assert.equal(hostSource, entry);
+    reports.push(artifact);
+  }
+  assert.deepEqual(reports[0], reports[1]);
+  assert.deepEqual(reports[0], reports[2]);
 });

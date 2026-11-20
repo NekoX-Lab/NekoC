@@ -50,6 +50,24 @@ test("memory files, relative imports and standard-library type checking", () => 
   player.free(); // idempotent wrapper disposal
 });
 
+test("sourceMap module identities match across relocated WASM memory roots", () => {
+  const artifacts = [];
+  for (const root of ["/workspace/alice", "/机器 B/deeper/project"]) {
+    const entry = `${root}/src/main.ts`;
+    const { bcmkn } = compile(entry, { files: {
+      [entry]: 'import { left } from "../left/util";\nimport { right } from "../right/util";\nonStart(() => { left(); right(); setStyle(99); });',
+      [`${root}/left/util.ts`]: 'export function left() {\n  setStyle(97);\n}',
+      [`${root}/right/util.ts`]: 'export function right() {\n\n  setStyle(98);\n}',
+    } });
+    assert.deepEqual([...new Set(Object.values(bcmkn.sourceMap).map(l => l.file))].sort(),
+      ["../left/util.ts", "../right/util.ts", "main.ts"]);
+    assert.ok(Object.values(bcmkn.sourceMap).some(l => l.file === "../left/util.ts" && l.line === 2 && l.column === 3));
+    assert.ok(Object.values(bcmkn.sourceMap).some(l => l.file === "../right/util.ts" && l.line === 3 && l.column === 3));
+    artifacts.push(bcmkn);
+  }
+  assert.deepEqual(artifacts[0], artifacts[1]);
+});
+
 test("share-player objects compile and execute through the packaged memory frontend", () => {
   const source = fs.readFileSync(path.join(root, "tests/fixtures/ts-share-objects.ts"), "utf8");
   const { bcmkn } = compile("/objects.ts", { files: { "/objects.ts": source } });
@@ -99,6 +117,8 @@ for (const name of ["variables", "custom_procedures", "control_flow"]) {
     const input = `samples/${name}.ts`;
     const source = fs.readFileSync(path.join(root, input), "utf8");
     const { bcmkn } = compile(`/${input}`, { files: { [`/${input}`]: source } });
+    assert.ok(Object.keys(bcmkn.sourceMap).length > 0);
+    assert.deepEqual([...new Set(Object.values(bcmkn.sourceMap).map(l => l.file))], [`${name}.ts`]);
     const nativeOutput = path.join(outputDir, `${name}.native.bcmkn`);
     const wasmOutput = path.join(outputDir, `${name}.wasm.bcmkn`);
     fs.writeFileSync(wasmOutput, JSON.stringify(bcmkn));

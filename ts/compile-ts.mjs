@@ -286,6 +286,11 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity, declarations) {
 // Global flag the implicit start script sets once top-level initialization ran.
 const STARTUP_READY = "__nekoc_ready";
 
+// Both lowering names and persisted runtime locations use this portable identity.
+function sourceIdentity(entryPath, fileName) {
+  return path.relative(path.dirname(path.resolve(entryPath)), path.resolve(fileName)).replaceAll("\\", "/");
+}
+
 // Boolean-only output checks from the official 0.27.4 block definitions
 // (main.8ccf2442.js). These are socket shapes, not TypeScript return types:
 // convert_type, variables_get and procedure reporters also return booleans but
@@ -716,7 +721,7 @@ class WorkspaceCompiler {
       rejectParseDiagnostics(moduleSourceFile);
       const originalModule = moduleSourceFile;
       moduleSourceFile = lowerFrontendFeatures(moduleSourceFile,
-        path.relative(path.dirname(this.entryPath), resolvedPath).replaceAll("\\", "/"),
+        sourceIdentity(this.entryPath, resolvedPath),
         this.host.readFile(DECLARATIONS) ?? defaultHost.readFile(DECLARATIONS) ?? "");
       const staticBindings = staticFunctionBindings.get(moduleSourceFile);
       // Modules only register functions; never silently omit initialization.
@@ -7180,7 +7185,8 @@ class WorkspaceCompiler {
     this.blocks[id] = { id, ...block };
     const node = sourceNode || this.currentStatementNode;
     if (node) blockSourceNodes.set(this.blocks[id], node);
-    const location = runtimeSourceLocation(node, this.replacementSourceFiles, helperOrigins, path.resolve);
+    const location = runtimeSourceLocation(node, this.replacementSourceFiles, helperOrigins, path.resolve,
+      file => sourceIdentity(this.entryPath, file));
     if (location) this.sourceMap[id] = location;
     return id;
   }
@@ -7188,7 +7194,8 @@ class WorkspaceCompiler {
   addBlockWithId(id, block, sourceNode) {
     if (this.target.name === "kitten4") this.targetBlocks.push([block, sourceNode || this.currentStatementNode]);
     this.blocks[id] = { id, ...block };
-    const location = runtimeSourceLocation(sourceNode || this.currentStatementNode, this.replacementSourceFiles, helperOrigins, path.resolve);
+    const location = runtimeSourceLocation(sourceNode || this.currentStatementNode, this.replacementSourceFiles, helperOrigins, path.resolve,
+      file => sourceIdentity(this.entryPath, file));
     if (location) this.sourceMap[id] = location;
     return id;
   }
@@ -8011,7 +8018,7 @@ export function compileFile(inputPath, host = defaultHost, { target = "kitten-n"
     );
     rejectParseDiagnostics(sourceFile);
     sourceFile = lowerFrontendFeatures(sourceFile,
-      path.relative(path.dirname(path.resolve(inputPath)), path.resolve(inputPath)).replaceAll("\\", "/"),
+      sourceIdentity(inputPath, inputPath),
       host.readFile(DECLARATIONS) ?? defaultHost.readFile(DECLARATIONS) ?? "");
     compiler = new WorkspaceCompiler(inputPath, sourceFile, host, compileTarget(target));
     const report = compiler.compile(sourceFile);

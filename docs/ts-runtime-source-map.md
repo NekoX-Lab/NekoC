@@ -2,13 +2,15 @@
 
 TypeScript → workspace report → `.bcmkn` → Engine → CLI / Player 的定位数据共用
 作品顶层 `sourceMap`。格式为积木 ID 到 `{file, line, column}` 的映射，行、列均从
-1 开始，列沿用 TypeScript 的 UTF-16 字符偏移。`file` 是前端宿主提供的源码路径；
-浏览器宿主使用虚拟文件路径，不需要运行时访问原文件。
+1 开始，列沿用 TypeScript 的 UTF-16 字符偏移。`file` 使用与 lowering 的 sourceIdentity
+相同的入口目录相对模块身份，统一 `/` 分隔：入口为 `main.ts`，导入可为
+`lib/util.ts` 或 `../shared/util.ts`。不写宿主绝对目录；移动工程、native 与 WASM
+虚拟文件宿主输出一致。运行时原样展示可读相对路径，不需要访问原文件。
 
 运行错误示例：
 
 ```text
-invalid costume for nekoc-actor-Cat [actor Cat (nekoc-actor-Cat), /game/main.ts:3:5] at block b2
+invalid costume for nekoc-actor-Cat [actor Cat (nekoc-actor-Cat), main.ts:3:5] at block b2
 ```
 
 - 角色包含名称及实例 ID；过程中的运行错误显示实际执行角色。
