@@ -74,7 +74,28 @@ fn assembly_diagnostics_include_source_and_guidance() {
         .find(|d| d.code == "invalid_actor_menu_target")
         .unwrap();
     assert_eq!(diagnostic.line, Some(2));
+    assert_eq!(diagnostic.column, Some(3));
     assert_eq!(diagnostic.snippet.as_deref(), source.lines().nth(1));
     assert!(diagnostic.suggestion.contains("sprite"));
     assert!(diagnostic.to_string().contains("help:"));
+    for optimize in [false, true] {
+        let output = dir.path().join("out.bcmkn");
+        let mut command = Command::cargo_bin("nekoc").unwrap();
+        command.arg("build").arg(&input).arg("--out").arg(&output);
+        if optimize {
+            command.arg("--optimize");
+        }
+        let result = command.output().unwrap();
+        assert_eq!(result.status.code(), Some(1));
+        assert!(result.stdout.is_empty());
+        let stderr = String::from_utf8(result.stderr).unwrap();
+        assert!(stderr.contains(&diagnostic.to_string()), "{stderr}");
+        assert!(stderr.contains("[compat]"), "{stderr}");
+        assert!(
+            stderr.contains("  2 |   rotateAround(\"missing\", 45);\n    |   ^"),
+            "{stderr}"
+        );
+        assert!(stderr.contains("\n  help: "), "{stderr}");
+        assert!(!output.exists());
+    }
 }

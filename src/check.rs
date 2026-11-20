@@ -30,6 +30,23 @@ pub struct Diagnostic {
 }
 
 impl Diagnostic {
+    pub(crate) fn from_actor_target(issue: &Value) -> Self {
+        let diagnostic = Self {
+            severity: "error".into(),
+            source: "compat".into(),
+            code: "invalid_actor_menu_target".into(),
+            message: issue["message"].as_str().unwrap_or("").to_owned(),
+            file: issue["source"]["file"].as_str().map(str::to_owned),
+            line: issue["source"]["line"].as_u64(),
+            column: issue["source"]["column"].as_u64(),
+            snippet: None,
+            suggestion: "Use the name or ID of a sprite declared in the same scene; see docs/api.md for supported actor targets.".into(),
+        };
+        #[cfg(not(target_arch = "wasm32"))]
+        let diagnostic = diagnostic.with_source_snippet();
+        diagnostic
+    }
+
     #[cfg(not(target_arch = "wasm32"))]
     fn from_frontend(value: &Value) -> Self {
         let text = |key: &str| value[key].as_str().unwrap_or_default().to_owned();
@@ -158,17 +175,7 @@ pub fn check_file(input: &Path, options: &CheckOptions) -> Result<CheckReport> {
                         if let Some(errors) =
                             error.downcast_ref::<crate::bcmkn_compiler::ActorTargetErrors>()
                         {
-                            diagnostics.extend(errors.0.iter().map(|issue| Diagnostic {
-                                severity: "error".into(),
-                                source: "compat".into(),
-                                code: "invalid_actor_menu_target".into(),
-                                message: issue["message"].as_str().unwrap_or("").to_owned(),
-                                file: issue["source"]["file"].as_str().map(str::to_owned),
-                                line: issue["source"]["line"].as_u64(),
-                                column: issue["source"]["column"].as_u64(),
-                                snippet: None,
-                                suggestion: "Use the name or ID of a sprite declared in the same scene; see docs/api.md for supported actor targets.".into(),
-                            }.with_source_snippet()));
+                            diagnostics.extend(errors.diagnostics());
                             None
                         } else {
                             return Err(error);

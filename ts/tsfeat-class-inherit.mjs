@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { objectTypes } from "./share-objects.mjs";
-import { classSourceOrigins } from "./class-metadata.mjs";
+import { classSourceOrigins, mapPrintedClassNodes } from "./class-metadata.mjs";
 
 const ambient = node => !!(node.flags & ts.NodeFlags.Ambient)
   || node.modifiers?.some(m => m.kind === ts.SyntaxKind.DeclareKeyword);
@@ -46,6 +46,7 @@ export function lowerClassInheritance(input, sourceIdentity = input.fileName) {
   const tag = fresh("typeId");
   const records = [], byNode = new Map(), bySymbol = new Map();
   const origins = new Map(), helpers = [], declarations = new Map();
+  const helperBodies = new Map(), fieldInitializers = new Map();
   const addHelper = (name, code, node) => { helpers.push(code); origins.set(name, { file: input, offset: node.getStart(file) }); };
   const typeText = node => node ? print(node) : "number";
   const inferredType = node => checker.typeToTypeNode(checker.getTypeAtLocation(node), undefined, ts.NodeBuilderFlags.NoTruncation);
@@ -792,12 +793,16 @@ export function lowerClassInheritance(input, sourceIdentity = input.fileName) {
     for (const r of records) {
       const fields = treeFields.get(r.root);
       declarations.set(r.name, `interface ${r.name} { ${JSON.stringify(tag)}: number; ${[...fields.values()].map(field => JSON.stringify(field.name) + ": " + typeText(field.type) + ";").join(" ")} }`);
-      const init = [...r.fields.values()].filter(field => field.initializer).map(field => `${r.self}[${JSON.stringify(field.name)}] = ${expressionText(field.initializer, r.self, r)};`).join("\n");
+      const initialized = [...r.fields.values()].filter(field => field.initializer);
+      const initializers = initialized.map(field => transformed(field.initializer, r.self, r));
+      fieldInitializers.set(r.init, initializers);
+      const init = initialized.map((field, i) => `${r.self}[${JSON.stringify(field.name)}] = ${print(initializers[i])};`).join("\n");
       addHelper(r.init, `function ${r.init}(${r.self}: ${r.name}): number { ${init} return 0; }`, r.node);
       for (const m of [...r.methods.values(), ...[...r.accessors.values()].flatMap(pair => Object.values(pair)), ...[...r.statics.values()].filter(m => m.helper)]) {
         if (m.abstract) continue;
         const body = transformed(m.node.body, m.static ? null : r.self, r);
         const concreteBody = ts.visitNode(body, replaceReturn);
+        helperBodies.set(m.helper, { statements: concreteBody.statements, trailing: !!(checker.getReturnTypeOfSignature(checker.getSignatureFromDeclaration(m.node)).flags & ts.TypeFlags.Void) });
         const signature = checker.getReturnTypeOfSignature(checker.getSignatureFromDeclaration(m.node));
         const returns = n => ts.isReturnStatement(n) && !!n.expression || ts.isBlock(n) && n.statements.some(returns) || ts.isIfStatement(n) && n.elseStatement && returns(n.thenStatement) && returns(n.elseStatement);
         const hasBareReturn = n => !ts.isFunctionLike(n) && (ts.isReturnStatement(n) && !n.expression || !!ts.forEachChild(n, hasBareReturn));
@@ -823,7 +828,11 @@ export function lowerClassInheritance(input, sourceIdentity = input.fileName) {
         if (!r.parent) body += `${r.init}(${r.self});`;
         for (const p of params.slice(arity)) body += `let ${p.name.text}: ${typeText(p.type ?? inferredType(p.name))} = ${expressionText(p.initializer, r.self, r)};`;
         if (!r.parent) for (const field of r.fields.values()) if (field.parameter) body += `${r.self}[${JSON.stringify(field.name)}] = ${field.name};`;
-        if (r.ctor) body += ts.visitNode(transformed(r.ctor.body, r.self, r), replaceReturn).statements.map(print).join("\n");
+        if (r.ctor) {
+          const statements = ts.visitNode(transformed(r.ctor.body, r.self, r), replaceReturn).statements;
+          helperBodies.set(r.construct + "_" + arity, { statements, trailing: true });
+          body += statements.map(print).join("\n");
+        }
       }
       const name = r.construct + "_" + arity;
       addHelper(name, `function ${name}(${r.self}: ${r.name}${args.length ? ", " + args.join(", ") : ""}): number { ${body} return 0; }`, r.ctor ?? r.node);
@@ -905,6 +914,19 @@ export function lowerClassInheritance(input, sourceIdentity = input.fileName) {
     text += "\n" + [...declarations.entries()].filter(([name]) => !records.some(r => r.name === name)).map(([,code]) => code).join("\n")
       + "\n" + helpers.filter(code => reachable.has(/^function (\w+)/.exec(code)[1])).join("\n") + "\n";
     const output = ts.createSourceFile(input.fileName, text, input.languageVersion, true, input.scriptKind);
+    for (const helper of output.statements) {
+      const name = helper.name?.text;
+      const body = helperBodies.get(name);
+      if (body) {
+        const start = helper.body.statements.length - Number(body.trailing) - body.statements.length;
+        body.statements.forEach((original, i) => mapPrintedClassNodes(helper.body.statements[start + i], original, input, origins.get(name)));
+      }
+      fieldInitializers.get(name)?.forEach((original, i) => {
+        const assignment = helper.body.statements[i];
+        mapPrintedClassNodes(assignment, original, input, origins.get(name));
+        mapPrintedClassNodes(assignment.expression.right, original, input, origins.get(name));
+      });
+    }
     classSourceOrigins.set(output, origins);
     return output;
   }

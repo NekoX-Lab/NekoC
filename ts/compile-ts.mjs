@@ -22,7 +22,7 @@ import { lowerTsClasses } from "./tsfeat-classes.mjs";
 import { lowerTsNullable } from "./tsfeat-nullable.mjs";
 import { lowerTsCollections } from "./tsmap.mjs";
 import { compileNilIntrinsic, nilIntrinsic } from "./nil-intrinsics.mjs";
-import { classFunctionNames, classSourceOrigins, markClassHelpers } from "./class-metadata.mjs";
+import { classFunctionNames, classNodeOrigins, classSourceOrigins, markClassHelpers } from "./class-metadata.mjs";
 import { bitwiseAssignments, bitwisePlan, bitwiseTokens } from "./bitwise.mjs";
 import { enrichDiagnostic, formatDiagnostic } from "./diagnostics.mjs";
 export { formatDiagnostic } from "./diagnostics.mjs";
@@ -124,6 +124,7 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity) {
       markClassHelpers(file, names);
       const origins = classSourceOrigins.get(classes);
       const mark = (node, origin) => {
+        origin = classNodeOrigins.get(node) ?? classNodeOrigins.get(ts.getOriginalNode(node)) ?? origin;
         helperOrigins.set(node, origin);
         ts.forEachChild(node, child => mark(child, origin));
       };
@@ -1668,11 +1669,18 @@ class WorkspaceCompiler {
     const copied = callback?.body.getText(file);
     const helperFile = statement.getSourceFile();
     const start = copied ? helperFile.text.indexOf(copied, statement.body.getStart(helperFile)) : -1;
+    const origins = new Map();
+    const collect = node => {
+      const origin = helperOrigins.get(node) ?? helperOrigins.get(ts.getOriginalNode(node));
+      if (origin) origins.set(`${node.kind}:${node.getStart(file)}`, origin);
+      ts.forEachChild(node, collect);
+    };
+    if (inherited && callback) collect(callback.body);
     const visit = node => {
       const position = node.getStart(helperFile);
       const offset = start >= 0 && position >= start && position < start + copied.length
         ? callback.body.getStart(file) + position - start : call.getStart(file);
-      helperOrigins.set(node, inherited ?? { file, offset });
+      helperOrigins.set(node, origins.get(`${node.kind}:${offset}`) ?? inherited ?? { file, offset });
       ts.forEachChild(node, visit);
     };
     visit(statement);

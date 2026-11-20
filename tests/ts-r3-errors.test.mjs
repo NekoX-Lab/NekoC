@@ -94,6 +94,43 @@ test("r3: imported and lowered code uses original snippets in memory hosts", () 
   }
 });
 
+test("r3: class helpers retain precise original member locations", () => {
+  const cases = [
+    { body: "  x = 1;\n  bad() {\n    missingApi();\n  }", line: 4, column: 5, call: "a.bad();" },
+    { body: "  x = 1;\n  constructor() {\n    missingApi();\n  }", line: 4, column: 5 },
+    { body: "  x = missingApi();", line: 2, column: 7 },
+    { body: "  x = (\n    missingApi()\n  );", line: 3, column: 5 },
+    { body: "  x = 1;\n  bad() {\n    [1].map(x => {\n      return missingApi(x);\n    });\n  }", line: 5, column: 14, call: "a.bad();" },
+    // Trigger both method-text edits and whole-file value reprinting.
+    { body: '  x = 1;\n  bad() {\n    console.log("abc".slice(1));\n    const kind = typeof 1;\n    missingApi();\n  }', line: 6, column: 5, call: "a.bad();" },
+  ];
+  for (const item of cases) for (const imported of [false, true]) for (const inherited of [false, true]) {
+    const prefix = inherited ? "class Base { base = 0; }\n" : "";
+    const body = inherited ? item.body.replace("constructor() {", "constructor() { super();") : item.body;
+    const declaration = `${prefix}class A${inherited ? " extends Base" : ""} {\n${body}\n}\n`;
+    const call = item.call ?? "console.log(a.x);";
+    const library = declaration + `export function helper() {\nlet a = new A();\n${call}\n}\n`;
+    const source = imported ? 'import { helper } from "./lib";\nonStart(() => { helper(); });\n'
+      : declaration + `let a = new A();\nonStart(() => { ${call} });\n`;
+    withFiles({ "main.ts": source, ...(imported ? { "lib.ts": library } : {}) }, (file, dir) => {
+      const expectedFile = imported ? path.join(dir, "lib.ts") : file;
+      const result = checkFile(file, { types: false });
+      assert.equal(result.ok, false);
+      assert.equal(result.diagnostics.length, 1);
+      const [d] = result.diagnostics;
+      assert.match(d.message, /missingApi/);
+      assertLocated(d, expectedFile, imported ? library : source);
+      assert.equal(d.line, item.line + Number(inherited));
+      assert.equal(d.column, item.column);
+      assert.match(d.snippet, /missingApi/);
+      assert.throws(() => compileFile(file), error => {
+        assert.deepEqual(error.diagnostics, result.diagnostics);
+        return true;
+      });
+    });
+  }
+});
+
 test("r3: imported type errors retain the dependency's source", () => {
   const imported = '// library\nexport const x: number = "bad";\n';
   withFiles({ "main.ts": 'import { x } from "./lib"; console.log(x);', "lib.ts": imported }, (file, dir) => {
