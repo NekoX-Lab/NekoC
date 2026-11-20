@@ -109,7 +109,7 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity) {
     validateRawSyntax(sourceFile);
     // Generated names use the entry-relative module identity, never the machine
     // path. Keep SourceFile.fileName intact for resolution and diagnostics.
-    const destructured = lowerTsDestructuring(sourceFile);
+    const destructured = lowerTsDestructuring(sourceFile, sourceIdentity);
     const collections = lowerTsCollections(destructured, sourceIdentity);
     const nullable = lowerTsNullable(collections, sourceIdentity);
     const classes = lowerTsClasses(nullable, sourceIdentity);

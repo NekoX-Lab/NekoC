@@ -10,6 +10,7 @@ import { lowerTsMethods } from "../ts/tsfeat-methods.mjs";
 import { lowerTsClasses } from "../ts/tsfeat-classes.mjs";
 import { lowerTsNullable } from "../ts/tsfeat-nullable.mjs";
 import { lowerTsCollections } from "../ts/tsmap.mjs";
+import { lowerTsDestructuring } from "../ts/ts-r2-destructure.mjs";
 
 function compileAt(root, source, modules = {}) {
   const entry = path.resolve(root, "src/main.ts");
@@ -31,6 +32,8 @@ const cases = {
   inheritance: 'class Base { value = 1; read() { return this.value; } } class Child extends Base { read() { return super.read() + 2; } } const box: Base = new Child(); console.log(box.read());',
   nullable: 'interface Box { value: number; } let box: Box | null = null; console.log(box?.value ?? 3); box = {value: 4}; console.log(box?.value);',
   collections: 'const map = new Map<string, number>(); map.set("a", 7); console.log(map.get("a"), map.size); const set = new Set(); set.add("a"); console.log(set.has("a"));',
+  objectDestructuring: 'const source = {value: 3, label: "cat"}; const {value: n, label} = source; console.log(n, label);',
+  arrayDestructuring: 'let left = 1, right = 2; [left, right] = [right, left]; console.log(left, right);',
 };
 
 for (const [name, source] of Object.entries(cases)) {
@@ -64,6 +67,23 @@ test("r2-determinism diagnostics retain real imported source paths", () => {
     && error.location.line > 0);
 });
 
+test("r2-determinism imported destructuring preserves separate module namespaces", () => {
+  const source = 'import { left } from "../left/util"; import { right } from "../right/util"; console.log(left(2), right(4));';
+  const modules = {
+    "left/util.ts": 'export function left(n: number) { const {value} = {value: n}; let a = value, b = 1; [a, b] = [b, a]; return a + b; }',
+    "right/util.ts": 'export function right(n: number) { const {value} = {value: n}; let a = value, b = 2; [a, b] = [b, a]; return a * b; }',
+  };
+  const first = executableReport(compileAt("virtual/imports/first", source, modules));
+  assert.equal(executableReport(compileAt("virtual/机器 B/deep/imports", source, modules)), first);
+  // Later passes can inline these temporaries; inspect the destructuring output
+  // itself for namespace separation as well as the final relocated graph.
+  const lowered = Object.entries(modules).map(([name, text]) => lowerTsDestructuring(
+    ts.createSourceFile(path.resolve("virtual/imports/first", name), text, ts.ScriptTarget.Latest, true),
+    `../${name}`).text).join("\n");
+  const salts = new Set([...lowered.matchAll(/__nekocDestructure_(\d+)_/g)].map(match => match[1]));
+  assert.equal(salts.size, 2, "imported destructuring must keep distinct entry-relative salts");
+});
+
 test("r2-determinism browser relative paths match POSIX paths", () => {
   for (const [from, to] of [
     ["/project/src", "/project/src/main.ts"],
@@ -76,7 +96,8 @@ test("r2-determinism browser relative paths match POSIX paths", () => {
 
 test("r2-determinism all lowering salts ignore Windows/POSIX machine paths", () => {
   const passes = { lexical: lowerTsFeatures, methods: lowerTsMethods, classes: lowerTsClasses,
-    inheritance: lowerTsClasses, nullable: lowerTsNullable, collections: lowerTsCollections };
+    inheritance: lowerTsClasses, nullable: lowerTsNullable, collections: lowerTsCollections,
+    objectDestructuring: lowerTsDestructuring, arrayDestructuring: lowerTsDestructuring };
   for (const [name, lower] of Object.entries(passes)) {
     const emitted = file => ts.createPrinter().printFile(lower(ts.createSourceFile(
       file, cases[name], ts.ScriptTarget.Latest, true, ts.ScriptKind.TS), "src/main.ts"));

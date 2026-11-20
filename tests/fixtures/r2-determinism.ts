@@ -21,7 +21,10 @@ onStart(() => {
   for (let i = 0; i < 3; i++) total += i;
   values.set("a", box.read());
   labels.add("a");
-  maybe = { value: total };
-  callProc("record", total);
+  const { value: recorded } = { value: total };
+  let left = 0, right = recorded;
+  [left, right] = [right, left];
+  maybe = { value: left };
+  callProc("record", left);
   console.log(box.read(), maybe?.value ?? 0, values.get("a"), labels.has("a"), cut("abc"));
 });

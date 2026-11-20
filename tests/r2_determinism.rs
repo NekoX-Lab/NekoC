@@ -90,8 +90,8 @@ onStart(() => { console.log(left(2), right(4)); });
 "#,
         )
         .unwrap();
-        fs::write(root.join("left/util.ts"), "export function left(n: number) { let total = 0; for (let i = 0; i < n; i++) total += i; return total; }").unwrap();
-        fs::write(root.join("right/util.ts"), "export function right(n: number) { let total = 1; for (let i = 0; i < n; i++) total *= 3; return total; }").unwrap();
+        fs::write(root.join("left/util.ts"), "export function left(n: number) { const {value} = {value: n}; let bound = 0, saved = value; [bound, saved] = [saved, bound]; let total = 0; for (let i = 0; i < bound; i++) total += i; return total; }").unwrap();
+        fs::write(root.join("right/util.ts"), "export function right(n: number) { const {value} = {value: n}; let bound = 0, saved = value; [bound, saved] = [saved, bound]; let total = 1; for (let i = 0; i < bound; i++) total *= 3; return total; }").unwrap();
         let output = root.join("result.bcmkn");
         artifacts.push(build(&root, Path::new("src/main.ts"), &output, false));
         let run = Command::cargo_bin("nekoc")
