@@ -31,4 +31,13 @@ test('r3 physics probes are original, reproducible and bound to official observa
     assert.deepEqual(value.pageErrors, []);
   }
   assert.equal(report.cases['physical-speed'].frames[0].variables.speed, 2);
+  const collision = JSON.parse(readFileSync('docs/kitten4-r3-collision-evidence.json'));
+  assert.equal(collision.frames, 4);
+  assert.deepEqual(collision.errors, []);
+  assert.deepEqual(collision.pageErrors, []);
+  assert.equal(collision.cases['review-grid-20-20-16-15'].before, false);
+  assert.equal(collision.cases['review-flip-0-0-0'].before, true);
+  const turn = report.cases['review-turn-710-pivot-0-0'].frames[0].actor;
+  assert.equal(turn.x, 627);
+  assert.equal(turn.rotation, -170);
 });

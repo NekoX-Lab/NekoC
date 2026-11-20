@@ -1,7 +1,7 @@
 {
   "schema": "nekoc-k4-r3-physics-v1",
   "fixture": "tests/fixtures/kitten4/r3-physics.json",
-  "sha256": "76dd9e1c08e5f7df6afec9fc4cef4ee717eefac58c14bd855e1365ab81677e20",
+  "sha256": "42941fc57126da1d58ef04ccafc20f454d1a5489ceb8fe89f5debf56b661e26e",
   "cases": {
     "right": {
       "frames": [
@@ -2162,6 +2162,2166 @@
       ],
       "errors": [],
       "pageErrors": []
+    },
+    "review-turn-710-pivot-0-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": -170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": -170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": -170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": -170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn-710-pivot-5--7": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn-710-pivot-5-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn--710-pivot-0-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": 170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": 170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": 170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": 170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn--710-pivot-5--7": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn--710-pivot-5-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn-1070-pivot-0-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": -170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": -170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": -170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": -170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn-1070-pivot-5--7": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn-1070-pivot-5-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn--1070-pivot-0-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": 170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": 170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": 170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 627,
+            "y": 0,
+            "rotation": 170,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn--1070-pivot-5--7": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn--1070-pivot-5-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 9.99999999999999,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn-90-pivot-0-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn-90-pivot-5--7": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn-90-pivot-5-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn--90-pivot-0-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 616,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": false,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 616,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": false,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 616,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": false,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 616,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": false,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn--90-pivot-5--7": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn--90-pivot-5-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn-450-pivot-0-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn-450-pivot-5--7": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn-450-pivot-5-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": 90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn--450-pivot-0-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 616,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": false,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 616,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": false,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 616,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": false,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 616,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": false,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn--450-pivot-5--7": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
+    },
+    "review-turn--450-pivot-5-0": {
+      "frames": [
+        {
+          "frame": 1,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 2,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 3,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        },
+        {
+          "frame": 4,
+          "actor": {
+            "id": "20000000-0000-4000-8000-000000000001",
+            "prototype_id": "20000000-0000-4000-8000-000000000001",
+            "name": "Probe",
+            "x": 630,
+            "y": 0,
+            "rotation": -90,
+            "current_style_id": "probe-style",
+            "scale": 100,
+            "scale_y": 100,
+            "visible": true
+          },
+          "variables": {
+            "before": true,
+            "after": true,
+            "speed": 0,
+            "speed_dir": 0
+          }
+        }
+      ],
+      "errors": [],
+      "pageErrors": []
     }
   },
   "assets": [
@@ -2206,5 +4366,5 @@
       "sha256": "6ed56cf80a197b1dad00403ef2d55f9f4c357cb000cc52b5b0ba32c3989730d6"
     }
   ],
-  "projectSha256": "64918d86c5eb39541b7879f446a4e66e536b928dd198249653a5964c750312bc"
+  "projectSha256": "864b57b9923ce1104ecd1781f145da0dd45c6b26128d2e5fdba9f6a3788ce925"
 }

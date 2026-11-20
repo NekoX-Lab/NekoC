@@ -82,8 +82,15 @@ fn edge_reflection_matches_official_points_corners_pivots_and_physics_speed() {
                 for key in ["x", "y", "rotation"] {
                     let got = actual["actors"][actor_id][key].as_f64().unwrap();
                     let want = expected["actor"][key].as_f64().unwrap();
+                    // K4 normalizes multi-turn initial rotations even when no
+                    // bounce occurs; positions must still match exactly.
+                    let delta = if key == "rotation" {
+                        (got - want + 180.0).rem_euclid(360.0) - 180.0
+                    } else {
+                        got - want
+                    };
                     assert!(
-                        (got - want).abs() < 1e-8,
+                        delta.abs() < 1e-8,
                         "{name} interpreted={interpreted} frame={frame} {key}: {got} != {want}"
                     );
                 }
@@ -161,6 +168,11 @@ fn actor_collisions_match_official_sample_threshold_stage_and_scene_rules() {
                 .push(other_id.into());
         }
         source["theatre"]["actors"][other_id] = other;
+        if let Some(workspace) = spec.get("workspace") {
+            source["theatre"]["actors"][actor_id]["block_data_json"] = workspace.clone();
+            source["theatre"]["actors"][other_id]["block_data_json"] =
+                spec["otherWorkspace"].clone();
+        }
         let width = spec["texture"][0].as_u64().unwrap() as usize;
         let height = spec["texture"][1].as_u64().unwrap() as usize;
         source["theatre"]["styles"]["probe-style"]["width"] = width.into();
@@ -182,10 +194,13 @@ fn actor_collisions_match_official_sample_threshold_stage_and_scene_rules() {
             }
             engine.use_virtual_clock();
             engine.start();
-            engine
-                .advance(1.0 / 60.0, 100_000, Duration::from_secs(2))
-                .unwrap();
-            let actual = engine.oracle_snapshot(1);
+            let frames = evidence["frames"].as_u64().unwrap() as u32;
+            for _ in 0..frames {
+                engine
+                    .advance(1.0 / 60.0, 100_000, Duration::from_secs(2))
+                    .unwrap();
+            }
+            let actual = engine.oracle_snapshot(frames);
             for key in ["before", "after"] {
                 let got = actual["variables"][key]
                     .as_bool()

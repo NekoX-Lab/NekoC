@@ -15,9 +15,23 @@ fn alpha_at(geometry: &CostumeGeometry<'_>, x: f64, y: f64) -> bool {
         (costume.width * 0.7).floor(),
         (costume.height * 0.7).floor(),
     );
-    if ![px, py, w, h].iter().all(|n| n.is_finite()) || px < 0.0 || py < 0.0 || px >= w || py >= h {
+    if ![px, py, w, h].iter().all(|n| n.is_finite())
+        || w <= 0.0
+        || h <= 0.0
+        || px < 0.0
+        || py < 0.0
+        || px > w
+        || py > h
+    {
         return false;
     }
+    // The player reads a flat alpha buffer after inclusive coordinate checks.
+    // In particular x == w aliases the next row; the final row must still fail.
+    let index = py * w + px;
+    if index >= w * h {
+        return false;
+    }
+    let (px, py) = (index % w, (index / w).floor());
     let Some((mw, mh, bits)) = &costume.mask else {
         return true;
     };
@@ -64,9 +78,11 @@ impl Engine {
         let mut hits = 0;
         let mut x = (l + 0.5).floor();
         while x < (r + 0.5).floor() {
-            let mut y = (t + 0.5).floor();
-            while y > (bottom + 0.5).floor() {
-                if alpha_at(&a, x, y) && alpha_at(&b, x, y) {
+            // Generate the grid in PIXI's y-down coordinates before mapping to
+            // stage y-up. Negating a rounded value loses JS half-tie behavior.
+            let mut y = (-bottom + 0.5).floor();
+            while y > (-t + 0.5).floor() {
+                if alpha_at(&a, x, -y) && alpha_at(&b, x, -y) {
                     hits += 1;
                     if tiny || hits == 5 {
                         return true;
@@ -86,8 +102,10 @@ impl Engine {
             let heading = (90.0 - sprite.direction + 180.0).rem_euclid(360.0) - 180.0;
             // K4's LEFT_RIGHT switches at +90/-90, not KN's zero heading.
             let k4_flip = !(-90.0..90.0).contains(&heading) && heading != -90.0;
-            let old_flip =
-                (sprite.direction - self.program.costume_turn + 540.0) % 360.0 - 180.0 < 0.0;
+            let direction = sprite.direction - self.program.costume_turn;
+            // Keep exactly the same normalization as geometry(), including
+            // Rust's signed remainder for multi-turn negative directions.
+            let old_flip = (direction % 360.0 + 540.0) % 360.0 - 180.0 < 0.0;
             if k4_flip != old_flip {
                 geometry.x += 2.0 * geometry.costume.center_point[0] * geometry.width
                     / geometry.costume.width;
@@ -235,5 +253,56 @@ impl Engine {
         self.sprites[actor].x += x;
         self.sprites[actor].y += y;
         self.dirty[actor] = true;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::engine::Costume;
+
+    #[test]
+    fn flat_alpha_boundary_aliases_next_row_but_never_reads_past_last_row() {
+        let mut costume = Costume {
+            width: 20.0,
+            height: 40.0,
+            mask: Some((20, 40, vec![255; 100])),
+            ..Default::default()
+        };
+        for width in [2.0, -2.0] {
+            for height in [4.0, -4.0] {
+                let geometry = CostumeGeometry {
+                    costume: &costume,
+                    x: 0.0,
+                    y: 0.0,
+                    width,
+                    height,
+                    angle: 0.0,
+                };
+                let sample = |u, v| {
+                    let (x, y) = geometry.point(u, v);
+                    alpha_at(&geometry, x, y)
+                };
+                assert!(sample(1.0, 0.5), "column w aliases the next row");
+                assert!(!sample(1.0, 1.0), "flat index beyond last row");
+                assert!(!sample(0.0, 1.0), "row h is outside the buffer");
+                assert!(!sample(1.1, 0.5), "column beyond inclusive boundary");
+            }
+        }
+        // A valid alias must sample the next row's first pixel, not the
+        // previous row's last pixel or padded bits in the source mask.
+        costume.mask.as_mut().unwrap().2.fill(0);
+        let bit = 22 * 20;
+        costume.mask.as_mut().unwrap().2[bit / 8] |= 1 << (bit % 8);
+        let geometry = CostumeGeometry {
+            costume: &costume,
+            x: 0.0,
+            y: 0.0,
+            width: -2.0,
+            height: 4.0,
+            angle: 0.0,
+        };
+        let (x, y) = geometry.point(1.0, 0.5);
+        assert!(alpha_at(&geometry, x, y));
     }
 }

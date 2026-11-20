@@ -1719,6 +1719,822 @@
         },
         "comments": {}
       }
+    },
+    "review-turn-710-pivot-0-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": 12.39183768915974,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 0,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 0,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn-710-pivot-5--7": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": 12.39183768915974,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": -7
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": -7
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn-710-pivot-5-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": 12.39183768915974,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn--710-pivot-0-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": -12.39183768915974,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 0,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 0,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn--710-pivot-5--7": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": -12.39183768915974,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": -7
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": -7
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn--710-pivot-5-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": -12.39183768915974,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn-1070-pivot-0-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": 18.675022996339326,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 0,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 0,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn-1070-pivot-5--7": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": 18.675022996339326,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": -7
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": -7
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn-1070-pivot-5-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": 18.675022996339326,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn--1070-pivot-0-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": -18.675022996339326,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 0,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 0,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn--1070-pivot-5--7": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": -18.675022996339326,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": -7
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": -7
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn--1070-pivot-5-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": -18.675022996339326,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn-90-pivot-0-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": 1.5707963267948966,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 0,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 0,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn-90-pivot-5--7": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": 1.5707963267948966,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": -7
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": -7
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn-90-pivot-5-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": 1.5707963267948966,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn--90-pivot-0-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": -1.5707963267948966,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 0,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 0,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn--90-pivot-5--7": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": -1.5707963267948966,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": -7
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": -7
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn--90-pivot-5-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": -1.5707963267948966,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn-450-pivot-0-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": 7.853981633974483,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 0,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 0,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn-450-pivot-5--7": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": 7.853981633974483,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": -7
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": -7
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn-450-pivot-5-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": 7.853981633974483,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn--450-pivot-0-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": -7.853981633974483,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 0,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 0,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn--450-pivot-5--7": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": -7.853981633974483,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": -7
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": -7
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
+    },
+    "review-turn--450-pivot-5-0": {
+      "actor": {
+        "x": 630,
+        "y": 0,
+        "rotation": -7.853981633974483,
+        "rotation_type": 1
+      },
+      "style": {
+        "id": "probe-style",
+        "name": "probe-style",
+        "width": 40,
+        "height": 40,
+        "adaptive": false,
+        "pivot": {
+          "x": 5,
+          "y": 0
+        },
+        "rotate_center": {
+          "x": 5,
+          "y": 0
+        },
+        "cdn_url": "",
+        "url": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCI+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBmaWxsPSIjMzM4OGFhIi8+PC9zdmc+"
+      },
+      "texture": [
+        40,
+        40,
+        0,
+        0,
+        40,
+        40
+      ],
+      "physical": false
     }
   }
 }

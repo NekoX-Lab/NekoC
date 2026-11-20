@@ -74,6 +74,12 @@ export function physicsProbes() {
   add("pivot-x", { x: 650, y: 10, rotation: 30 }, undefined, [5, 0]);
   add("pivot-y", { x: 650, y: 10, rotation: 30 }, undefined, [0, -7]);
   add("physical-speed", { x: 645, rotation: 0 }, undefined, undefined, true);
+  for (const rotation of [710, -710, 1070, -1070, 90, -90, 450, -450]) {
+    for (const pivot of [[0, 0], [5, -7], [5, 0]]) {
+      add(`review-turn-${rotation}-pivot-${pivot.join('-')}`,
+        { x: 630, y: 0, rotation, rotation_type: 1 }, [40, 40, 0, 0, 40, 40], pivot);
+    }
+  }
   return { actorId, template, cases };
 }
 
@@ -145,6 +151,32 @@ export function collisionProbes() {
   add('target-hidden', {}, { visible: false });
   add('subject-hidden', { visible: false });
   add('cross-scene', {}, { scene: '10000000-0000-4000-8000-000000000002' });
+  for (const texture of [[19, 19], [20, 19], [19, 20], [21, 17], [3, 3], [4, 2], [20, 20]]) {
+    for (const [x, y] of [[16, 15], [16, 16], [15, 16], [14, 15], [15, 14],
+      [0.5, 0], [0, 0.5], [0, 0], [17.6, 16.6], [-16, -15], [-15, -16],
+      [0.5, -0.5], [-0.5, 0.5]]) {
+      add(`review-grid-${texture.join('-')}-${x}-${y}`, {}, { x, y }, texture);
+    }
+  }
+  for (const flip of ['0', '1']) {
+    for (const [x, y] of [[0, 0], [0.5, -0.5], [-0.5, 0.5], [0, 3]]) {
+      const name = `review-flip-${flip}-${x}-${y}`;
+      add(name, { x, y, scale: 10, rotation: 0, rotation_type: 2 },
+        { x, y, scale: 10, rotation: 0, rotation_type: 2 }, [20, 40]);
+      cases[name].flip = flip;
+      cases[name].workspace = workspace([chain([b('start_on_click'), b('self_flip', { options: flip }),
+        b('wait', {}, { time: n(0) }),
+        store('before', b('bump', { sprite1: '__self', sprite2: floorId })),
+        store('after', b('bump', { sprite1: floorId, sprite2: actorId })),
+      ])], schema);
+      cases[name].otherWorkspace = workspace([chain([b('start_on_click'), b('self_flip', { options: flip })])], schema);
+    }
+  }
+  for (const rotation of [30, 45, 90, 135, 180, -45]) {
+    for (const x of [14, 16, 18, 20]) {
+      add(`review-rotated-${rotation}-${x}`, { rotation: rotation * Math.PI / 180 }, { x }, [20, 19]);
+    }
+  }
   return { actorId, floorId, template, cases };
 }
 
@@ -154,6 +186,10 @@ export function collisionProject(probes, spec) {
   const other = structuredClone(actor);
   Object.assign(actor, spec.a);
   Object.assign(other, { id: floorId, name: 'Other', block_data_json: { blocks: {}, connections: {}, comments: {} } }, spec.other);
+  if (spec.flip !== undefined) {
+    actor.block_data_json = structuredClone(spec.workspace);
+    other.block_data_json = structuredClone(spec.otherWorkspace);
+  }
   project.theatre.actors[floorId] = other;
   project.theatre.styles['probe-style'].width = spec.texture[0];
   project.theatre.styles['probe-style'].height = spec.texture[1];
@@ -240,14 +276,14 @@ async function main() {
   }
   await saveJson(evidencePath, report);
   const combined = combinedCollisions(collisions);
-  const collisionTrace = await runOracle(combined.project, { frames: 1, seed: 1, virtualTime: true });
+  const collisionTrace = await runOracle(combined.project, { frames: 4, seed: 1, virtualTime: true });
   await saveJson('dist/k4-r3-physics/collisions.official.json', collisionTrace);
   const collisionReport = { schema: 'nekoc-k4-r3-collision-v1', fixture: collisionFixturePath,
     sha256: sha256(JSON.stringify(collisions, null, 2) + '\n'),
     projectSha256: sha256(JSON.stringify(combined.project, null, 2) + '\n'), assets: collisionTrace.diagnostics.assets,
-    errors: collisionTrace.errors, pageErrors: collisionTrace.diagnostics.pageErrors,
+    errors: collisionTrace.errors, pageErrors: collisionTrace.diagnostics.pageErrors, frames: 4,
     cases: Object.fromEntries(Object.keys(combined.ids).map(name => [name,
-      Object.fromEntries(['before', 'after'].map(key => [key, collisionTrace.frames[0].variables[`${name}/${key}`]]))])) };
+      Object.fromEntries(['before', 'after'].map(key => [key, collisionTrace.frames.at(-1).variables[`${name}/${key}`]]))])) };
   await saveJson('docs/kitten4-r3-collision-evidence.json', collisionReport);
   console.log('collisions', JSON.stringify(collisionReport.cases));
 }
