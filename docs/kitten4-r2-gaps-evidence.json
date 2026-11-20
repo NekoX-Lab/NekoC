@@ -1,0 +1,2104 @@
+{
+  "schema": "nekoc-k4-r2-gaps-evidence-v1",
+  "cases": {
+    "identity": {
+      "sha256": "e80e27d4fb1471e4989d2d483847c2f872b412654b3cf5994b42fba7d248d19b",
+      "frames": [
+        {
+          "frame": 1,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "未登录用户",
+              0,
+              1
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 2,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "未登录用户",
+              0,
+              1
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 3,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "未登录用户",
+              0,
+              1
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 4,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "未登录用户",
+              0,
+              1
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        }
+      ],
+      "errors": [],
+      "pageErrors": [],
+      "externalRequests": [
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/kitten",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/sysinfo",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob%EF%BC%8Ficn_keyboard_nor.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob_icn_reset.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        }
+      ],
+      "executedBlocks": [
+        "start",
+        "generated-1",
+        "generated-2",
+        "name",
+        "generated-3",
+        "generated-4",
+        "user-id",
+        "generated-5",
+        "generated-6",
+        "online-count"
+      ]
+    },
+    "cloud-record": {
+      "sha256": "1605f6284fb5cb28dbd00b718fd71f69e5c024dcc9f819a66a13e67f0dc7de22",
+      "frames": [
+        {
+          "frame": 1,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "未登录用户/0/15/5",
+              "未登录用户",
+              0,
+              15,
+              5
+            ],
+            "shared": "未登录用户/0/15/5"
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result",
+            "shared": "shared"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 2,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "未登录用户/0/15/5",
+              "未登录用户",
+              0,
+              15,
+              5
+            ],
+            "shared": "未登录用户/0/15/5"
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result",
+            "shared": "shared"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 3,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "未登录用户/0/15/5",
+              "未登录用户",
+              0,
+              15,
+              5
+            ],
+            "shared": "未登录用户/0/15/5"
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result",
+            "shared": "shared"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 4,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "未登录用户/0/15/5",
+              "未登录用户",
+              0,
+              15,
+              5
+            ],
+            "shared": "未登录用户/0/15/5"
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result",
+            "shared": "shared"
+          },
+          "entity_variables": {}
+        }
+      ],
+      "errors": [],
+      "pageErrors": [],
+      "externalRequests": [
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/kitten",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/sysinfo",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob%EF%BC%8Ficn_keyboard_nor.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob_icn_reset.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        }
+      ],
+      "executedBlocks": [
+        "start",
+        "write-record",
+        "record",
+        "generated-1",
+        "generated-3",
+        "generated-4",
+        "generated-5",
+        "generated-6",
+        "generated-7",
+        "generated-8",
+        "generated-9",
+        "generated-10",
+        "generated-13",
+        "generated-14",
+        "generated-15",
+        "generated-16",
+        "generated-17",
+        "generated-20",
+        "generated-21",
+        "generated-22",
+        "generated-23",
+        "generated-24",
+        "generated-27",
+        "generated-28",
+        "generated-29",
+        "generated-30",
+        "generated-31"
+      ]
+    },
+    "face-pointer": {
+      "sha256": "27bb7f7414cdad0d7fa37f5252d0b882ba3e46d1beeefb6aec6adcacbdbe0a5d",
+      "frames": [
+        {
+          "frame": 1,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 1,
+            "result": []
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 2,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 2,
+            "result": []
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 3,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 3,
+            "result": []
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 4,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 4,
+            "result": []
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        }
+      ],
+      "errors": [],
+      "pageErrors": [],
+      "externalRequests": [
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/kitten",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/sysinfo",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob%EF%BC%8Ficn_keyboard_nor.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob_icn_reset.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        }
+      ],
+      "executedBlocks": [
+        "start",
+        "forever",
+        "face-pointer",
+        "continued"
+      ]
+    },
+    "move-pointer": {
+      "sha256": "f7e6ea652a5f84bbdac68b80bb029c4cade36e30b6501c53c8c4b3ab7f433877",
+      "frames": [
+        {
+          "frame": 1,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 1,
+            "result": []
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 2,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 2,
+            "result": []
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 3,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 3,
+            "result": []
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 4,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 4,
+            "result": []
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        }
+      ],
+      "errors": [],
+      "pageErrors": [],
+      "externalRequests": [
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/kitten",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/sysinfo",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob%EF%BC%8Ficn_keyboard_nor.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob_icn_reset.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        }
+      ],
+      "executedBlocks": [
+        "start",
+        "forever",
+        "move-pointer",
+        "continued"
+      ]
+    },
+    "relative-scenes": {
+      "sha256": "cbfe24aac2b600576abb84050bf1d74ec9be65fbae8304544312ebc4363cfd8c",
+      "frames": [
+        {
+          "frame": 1,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "first-boundary"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 2,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "first-boundary"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 3,
+          "current_scene_id": "10000000-0000-4000-8000-000000000002",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "first-boundary",
+              "next"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 4,
+          "current_scene_id": "10000000-0000-4000-8000-000000000002",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "first-boundary",
+              "next"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 5,
+          "current_scene_id": "10000000-0000-4000-8000-000000000002",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "first-boundary",
+              "next",
+              "last-boundary"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 6,
+          "current_scene_id": "10000000-0000-4000-8000-000000000002",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "first-boundary",
+              "next",
+              "last-boundary"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 7,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "first-boundary",
+              "next",
+              "last-boundary",
+              "previous"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 8,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "first-boundary",
+              "next",
+              "last-boundary",
+              "previous"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 9,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "first-boundary",
+              "next",
+              "last-boundary",
+              "previous"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 10,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "first-boundary",
+              "next",
+              "last-boundary",
+              "previous"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        }
+      ],
+      "errors": [],
+      "pageErrors": [],
+      "externalRequests": [
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/kitten",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/sysinfo",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob%EF%BC%8Ficn_keyboard_nor.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob_icn_reset.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        }
+      ],
+      "executedBlocks": [
+        "start",
+        "before-first",
+        "generated-2",
+        "generated-3",
+        "wait-first",
+        "next",
+        "generated-7",
+        "generated-8",
+        "wait-next",
+        "after-last",
+        "generated-12",
+        "generated-13",
+        "wait-last",
+        "previous",
+        "generated-17",
+        "generated-18"
+      ]
+    },
+    "unlisted-scene": {
+      "sha256": "f08f67c3ddec496a9c828e841e714dee665a2391e98d5ac496e649400eed2d21",
+      "frames": [
+        {
+          "frame": 1,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "continued"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 2,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "continued"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 3,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "continued"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 4,
+          "current_scene_id": "10000000-0000-4000-8000-000000000001",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "continued"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        }
+      ],
+      "errors": [],
+      "pageErrors": [],
+      "externalRequests": [
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/kitten",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/sysinfo",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob%EF%BC%8Ficn_keyboard_nor.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob_icn_reset.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        }
+      ],
+      "executedBlocks": [
+        "start",
+        "next",
+        "generated-2",
+        "generated-3"
+      ]
+    },
+    "unlisted-previous": {
+      "sha256": "09d9c8418934cdc89ff302de599b297a42bd2b1d2305cec13b0a6dd401108abe",
+      "frames": [
+        {
+          "frame": 1,
+          "current_scene_id": "10000000-0000-4000-8000-000000000002",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": []
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 2,
+          "current_scene_id": "10000000-0000-4000-8000-000000000002",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": []
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 3,
+          "current_scene_id": "10000000-0000-4000-8000-000000000002",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "continued"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 4,
+          "current_scene_id": "10000000-0000-4000-8000-000000000002",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "continued"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        }
+      ],
+      "errors": [],
+      "pageErrors": [],
+      "externalRequests": [
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/kitten",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/sysinfo",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob%EF%BC%8Ficn_keyboard_nor.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob_icn_reset.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        }
+      ],
+      "executedBlocks": [
+        "start",
+        "enter-unlisted",
+        "yield",
+        "previous",
+        "generated-4",
+        "generated-5"
+      ]
+    },
+    "unlisted-next": {
+      "sha256": "b7e5eeb40533f6aac77b5de6b8782f9fe569a668f3c970380a02cb60d7c07d40",
+      "frames": [
+        {
+          "frame": 1,
+          "current_scene_id": "10000000-0000-4000-8000-000000000002",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": []
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 2,
+          "current_scene_id": "10000000-0000-4000-8000-000000000002",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": []
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 3,
+          "current_scene_id": "10000000-0000-4000-8000-000000000002",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "continued"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        },
+        {
+          "frame": 4,
+          "current_scene_id": "10000000-0000-4000-8000-000000000002",
+          "actors": {
+            "20000000-0000-4000-8000-000000000001": {
+              "id": "20000000-0000-4000-8000-000000000001",
+              "prototype_id": "20000000-0000-4000-8000-000000000001",
+              "name": "Probe",
+              "x": 12,
+              "y": -7,
+              "rotation": 29.999999999999996,
+              "current_style_id": "costume-a",
+              "scale": 100,
+              "scale_y": 100,
+              "visible": true
+            }
+          },
+          "variables": {
+            "log": 0,
+            "result": [
+              "continued"
+            ]
+          },
+          "variable_names": {
+            "log": "log",
+            "result": "result"
+          },
+          "entity_variables": {}
+        }
+      ],
+      "errors": [],
+      "pageErrors": [],
+      "externalRequests": [
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/kitten",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://collection.codemao.cn/report/sysinfo",
+          "method": "POST",
+          "resourceType": "ping",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+          "method": "GET",
+          "resourceType": "script",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+          "method": "GET",
+          "resourceType": "xhr",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob%EF%BC%8Ficn_keyboard_nor.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        },
+        {
+          "url": "https://kn-cdn.codemao.cn/player-icons/mob_icn_reset.png",
+          "method": "GET",
+          "resourceType": "image",
+          "action": "blocked"
+        }
+      ],
+      "executedBlocks": [
+        "start",
+        "enter-unlisted",
+        "yield",
+        "next",
+        "generated-4",
+        "generated-5"
+      ]
+    }
+  },
+  "frames": 4,
+  "assets": [
+    {
+      "name": "player_v2__3ffeebbd0c789e8d9422.css",
+      "source": "player_v2__3ffeebbd0c789e8d9422.css",
+      "sha256": "39e8e70b124b604831773893cdc95931cdee3eaea52c6dd69f33f5781d48b45a"
+    },
+    {
+      "name": "player_v2.2d180c468559fbd29528.js",
+      "source": "player_v2.2d180c468559fbd29528.js.orig",
+      "sha256": "0f7933d51266add6cbad0682b9531036dc1c8daf8c522cde4243744376ce4160"
+    },
+    {
+      "name": "runtime.f42f527f119e09010b85.js",
+      "source": "runtime.f42f527f119e09010b85.js",
+      "sha256": "4164d67795238f64d035f473418236038ae475ae36032a967cba16ede263735f"
+    },
+    {
+      "name": "vendors.d00f4bd454a6352e9d71.js",
+      "source": "vendors.d00f4bd454a6352e9d71.js",
+      "sha256": "9f484cedbde10bcb82958aaf6cdeb24e40d5b52c3e825e027564402dd7977867"
+    },
+    {
+      "name": "9.c396696e9dc71e25b012.js",
+      "source": "9.c396696e9dc71e25b012.js",
+      "sha256": "5758343310c47596d56e954aa05fa76a546080c8bf4fefd41cac0042794d6195"
+    },
+    {
+      "name": "14.c95e6f2ddd61fb701d0e.js",
+      "source": "14.c95e6f2ddd61fb701d0e.js",
+      "sha256": "d3ce91c9113463db4c0988210caeb1be2ddc508499d5c53a8e73a13b5f440175"
+    },
+    {
+      "name": "11.477512e6f03fd2f6f3c5.js",
+      "source": "11.477512e6f03fd2f6f3c5.js",
+      "sha256": "e81bfe3462cc3e79a70ba016ddee2a372a31480d3f52964952e1d21f3a490f91"
+    }
+  ]
+}

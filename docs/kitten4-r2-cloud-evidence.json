@@ -1,0 +1,644 @@
+{
+  "schema": "r2-k4gaps-public-cloud-evidence-v1",
+  "kernelSha256": "0f7933d51266add6cbad0682b9531036dc1c8daf8c522cde4243744376ce4160",
+  "runnerSha256": "3d4a14fd5ca0553fbed6497f8233730ec6a873649e65acdad12349ddaa5b7953",
+  "oracleSha256": "e913d0e8925f33c3078ee458c42dc66ad326be152c9ae34636c80f937ca7dc53",
+  "detailedResultsSha256": "ff2031d162ffe491fe52c6aa1da8aebc05be28500cc1a9023e69d9b55e618e92",
+  "scope": "固定官方 .orig + 原创夹具；账户401由本地oracle返回；所有外部网络阻断；不代表官方在线云服务。",
+  "startedAt": "2026-11-19T14:53:03.378Z",
+  "completedAt": "2026-11-19T14:53:08.869Z",
+  "browserVersion": "157.0.4341.60",
+  "browserLaunches": 1,
+  "maxConcurrentBrowsers": 1,
+  "totalOfficialUpdates": 120,
+  "allVerified": true,
+  "cases": [
+    {
+      "id": "anonymous-401-list",
+      "status": "ran",
+      "fixture": "k4cloud-list.bcm",
+      "fixtureSha256": "47ff77796b9d163e21798652cff691575b0b87203be3e5b4efd8f457d4758a04",
+      "frames": 39,
+      "account401Observed": true,
+      "anonymousThroughout": true,
+      "globalModeAtFrameCallbacks": true,
+      "initialWorkId": null,
+      "injectedWorkId": null,
+      "beforeStart": {
+        "workId": null,
+        "isLogin": false,
+        "authType": null,
+        "runState": 0,
+        "runError": false,
+        "loadState": "load_done",
+        "socketConnected": false,
+        "cloudMetadataIds": [
+          "shared",
+          "personal",
+          "items"
+        ]
+      },
+      "injections": [],
+      "accountResponses": [
+        {
+          "path": "/web/users/details",
+          "method": "GET",
+          "status": 401
+        },
+        {
+          "path": "/web/users/details",
+          "method": "GET",
+          "status": 401
+        }
+      ],
+      "assets": [
+        {
+          "name": "runtime.f42f527f119e09010b85.js",
+          "sha256": "4164d67795238f64d035f473418236038ae475ae36032a967cba16ede263735f"
+        },
+        {
+          "name": "vendors.d00f4bd454a6352e9d71.js",
+          "sha256": "9f484cedbde10bcb82958aaf6cdeb24e40d5b52c3e825e027564402dd7977867"
+        },
+        {
+          "name": "player_v2.2d180c468559fbd29528.js",
+          "sha256": "0f7933d51266add6cbad0682b9531036dc1c8daf8c522cde4243744376ce4160"
+        },
+        {
+          "name": "9.c396696e9dc71e25b012.js",
+          "sha256": "5758343310c47596d56e954aa05fa76a546080c8bf4fefd41cac0042794d6195"
+        },
+        {
+          "name": "14.c95e6f2ddd61fb701d0e.js",
+          "sha256": "d3ce91c9113463db4c0988210caeb1be2ddc508499d5c53a8e73a13b5f440175"
+        },
+        {
+          "name": "11.477512e6f03fd2f6f3c5.js",
+          "sha256": "e81bfe3462cc3e79a70ba016ddee2a372a31480d3f52964952e1d21f3a490f91"
+        }
+      ],
+      "replacements": [
+        {
+          "blockId": "k4cloud-51",
+          "frame": 16,
+          "indexType": "number",
+          "params": {
+            "INDEX": 2,
+            "VALUE": "middle",
+            "VAR": "items",
+            "TYPE": "nth"
+          },
+          "observedRunStateAfterFrame": 1,
+          "socketConnectedAfterFrame": false,
+          "before": [
+            "head",
+            7,
+            "tail"
+          ],
+          "after": [
+            "head",
+            "middle",
+            "tail"
+          ]
+        },
+        {
+          "blockId": "k4cloud-58",
+          "frame": 19,
+          "indexType": "undefined",
+          "params": {
+            "VALUE": "end",
+            "VAR": "items",
+            "TYPE": "last"
+          },
+          "observedRunStateAfterFrame": 1,
+          "socketConnectedAfterFrame": false,
+          "before": [
+            "head",
+            "middle",
+            "tail"
+          ],
+          "after": [
+            "head",
+            "middle",
+            "end"
+          ]
+        },
+        {
+          "blockId": "k4cloud-82",
+          "frame": 31,
+          "indexType": "number",
+          "params": {
+            "INDEX": 99,
+            "VALUE": "appended",
+            "VAR": "items",
+            "TYPE": "nth"
+          },
+          "observedRunStateAfterFrame": 1,
+          "socketConnectedAfterFrame": false,
+          "before": [
+            "head",
+            "overflow"
+          ],
+          "after": [
+            "head",
+            "overflow",
+            "appended"
+          ]
+        }
+      ],
+      "runtimeErrors": 0,
+      "pageErrors": 0,
+      "allowedExternalRequests": 0,
+      "webSocketAttempts": 0,
+      "localWriteRequests": 0,
+      "checks": {
+        "account401Observed": true,
+        "anonymousThroughout": true,
+        "globalModeAtEveryFrameCallback": true,
+        "allReplaceBlocksCalled": true,
+        "noExternalTrafficAllowed": true,
+        "noLocalWriteRequests": true,
+        "noErrors": true,
+        "nthReplaceExpected": true,
+        "lastReplaceExpected": true,
+        "overflowReplaceAfterDisconnected": true
+      },
+      "verified": true
+    },
+    {
+      "id": "anonymous-401-list-numeric-work-id",
+      "status": "ran",
+      "fixture": "k4cloud-list.bcm",
+      "fixtureSha256": "47ff77796b9d163e21798652cff691575b0b87203be3e5b4efd8f457d4758a04",
+      "frames": 39,
+      "account401Observed": true,
+      "anonymousThroughout": true,
+      "globalModeAtFrameCallbacks": true,
+      "initialWorkId": null,
+      "injectedWorkId": 314915568,
+      "beforeStart": {
+        "workId": null,
+        "isLogin": false,
+        "authType": null,
+        "runState": 0,
+        "runError": false,
+        "loadState": "load_done",
+        "socketConnected": false,
+        "cloudMetadataIds": [
+          "shared",
+          "personal",
+          "items"
+        ]
+      },
+      "afterWorkIdInjection": {
+        "workId": 314915568,
+        "isLogin": false,
+        "authType": null,
+        "runState": 0,
+        "runError": false,
+        "loadState": "load_done",
+        "socketConnected": false,
+        "cloudMetadataIds": [
+          "shared",
+          "personal",
+          "items"
+        ]
+      },
+      "injections": [
+        {
+          "phase": "before-start",
+          "type": "numeric-work-id-state-only",
+          "value": 314915568,
+          "scope": "original fixture, not this corpus work"
+        }
+      ],
+      "accountResponses": [
+        {
+          "path": "/web/users/details",
+          "method": "GET",
+          "status": 401
+        },
+        {
+          "path": "/web/users/details",
+          "method": "GET",
+          "status": 401
+        }
+      ],
+      "assets": [
+        {
+          "name": "runtime.f42f527f119e09010b85.js",
+          "sha256": "4164d67795238f64d035f473418236038ae475ae36032a967cba16ede263735f"
+        },
+        {
+          "name": "vendors.d00f4bd454a6352e9d71.js",
+          "sha256": "9f484cedbde10bcb82958aaf6cdeb24e40d5b52c3e825e027564402dd7977867"
+        },
+        {
+          "name": "player_v2.2d180c468559fbd29528.js",
+          "sha256": "0f7933d51266add6cbad0682b9531036dc1c8daf8c522cde4243744376ce4160"
+        },
+        {
+          "name": "9.c396696e9dc71e25b012.js",
+          "sha256": "5758343310c47596d56e954aa05fa76a546080c8bf4fefd41cac0042794d6195"
+        },
+        {
+          "name": "14.c95e6f2ddd61fb701d0e.js",
+          "sha256": "d3ce91c9113463db4c0988210caeb1be2ddc508499d5c53a8e73a13b5f440175"
+        },
+        {
+          "name": "11.477512e6f03fd2f6f3c5.js",
+          "sha256": "e81bfe3462cc3e79a70ba016ddee2a372a31480d3f52964952e1d21f3a490f91"
+        }
+      ],
+      "replacements": [
+        {
+          "blockId": "k4cloud-51",
+          "frame": 16,
+          "indexType": "number",
+          "params": {
+            "INDEX": 2,
+            "VALUE": "middle",
+            "VAR": "items",
+            "TYPE": "nth"
+          },
+          "observedRunStateAfterFrame": 1,
+          "socketConnectedAfterFrame": false,
+          "before": [
+            "head",
+            7,
+            "tail"
+          ],
+          "after": [
+            "head",
+            "middle",
+            "tail"
+          ]
+        },
+        {
+          "blockId": "k4cloud-58",
+          "frame": 19,
+          "indexType": "undefined",
+          "params": {
+            "VALUE": "end",
+            "VAR": "items",
+            "TYPE": "last"
+          },
+          "observedRunStateAfterFrame": 1,
+          "socketConnectedAfterFrame": false,
+          "before": [
+            "head",
+            "middle",
+            "tail"
+          ],
+          "after": [
+            "head",
+            "middle",
+            "end"
+          ]
+        },
+        {
+          "blockId": "k4cloud-82",
+          "frame": 31,
+          "indexType": "number",
+          "params": {
+            "INDEX": 99,
+            "VALUE": "appended",
+            "VAR": "items",
+            "TYPE": "nth"
+          },
+          "observedRunStateAfterFrame": 1,
+          "socketConnectedAfterFrame": false,
+          "before": [
+            "head",
+            "overflow"
+          ],
+          "after": [
+            "head",
+            "overflow",
+            "appended"
+          ]
+        }
+      ],
+      "runtimeErrors": 0,
+      "pageErrors": 0,
+      "allowedExternalRequests": 0,
+      "webSocketAttempts": 0,
+      "localWriteRequests": 0,
+      "checks": {
+        "account401Observed": true,
+        "anonymousThroughout": true,
+        "globalModeAtEveryFrameCallback": true,
+        "allReplaceBlocksCalled": true,
+        "noExternalTrafficAllowed": true,
+        "noLocalWriteRequests": true,
+        "noErrors": true,
+        "nthReplaceExpected": true,
+        "lastReplaceExpected": true,
+        "overflowReplaceAfterDisconnected": true
+      },
+      "verified": true
+    },
+    {
+      "id": "controlled-connected-flag-no-reply",
+      "status": "ran",
+      "fixture": "k4cloud-list.bcm",
+      "fixtureSha256": "47ff77796b9d163e21798652cff691575b0b87203be3e5b4efd8f457d4758a04",
+      "frames": 39,
+      "account401Observed": true,
+      "anonymousThroughout": true,
+      "globalModeAtFrameCallbacks": true,
+      "initialWorkId": null,
+      "injectedWorkId": 314915568,
+      "beforeStart": {
+        "workId": null,
+        "isLogin": false,
+        "authType": null,
+        "runState": 0,
+        "runError": false,
+        "loadState": "load_done",
+        "socketConnected": false,
+        "cloudMetadataIds": [
+          "shared",
+          "personal",
+          "items"
+        ]
+      },
+      "afterWorkIdInjection": {
+        "workId": 314915568,
+        "isLogin": false,
+        "authType": null,
+        "runState": 0,
+        "runError": false,
+        "loadState": "load_done",
+        "socketConnected": false,
+        "cloudMetadataIds": [
+          "shared",
+          "personal",
+          "items"
+        ]
+      },
+      "injections": [
+        {
+          "phase": "before-start",
+          "type": "numeric-work-id-state-only",
+          "value": 314915568,
+          "scope": "original fixture, not this corpus work"
+        },
+        {
+          "afterFrame": 13,
+          "type": "socket-is-connected-flag-only",
+          "value": true,
+          "scope": "controlled branch test; no real socket or service reply"
+        },
+        {
+          "afterFrame": 19,
+          "type": "socket-is-connected-flag-only",
+          "value": false,
+          "scope": "controlled branch test; no real socket or service reply"
+        }
+      ],
+      "accountResponses": [
+        {
+          "path": "/web/users/details",
+          "method": "GET",
+          "status": 401
+        },
+        {
+          "path": "/web/users/details",
+          "method": "GET",
+          "status": 401
+        }
+      ],
+      "assets": [
+        {
+          "name": "runtime.f42f527f119e09010b85.js",
+          "sha256": "4164d67795238f64d035f473418236038ae475ae36032a967cba16ede263735f"
+        },
+        {
+          "name": "vendors.d00f4bd454a6352e9d71.js",
+          "sha256": "9f484cedbde10bcb82958aaf6cdeb24e40d5b52c3e825e027564402dd7977867"
+        },
+        {
+          "name": "player_v2.2d180c468559fbd29528.js",
+          "sha256": "0f7933d51266add6cbad0682b9531036dc1c8daf8c522cde4243744376ce4160"
+        },
+        {
+          "name": "9.c396696e9dc71e25b012.js",
+          "sha256": "5758343310c47596d56e954aa05fa76a546080c8bf4fefd41cac0042794d6195"
+        },
+        {
+          "name": "14.c95e6f2ddd61fb701d0e.js",
+          "sha256": "d3ce91c9113463db4c0988210caeb1be2ddc508499d5c53a8e73a13b5f440175"
+        },
+        {
+          "name": "11.477512e6f03fd2f6f3c5.js",
+          "sha256": "e81bfe3462cc3e79a70ba016ddee2a372a31480d3f52964952e1d21f3a490f91"
+        }
+      ],
+      "replacements": [
+        {
+          "blockId": "k4cloud-51",
+          "frame": 16,
+          "indexType": "number",
+          "params": {
+            "INDEX": 2,
+            "VALUE": "middle",
+            "VAR": "items",
+            "TYPE": "nth"
+          },
+          "observedRunStateAfterFrame": 1,
+          "socketConnectedAfterFrame": true,
+          "before": [
+            "head",
+            7,
+            "tail"
+          ],
+          "after": [
+            "head",
+            7,
+            "tail"
+          ]
+        },
+        {
+          "blockId": "k4cloud-58",
+          "frame": 19,
+          "indexType": "undefined",
+          "params": {
+            "VALUE": "end",
+            "VAR": "items",
+            "TYPE": "last"
+          },
+          "observedRunStateAfterFrame": 1,
+          "socketConnectedAfterFrame": true,
+          "before": [
+            "head",
+            7,
+            "tail"
+          ],
+          "after": [
+            "head",
+            7,
+            "tail"
+          ]
+        },
+        {
+          "blockId": "k4cloud-82",
+          "frame": 31,
+          "indexType": "number",
+          "params": {
+            "INDEX": 99,
+            "VALUE": "appended",
+            "VAR": "items",
+            "TYPE": "nth"
+          },
+          "observedRunStateAfterFrame": 1,
+          "socketConnectedAfterFrame": false,
+          "before": [
+            "head",
+            "overflow"
+          ],
+          "after": [
+            "head",
+            "overflow",
+            "appended"
+          ]
+        }
+      ],
+      "runtimeErrors": 0,
+      "pageErrors": 0,
+      "allowedExternalRequests": 0,
+      "webSocketAttempts": 0,
+      "localWriteRequests": 0,
+      "checks": {
+        "account401Observed": true,
+        "anonymousThroughout": true,
+        "globalModeAtEveryFrameCallback": true,
+        "allReplaceBlocksCalled": true,
+        "noExternalTrafficAllowed": true,
+        "noLocalWriteRequests": true,
+        "noErrors": true,
+        "nthReplaceExpected": true,
+        "lastReplaceExpected": true,
+        "overflowReplaceAfterDisconnected": true
+      },
+      "verified": true
+    },
+    {
+      "id": "anonymous-401-scalar-and-list-writes",
+      "status": "ran",
+      "fixture": "cloud-writes.bcm",
+      "fixtureSha256": "a48128c766fac38a0743cccf09e83a66209136d1316be75b83d980b49a31caeb",
+      "frames": 3,
+      "account401Observed": true,
+      "anonymousThroughout": true,
+      "globalModeAtFrameCallbacks": true,
+      "initialWorkId": null,
+      "injectedWorkId": null,
+      "beforeStart": {
+        "workId": null,
+        "isLogin": false,
+        "authType": null,
+        "runState": 0,
+        "runError": false,
+        "loadState": "load_done",
+        "socketConnected": false,
+        "cloudMetadataIds": [
+          "shared",
+          "personal",
+          "items"
+        ]
+      },
+      "injections": [],
+      "accountResponses": [
+        {
+          "path": "/web/users/details",
+          "method": "GET",
+          "status": 401
+        },
+        {
+          "path": "/web/users/details",
+          "method": "GET",
+          "status": 401
+        }
+      ],
+      "assets": [
+        {
+          "name": "runtime.f42f527f119e09010b85.js",
+          "sha256": "4164d67795238f64d035f473418236038ae475ae36032a967cba16ede263735f"
+        },
+        {
+          "name": "vendors.d00f4bd454a6352e9d71.js",
+          "sha256": "9f484cedbde10bcb82958aaf6cdeb24e40d5b52c3e825e027564402dd7977867"
+        },
+        {
+          "name": "player_v2.2d180c468559fbd29528.js",
+          "sha256": "0f7933d51266add6cbad0682b9531036dc1c8daf8c522cde4243744376ce4160"
+        },
+        {
+          "name": "9.c396696e9dc71e25b012.js",
+          "sha256": "5758343310c47596d56e954aa05fa76a546080c8bf4fefd41cac0042794d6195"
+        },
+        {
+          "name": "14.c95e6f2ddd61fb701d0e.js",
+          "sha256": "d3ce91c9113463db4c0988210caeb1be2ddc508499d5c53a8e73a13b5f440175"
+        },
+        {
+          "name": "11.477512e6f03fd2f6f3c5.js",
+          "sha256": "e81bfe3462cc3e79a70ba016ddee2a372a31480d3f52964952e1d21f3a490f91"
+        }
+      ],
+      "replacements": [
+        {
+          "blockId": "cloud-19",
+          "frame": 1,
+          "indexType": "number",
+          "params": {
+            "INDEX": 99,
+            "VALUE": "replacement",
+            "VAR": "items",
+            "TYPE": "nth"
+          },
+          "observedRunStateAfterFrame": 1,
+          "socketConnectedAfterFrame": false,
+          "before": null,
+          "after": [
+            "head",
+            "tail",
+            "inserted",
+            "replacement"
+          ]
+        }
+      ],
+      "finalScalars": {
+        "public": "room/message",
+        "private": 7
+      },
+      "runtimeErrors": 0,
+      "pageErrors": 0,
+      "allowedExternalRequests": 0,
+      "webSocketAttempts": 0,
+      "localWriteRequests": 0,
+      "checks": {
+        "account401Observed": true,
+        "anonymousThroughout": true,
+        "globalModeAtEveryFrameCallback": true,
+        "allReplaceBlocksCalled": true,
+        "noExternalTrafficAllowed": true,
+        "noLocalWriteRequests": true,
+        "noErrors": true,
+        "scalarAndListWrites": true
+      },
+      "verified": true
+    }
+  ],
+  "recommendation": "保留默认匿名未连接时的会话内本地云写；不要按account401整体改为no-op。连接标志为true的路径须单独处理，不将故障注入当在线服务认证。",
+  "limitations": [
+    "Account 401 is served by the existing local oracle, not a request to the production account service.",
+    "Normal Start uses vxpV.n with the existing deterministic oracle instrumentation.",
+    "Numeric work_id changes Redux state only; the original fixture and token URL remain.",
+    "Connected-without-reply sets only the branch flag after Start; no handshake, transport, server acknowledgement, or reconnect is simulated.",
+    "BeforeStart observations and frame snapshots do not invoke lazy variable/list getters.",
+    "No NekoC VM or local cloud backend is executed.",
+    "This fixture-only runner does not load or refresh historical corpus observations."
+  ]
+}
