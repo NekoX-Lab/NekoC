@@ -144,6 +144,8 @@ node tools/editor-compat.mjs hello.bcmkn
 
 ## 示例
 
+想从可操作的小作品开始？见 **[创作模板](samples/templates/README.md)**：移动与碰撞、菜单与场景切换、列表背包。每个模板附参数说明和操作方式，可独立编译为 `.bcmkn`。
+
 ### 事件和变量
 
 ```ts
