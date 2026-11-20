@@ -52,6 +52,55 @@ test('r3 KN unresolved play with no media callbacks has bounded wait',t=>{
   play(2);staleEnd();assert.deepEqual(done,[1]);advance(15000);assert.deepEqual(done,[1,2]);
 });
 
+for(const action of ['unlock','resume'])test(`r3 KN repeated ${action} without progress cannot renew the stall deadline`,t=>{
+  const {audio,Audio,play,advance,done,errors}=setup(t);
+  Audio.prototype.play=()=>new Promise(()=>{});
+  play(1);
+  // Reproduce continuous gameplay input for 1000 simulated seconds.
+  for(let i=0;i<100;i++){advance(10000);audio[action]();}
+  assert.deepEqual(done,[1]);assert.equal(errors.length,1);assert.match(errors[0],/15 秒/);
+  // Reuse is a new playback, unlike an unlock attempt.
+  play(2);advance(14999);assert.deepEqual(done,[1]);advance(1);assert.deepEqual(done,[1,2]);
+});
+
+test('r3 KN repeated unlock preserves observed progress and ignores stale play failures',async t=>{
+  const {audio,Audio,play,advance,elements,done,errors}=setup(t);const rejects=[];
+  Audio.prototype.play=()=>new Promise((_,reject)=>rejects.push(reject));
+  play(1);advance(10000);audio.unlock();
+  rejects[0](failure('NotAllowedError'));await tick();
+  assert.deepEqual(errors,[]);
+  // The retry starts moving: unlock must not erase a changed media position
+  // before checkProgress observes it.
+  elements[0].currentTime=1;audio.unlock();advance(4999);
+  rejects[1](failure('NotFoundError'));await tick();assert.deepEqual(errors,[]);
+  for(let i=2;i<=5;i++){
+    elements[0].currentTime=i;audio.unlock();advance(14000);assert.deepEqual(done,[]);
+  }
+  elements[0].onended();assert.deepEqual(done,[1]);assert.deepEqual(errors,[]);
+  rejects.at(-1)(failure('NotFoundError'));await tick();assert.deepEqual(errors,[]);
+});
+
+test('r3 KN autoplay unlock starts a new deadline once, not on every subsequent gesture',async t=>{
+  const {audio,Audio,play,advance,elements,done,errors}=setup(t);
+  Audio.prototype.play=()=>Promise.reject(failure('NotAllowedError'));
+  play(1);await tick();advance(60000);assert.deepEqual(done,[]);
+  Audio.prototype.play=()=>new Promise(()=>{});
+  audio.unlock();advance(10000);audio.unlock();advance(4999);assert.deepEqual(done,[]);
+  advance(1);assert.deepEqual(done,[1]);assert.equal(errors.length,2);
+  // A later authorized attempt may recover with real progress.
+  play(2);advance(10000);elements[0].currentTime=1;audio.unlock();advance(0);
+  advance(14999);assert.deepEqual(done,[1]);elements[0].onended();assert.deepEqual(done,[1,2]);
+});
+
+test('r3 KN genuine pause/resume resets the deadline but following unlocks do not',t=>{
+  const {audio,Audio,play,advance,done}=setup(t);
+  Audio.prototype.play=()=>new Promise(()=>{});
+  play(1);advance(14000);audio.pause();advance(120000);assert.deepEqual(done,[]);
+  audio.unlock();advance(10000);assert.deepEqual(done,[]);audio.resume();
+  advance(10000);audio.unlock();advance(4999);assert.deepEqual(done,[]);
+  advance(1);assert.deepEqual(done,[1]);
+});
+
 test('r3 KN progress and pause do not consume the stall deadline',t=>{
   const {audio,play,advance,elements,done}=setup(t);
   play(1);

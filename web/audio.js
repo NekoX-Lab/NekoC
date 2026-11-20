@@ -41,7 +41,13 @@ export class ProjectAudio {
   play(voice) {
     const generation=voice.generation;
     const attempt=++voice.attempt;
-    voice.progressAt=performance.now();voice.lastTime=voice.element.currentTime;voice.blocked=false;
+    // A play attempt is not media progress. Input gestures may retry this on
+    // every key/pointer event; only a new run or leaving autoplay denial starts
+    // a fresh deadline. Keep lastTime so progress before unlock is still seen.
+    if(voice.progressAt===undefined||voice.blocked){
+      voice.progressAt=performance.now();voice.lastTime=voice.element.currentTime;
+    }
+    voice.blocked=false;
     const failed=error=>{
       if(!voice.wanted||this.paused||generation!==voice.generation||attempt!==voice.attempt||error.name==='AbortError')return;
       voice.blocked=error.name==='NotAllowedError';
@@ -135,6 +141,7 @@ export class ProjectAudio {
       }
       voice.waits=command.wait?[command.wait]:[];
       voice.element.currentTime=0;voice.wanted=true;voice.generation++;
+      voice.progressAt=undefined;voice.blocked=false;
       this.bindEvents(voice,resource);
       if(!this.paused)this.play(voice);
     }
@@ -245,8 +252,10 @@ export class ProjectAudio {
   }
   pause(){this.paused=true;for(const voice of this.voices.values()){voice.attempt++;voice.element.pause();}this.midiContext?.suspend?.().catch(()=>{});globalThis.speechSynthesis?.pause();}
   resume(){
-    this.paused=false;for(const voice of this.voices.values())if(voice.wanted)this.play(voice);this.midiContext?.resume?.().catch(()=>{});
-    for(const item of this.speech)item.progressAt=undefined;
+    const wasPaused=this.paused;this.paused=false;
+    for(const voice of this.voices.values())if(voice.wanted){if(wasPaused)voice.progressAt=undefined;this.play(voice);}
+    this.midiContext?.resume?.().catch(()=>{});
+    if(wasPaused)for(const item of this.speech)item.progressAt=undefined;
     globalThis.speechSynthesis?.resume();
     for(const item of this.speech)if(!item.started&&item.utterance)this.startSpeech(item);
   }
