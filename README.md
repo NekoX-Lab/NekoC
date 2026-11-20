@@ -61,7 +61,7 @@ npm CLI 提供 `check`、`build`、`run --frames`。原生 `.bcm` 导出、`--te
 
 ### 3. 运行已有作品
 
-**有画面的播放器**：打开[浏览器播放器](https://nekox-lab.github.io/NekoC/play.html?engine=wasm)，导入作品；或者下载系统对应的[预编译包](docs/install.md)，Windows 双击 `start.cmd`，macOS / Linux 运行 `./start.sh`，在打开的页面拖入 `.bcmkn` / `.bcm`。原生包自带后端，运行作品无需 Rust 或 Node.js。
+**有画面的播放器**：打开[浏览器播放器](https://nekox-lab.github.io/NekoC/play/play.html?engine=wasm)，导入作品；或者下载系统对应的[预编译包](docs/install.md)，Windows 双击 `start.cmd`，macOS / Linux 运行 `./start.sh`，在打开的页面拖入 `.bcmkn` / `.bcm`。原生包自带后端，运行作品无需 Rust 或 Node.js。
 
 **命令行无头运行**：已装 npm 包后，打印指定帧数内的日志：
 
