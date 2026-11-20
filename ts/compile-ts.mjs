@@ -1316,10 +1316,12 @@ class WorkspaceCompiler {
           const helper = this.helperCalls.get(node);
           const name = helper?.name ?? calleeName(node.expression);
           const last = name?.split(".").at(-1);
-          if (["wait", "waitUntil", "ask", "askChoice", "broadcastAndWait", "tellAndWait", "syncTell",
+          // Match compileStatementCall: declared/imported functions shadow
+          // ambient APIs, including names such as say, think and wait.
+          if (this.inlineFunctions.has(name)) state = analyzeFunction(name);
+          else if (["wait", "waitUntil", "ask", "askChoice", "broadcastAndWait", "tellAndWait", "syncTell",
             "glideTo", "glideChangeX", "glideChangeY", "say", "think", "stageDialog",
             "playAudioAndWait", "fadeVisibility", "appearWith"].includes(last)) state = "yield";
-          else if (this.inlineFunctions.has(name)) state = analyzeFunction(name);
           else if (["warp", "repeatTimes", "repeatUntil", "forRange", "ifThen", "ifElse"].includes(name)) inlineControl = true;
           else if (name === "console.log" || name?.startsWith("Math.")
             || ["Number", "String", "Boolean", "clearTimeout", "clearInterval"].includes(name)) state = "sync";
@@ -1818,7 +1820,8 @@ class WorkspaceCompiler {
         }
         function ${worker}(__timerArg${n}) {
           while (__timerArg${n}.active) {
-            wait(__timerArg${n}.delay);
+            // Compiler-owned scheduling must not call a user's wait function.
+            self.wait(__timerArg${n}.delay);
             if (!__timerArg${n}.active) return;
             ${calleeName(node.expression) === "setTimeout" ? `__timerArg${n}.active = false;` : ""}
             __timerCallback${n}();

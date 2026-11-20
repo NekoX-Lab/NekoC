@@ -336,6 +336,43 @@ for (const [name, source, expected] of [
   }
 });
 
+for (const name of ["say", "think", "wait"]) {
+  for (const mode of ["cancel-timeout", "cancel-interval", "callback"]) {
+    test(`r3-tsasync synchronous user ${name} shadows the ambient API: ${mode}`, async () => {
+      const prefix = `let n = 0; function ${name}(value: number) { n += value; }`;
+      const iterate = `[1,2,3,4,5].forEach(v => { ${name}(v); });`;
+      const source = mode === "callback"
+        ? `${prefix} setTimeout(() => { ${iterate} console.log(n); }, 0); setTimeout(() => console.log(n), 0);`
+        : `${prefix} const h = ${mode === "cancel-interval" ? "setInterval" : "setTimeout"}(() => console.log(99), 0); ${iterate} clearTimeout(h); console.log(n);`;
+      const expected = mode === "callback" ? ["15", "15"] : ["15"];
+      assert.deepEqual(await nodeLogs(source), expected);
+      const report = compileFile(entry, hostFor(source));
+      const helpers = report.procedures.filter(p => /^__forEach\d+ \(implementation\)$/.test(p.name));
+      assert.ok(helpers.length);
+      assert.ok(helpers.every(p => Object.values(p.workspaceData.blocks).some(b => b.type === "warp")));
+      for (const actual of vmLogs(source, `shadow-${name}-${mode}`, {}, true)) assert.deepEqual(actual, expected);
+    });
+  }
+}
+
+test("r3-tsasync imported say keeps synchronous forEach atomic", async () => {
+  const dependency = "export function say(value: number) { console.log(value); }";
+  const source = 'import { say } from "./dependency"; const h = setTimeout(() => console.log(99), 0); [1,2,3].forEach(v => { say(v); }); clearTimeout(h);';
+  const expected = ["1", "2", "3"];
+  assert.deepEqual(await nodeLogs(dependency.replace("export ", "") + source.replace('import { say } from "./dependency";', "")), expected);
+  for (const actual of vmLogs(source, "imported-shadow-say", { "dependency.ts": dependency }, true)) assert.deepEqual(actual, expected);
+});
+
+test("r3-tsasync shadowed API names still propagate genuine cooperative waits", () => {
+  for (const name of ["say", "think"]) {
+    const report = compileFile(entry, hostFor(`function ${name}(value: number) { wait(0.01); console.log(value); }
+      setTimeout(() => {}, 0); [1,2].forEach(value => { ${name}(value); });`));
+    const helper = report.procedures.find(p => /^__forEach\d+ \(implementation\)$/.test(p.name));
+    assert.ok(helper);
+    assert.equal(Object.values(helper.workspaceData.blocks).some(b => b.type === "warp"), false);
+  }
+});
+
 test("r3-tsasync forEach guard covers unused, nested, waiting and imported callbacks", () => {
   for (const call of [
     "new Map<number,number>([[1,1]]).forEach(v => { console.log(v); });",
