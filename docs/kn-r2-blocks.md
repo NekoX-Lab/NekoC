@@ -100,6 +100,42 @@ SHA-256：`0be9bcf1696995dc1b7cc9f6d86c5abe9bbd0263641db17c5c24c388c0730885`。
   `dist/r2-knblocks/revision-official-{phase,extremes}.*`。这是未改写
   官方方法的局部执行，不宣称完整浏览器原生工程或像素端到端认证。
 
+### 第二次复审：组合动画与取消阶段
+
+- 接受 kids 与 glide 相互覆盖顺序的问题。KN 正有限时长 glide 与 kids
+  共用独立运动任务队列，普通脚本全部执行后按实际登记顺序更新，不按脚本
+  创建顺序或当前 ready cursor 推断；脚本内只保留运动 blocker。
+  Kitten 4 glide 及零时长即时路径不改为这套 KN 队列。
+- 固定官方包的 `moveTargetTo`（字符偏移 2236868）、
+  `changeTargetPosition`（2238261）均登记 TaskManager task；
+  module 34139 的 add_task push 与 update 顺序是上述调整的依据。
+  已重跑审查的 `official-mix.mjs`、`official-cli-samples.mjs`；
+  kids→glide（100px/0.5s）在 0/125/250ms 为 x=0/25/50。
+- 运动 owner 使用稳定 task id，不依赖会压缩的 interpreter 索引；
+  停止其他脚本立即禁止后继，但不删除本帧末更新。下次 update 入口清掉
+  已终止 owner 的运动，取消不触发终点校正，不允许多帧继续移动。
+  官方 dispose_block_group（4832429）及
+  dispose_other_block_groups_of_entity（4833034）只排队销毁；
+  官方 stop 探针 0/125/下一 update 的 x=10/35/35。
+- 全停会抑制剩余本帧 task 更新；restart 清空运动队列。KN 角色显式销毁
+  与固定官方 `destruct_entity`（4832226）一致，在下一 update 入口执行；
+  请求帧保留 drawable 和最后一次运动。实际删除、场景清理及 clone-cap
+  淘汰仍清掉该角色所有运动，防止复用 slot 后旧 task 写入新角色。
+- 本轮 `tests/kn_r2_blocks.rs` 新增两种动画启动顺序、不同终点的结束校正
+  与逐段笔迹、登记顺序不同于脚本创建顺序、停止当前/其他/其他角色/全部、
+  取消后多帧不移动及角色删除回归，JIT 开关均覆盖。
+- 局部官方探针只执行未改写的 helper/manager/task 方法与原创适配器；
+  停止探针的下一次 update disposal orchestration 为原创适配，不宣称
+  完整官方 update_dispose 或浏览器原生脚本端到端调度认证。证据仅留
+  忽略的 `dist/review-r2-knblocks-round2/` 与 `dist/r2-knblocks/round2-*`。
+- 本轮新 release 的审查原始夹具第 1/7/8/9 帧：glide 的 x 为
+  0/20/23.3333333333/26.6666666667，stop 为
+  10/30/33.3333333333/33.3333333333，停止后不再移动。仅补原生元数据
+  的副本通过官方 `/kids` editor-compat（8/7 blocks、均 `ok:true`），
+  同一 release 第 9 帧坐标及线程数与原件一致。49 作品各 600 帧仍为
+  47/49，输入哈希全部一致、原成功 47 项无回退；保留原有 physics
+  不支持和 return 缺 VALUE 两项明确失败，不宣称全语料全通过。
+
 ## 官方服务失败与代码占位块证据
 
 同一固定主包 `main.0f3db563.js` 的零基源码位置：
@@ -109,7 +145,7 @@ SHA-256：`0be9bcf1696995dc1b7cc9f6d86c5abe9bbd0263641db17c5c24c388c0730885`。
 | 摄像头面板 handler | 2189303 | `open_hide_camera` 等待 `turnOn`；失败后仍结束命令 |
 | webcam handler | 2213871 | `open_close_webcam` 共享摄像头状态 |
 | 摄像头 `turnOn` | 2047284 | 权限拒绝设置 `NO_PERMISSION`，发摄像头 STOP 事件后返回；不是作品 stop-all |
-| 摄像头 `turnOff` | 2053470 | 恢复关闭状态；未建立视频流时不重置 alpha |
+| 摄像头 `turnOff` | 2053470 | 恢复关闭状态；失败后的关闭重置 alpha，已关闭时重复关闭不重置，复核见 kn-r3-camera.md |
 | chat / preset / new conversation | 2200880 / 2201888 / 2202728 | 离线拒绝、清空答案缓存；没有成功回答 |
 | OCR actor / photo | 3496105 / 3497524 | 保留既有显式离线空结果 profile |
 | face / object detection | 2195152 / 2198141 | 未登录提前返回；不制造检测结果 |
@@ -138,14 +174,20 @@ WebSocket；随后切换 offline，CDP 摄像头权限设为 denied，不使用�
 consoleErrors；证据限于域函数和最小原生脚本，不作为完整编辑器/渲染认证。
 服务原生案例完整调度仅观察后继与独立脚本能继续，未声明微任务相位等价。
 
-实现：CLI 明确选择 `set_kn_offline_anonymous(true)` 与
-`set_kn_camera_unavailable(true)`，通过 JSON `kn_panel_notices` 输出去重提示
+实现（与 r3-camera 合并后的语义）：CLI 明确选择
+`set_kn_offline_anonymous(true)`，通过 JSON `kn_panel_notices` 输出去重提示
 `ai_offline` / `ai_login_required` / `ai_missing_model` / `camera_unavailable` /
-`translation_unavailable`。Engine 库默认不自动假定摄像头不可用或 AI 离线；
-未选择摄像头 profile 的 `turn_on` 在执行时明确诊断。摄像头失败保留 alpha，
-不创建流、画面或检测成功状态；通知在重启时清空，宿主 profile 保留。
-仅此代码占位块的明确布尔禁用状态可跳过，未禁用时给出含 block id 的诊断，
-未知积木仍报错，不以通用 no-op 伪装支持。
+`translation_unavailable`。Engine 库的 AI 仍须显式选择离线 profile；
+摄像头则使用 r3-camera 的无后端可恢复路径，不再额外要求摄像头 opt-in。
+摄像头打开失败当时保留 alpha，失败后关闭重置为 0.6，不创建流、画面或
+检测成功状态；通知与 capture 状态在重启时清空，AI profile 保留。
+所有通知共用 `PanelNotice` 与同一个去重队列，组合回归检查摄像头、AI、
+翻译通知并存、异步后继及重启后的再次通知。
+合入 r3-translator 后，四种转换占位块作为 statement 时的明确布尔禁用
+状态均保留专用跳过规则；value/boolean 占位块作为 reporter 时保留官方
+NaN/false、动态输入求值和 disabled_param 检查，见 kn-r3-translator-evidence.md。
+未禁用的 execution 占位块仍给出含 block id 的诊断，未知积木仍报错，
+不以通用 no-op 伪装支持。
 
 ## 复现
 

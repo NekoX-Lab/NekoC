@@ -1,15 +1,12 @@
-use super::{Engine, RuntimeSemantics};
+use super::Engine;
 
 impl Engine {
     // Official iNFq/destruct_entity queues destruction for update_dispose at
     // the next update entry. Scripts stop now, but the drawable and its local
     // state survive this frame. Scene cleanup and clone-cap eviction retain
-    // their separate immediate path; KN disposal is also unchanged.
+    // their separate immediate path. KN RuntimeManager/destruct_entity also
+    // queues forced interpreter disposal and entity destruction for next entry.
     pub(super) fn request_entity_disposal(&mut self, actor: usize) {
-        if self.program.semantics != RuntimeSemantics::Kitten4 {
-            self.delete_clone(actor);
-            return;
-        }
         if !self.k4_pending_disposals.contains(&actor) {
             self.k4_pending_disposals.push(actor);
         }

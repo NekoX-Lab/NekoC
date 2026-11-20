@@ -490,7 +490,7 @@ struct GlideSpec {
 }
 #[derive(Clone, Debug)]
 enum Anim {
-    KidsMotion(kn_kids::Motion),
+    KnMotion,
     Shake(k4_shake::Shake),
     EntityVisibility {
         start: f64,
@@ -3725,7 +3725,7 @@ impl Compiler {
                         if self.program.semantics == RuntimeSemantics::KnCurrent =>
                     {
                         bail!(
-                            "enabled KN code placeholder has no matching block at {}; replace it with a supported block or disable it",
+                            "enabled KN code placeholder {kind} has no matching block at {}; replace it with a supported block or disable it",
                             b["id"]
                         )
                     }
@@ -5302,6 +5302,7 @@ pub struct Engine {
     k4_shake_clock: k4_shake::Clock,
     k4_media: k4_media::State,
     kn_panel: kn_panel::State,
+    kn_motion: Vec<kn_kids::MotionTask>,
     kn_local: kn_local::State,
     oracle_events: Option<Vec<Value>>,
     evaluation_cache: Vec<BTreeMap<(bool, usize), VecDeque<Cell>>>,
@@ -5798,6 +5799,7 @@ impl Engine {
             k4_shake_clock: k4_shake::Clock::default(),
             k4_media: k4_media::State::default(),
             kn_panel: kn_panel::State::default(),
+            kn_motion: vec![],
             kn_local: kn_local::State::default(),
             trace_filter: None,
             trace_truncated: false,
@@ -5967,6 +5969,7 @@ impl Engine {
         self.answer = Cell::Text("".into());
         self.choice = (0.0, Cell::Text("".into()));
         self.tasks.clear();
+        self.kn_motion.clear();
         self.kn_timers.clear();
         self.next_task_id = 0;
         self.received.clear();
@@ -7938,6 +7941,9 @@ impl Engine {
         Ok(())
     }
     fn delete_clone(&mut self, index: usize) {
+        // Actual deletion also serves immediate scene/cap cleanup. Never let
+        // an old motion target a clone slot reused later in this same tick.
+        self.kn_motion.retain(|motion| motion.actor != index);
         self.k4_pending_disposals.retain(|&actor| actor != index);
         if !self.sprites[index].alive {
             return;
@@ -9804,6 +9810,7 @@ impl Engine {
             Op::Stop(scope) => {
                 if scope == 0 {
                     self.stopped = true;
+                    self.kn_motion.clear();
                     self.kn_timers.clear();
                     let audio = Cell::Text("all".into());
                     self.audio.stop(&audio);
@@ -10050,16 +10057,23 @@ impl Engine {
                 if !to.1.is_finite() {
                     to.1 = from.1;
                 }
-                self.tasks[index].anim = Some(Anim::Glide {
-                    start: self.time,
-                    duration: if duration.is_finite() {
-                        duration.max(0.0)
-                    } else {
-                        0.0
-                    },
-                    from,
-                    to,
-                });
+                if self.program.semantics == RuntimeSemantics::KnCurrent
+                    && duration.is_finite()
+                    && duration > 0.0
+                {
+                    self.start_kn_glide(index, actor, duration, from, to);
+                } else {
+                    self.tasks[index].anim = Some(Anim::Glide {
+                        start: self.time,
+                        duration: if duration.is_finite() {
+                            duration.max(0.0)
+                        } else {
+                            0.0
+                        },
+                        from,
+                        to,
+                    });
+                }
             }
             Op::Fade(time, show) => {
                 let duration = self.eval(time, actor);
@@ -10094,7 +10108,7 @@ impl Engine {
             Op::AnimStep => {
                 if matches!(
                     self.tasks[index].anim,
-                    Some(Anim::Shake(_) | Anim::KidsMotion(_))
+                    Some(Anim::Shake(_) | Anim::KnMotion)
                 ) {
                     self.tasks[index].pc = pc;
                     return Ok(false);
@@ -10107,7 +10121,7 @@ impl Engine {
                     return Ok(true);
                 };
                 let (start, duration) = match anim {
-                    Anim::KidsMotion(_) => unreachable!("kids motion stepped above"),
+                    Anim::KnMotion => unreachable!("KN motion advances at frame end"),
                     Anim::Shake(_) => unreachable!("shake advances at frame end"),
                     Anim::Glide {
                         start, duration, ..
@@ -10126,7 +10140,7 @@ impl Engine {
                 };
                 self.dirty[actor] = true;
                 match anim {
-                    Anim::KidsMotion(_) => unreachable!("kids motion stepped above"),
+                    Anim::KnMotion => unreachable!("KN motion advances at frame end"),
                     Anim::Shake(_) => unreachable!("shake advances at frame end"),
                     Anim::EntityVisibility { targets, show, .. } => {
                         self.update_entity_visibility(&targets, show, t);
@@ -10383,6 +10397,7 @@ impl Engine {
         #[cfg(feature = "interp-profile")]
         let _profile = interp_profile::span("tick", &());
         self.scheduler_tick += 1;
+        self.dispose_kn_motion();
         self.prune_extensions()?;
         if let Some(activation) = self.scene_activation.as_ref()
             && activation.completed(self.time)
@@ -10543,7 +10558,7 @@ impl Engine {
             }
         }
         self.tick_k4_shake();
-        self.tick_kn_kids_motion()?;
+        self.tick_kn_motion()?;
         self.tick_entity_visibility(dt);
         self.synchronize_soft_physics_geometry();
         // Rebase the round-robin cursor when finished tasks are compacted. Wait

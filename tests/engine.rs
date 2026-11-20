@@ -1666,7 +1666,11 @@ fn glide_interpolates_over_time_and_draws_pen_segments() {
     assert_eq!((f.sprites[0].x, f.sprites[0].y), (50.0, 25.0));
     assert!(!f.lines.is_empty());
     let f = vm.advance(0.25, 1000, budget).unwrap();
-    // Glide ends at its target; the zero-time relative glide applies immediately.
+    // KN TaskManager reaches the endpoint at frame end; the blocker is
+    // disposed at the next update, before the zero-time relative glide.
+    assert_eq!((f.sprites[0].x, f.sprites[0].y), (100.0, 50.0));
+    assert_eq!(f.active, 1);
+    let f = vm.advance(0.0, 1000, budget).unwrap();
     assert_eq!((f.sprites[0].x, f.sprites[0].y), (70.0, 50.0));
     assert_eq!(f.active, 0);
 }
@@ -1856,6 +1860,10 @@ fn clones_run_clone_hats_share_events_and_are_deleted() {
     let f = frame(&mut vm);
     // The original and all three clones receive the key; clones delete themselves.
     assert_eq!(vm.numeric_variables()[1], 4.0);
+    // RuntimeManager queues destruction for next update; drawable actors
+    // and their final registered motion task survive the requesting frame.
+    assert!(f.removed.is_empty());
+    let f = frame(&mut vm);
     assert_eq!(f.removed.len(), 3);
     assert_eq!(f.order.unwrap(), ["nekoc-default-actor"]);
     // Slots are reused: creating clones again does not grow without bound.

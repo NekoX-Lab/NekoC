@@ -168,7 +168,7 @@
 | 47 | `coordinate_of_sprite` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3002`<br>`src/engine.rs:3012` | T10, T29, T38, T41, T50 | 有路径；完整语义未验证 |
 | 48 | `create_stage_dialog` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4290`<br>`src/engine.rs:4298` | T50 | 有路径；完整语义未验证 |
 | 49 | `delete_list_item` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4670` | T10, T50, T54 | 有路径；完整语义未验证 |
-| 50 | `dispose_clone` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4557` | T1, T10, T49, T50 | 有路径；完整语义未验证 |
+| 50 | `dispose_clone` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4557` | T1, T10, T43, T49, T50 | 有路径；完整语义未验证 |
 | 51 | `distance_to` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3056`<br>`src/engine.rs:3065` | T29, T38, T50 | 有路径；完整语义未验证 |
 | 52 | `divisible_by` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2188`<br>`src/engine.rs:3211` | T10, T50 | 有路径；完整语义未验证 |
 | 53 | `effect_of_sprite` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3002`<br>`src/engine.rs:3167` | T29, T38, T41, T50 | 有路径；完整语义未验证 |
@@ -274,7 +274,7 @@
 | 153 | `microbit_sound_level` | 部分语义 | 官方硬件扩展定义／未安装 | `src/engine.rs:1958`<br>`src/engine.rs:2815` | T46 | 仅无连接 Promise 兑现为 numeric NaN；子表达式逐次跨 update 恢复，真实传感器未实现，复杂过程/调度组合未验证 |
 | 154 | `microbit_stop` | 部分语义 | 官方硬件扩展定义／未安装 | `src/engine.rs:3732` | T46 | 仅无连接 Promise 早退，求值输入后下一 update 继续；真实设备未实现，完整微任务/调度组合未验证 |
 | 155 | `microbit_temperature` | 部分语义 | 官方硬件扩展定义／未安装 | `src/engine.rs:1958`<br>`src/engine.rs:2815` | T46 | 仅无连接 Promise 兑现为 numeric NaN；子表达式逐次跨 update 恢复，真实传感器未实现，复杂过程/调度组合未验证 |
-| 156 | `mirror` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4257` | T1, T10, T16, T18, T20, T22, T42, T50 | 有路径；完整语义未验证 |
+| 156 | `mirror` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4257` | T1, T10, T16, T18, T20, T22, T42, T43, T50 | 有路径；完整语义未验证 |
 | 157 | `mouse_down` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2180`<br>`src/engine.rs:3177` | T15, T42, T50, T55 | 官方0.27.4完整原创工程/浏览器按下和无效目标实测见 docs/kn-partial.md；非法目标返回false，触摸/失焦及完整事件顺序未验证 |
 | 158 | `move_to_body_part` | 部分语义 | 可配置面板／默认隐藏 | `src/engine.rs:3821` | T33 | 仅无检测结果时不修改位置；检测后端未实现 |
 | 159 | `new_conversation` | 部分语义 | 可配置面板／默认隐藏 | `src/engine.rs:3781` | T33, T34, T36, T43 | 仅显式离线匿名 profile 的拒绝且保留缓存；真实新会话后端未实现 |
@@ -326,7 +326,7 @@
 | 205 | `self_face_to_sprite` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4166` | T50 | 有路径；完整语义未验证 |
 | 206 | `self_glide_coordinate_x` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4202` | T50 | 有路径；完整语义未验证 |
 | 207 | `self_glide_coordinate_y` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4202` | T50 | 有路径；完整语义未验证 |
-| 208 | `self_glide_to` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4202` | T10, T41, T50 | 有路径；完整语义未验证 |
+| 208 | `self_glide_to` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4202` | T10, T41, T43, T50 | 有路径；完整语义未验证 |
 | 209 | `self_go_forward` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4047` | T10, T13, T16, T47, T50, T59 | 有路径；完整语义未验证 |
 | 210 | `self_gradually_show_hide` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4241` | T10, T50 | 有路径；完整语义未验证 |
 | 211 | `self_listen` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3372` | T10, T13, T22, T50 | 有路径；完整语义未验证 |
@@ -381,7 +381,7 @@
 | 260 | `stamp` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4729`<br>`src/engine.rs:4755` | T10, T17, T41, T50 | 有路径；完整语义未验证 |
 | 261 | `start_as_a_mirror` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3392` | T1, T10, T16, T18 | 有路径；完整语义未验证 |
 | 262 | `start_on_click` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:3377` | T9, T10, T14, T50, T65 | 有路径；完整语义未验证 |
-| 263 | `stop` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4810` | T2, T10, T11, T12, T16, T21, T23, T49, T50, T63 | 有路径；完整语义未验证 |
+| 263 | `stop` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4810` | T2, T10, T11, T12, T16, T21, T23, T43, T49, T50, T63 | 有路径；完整语义未验证 |
 | 264 | `stop_audio` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4665` | T2, T10, T50, T57 | 有路径；完整语义未验证 |
 | 265 | `stop_robot2_master_motor` | 部分语义 | 官方硬件扩展定义／未安装 | `src/engine.rs:3732` | T46 | 仅无连接 Promise 早退，求值输入后下一 update 继续；真实设备未实现，完整微任务/调度组合未验证 |
 | 266 | `stop_robot_master_light` | 部分语义 | 官方硬件扩展定义／未安装 | `src/engine.rs:3732` | T46 | 仅无连接 Promise 早退，求值输入后下一 update 继续；真实设备未实现，完整微任务/调度组合未验证 |
