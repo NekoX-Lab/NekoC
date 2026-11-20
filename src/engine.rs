@@ -40,6 +40,7 @@ mod kn_catalog;
 mod kn_conversion;
 mod kn_hardware;
 mod kn_helpers;
+mod kn_kids;
 mod kn_local;
 mod kn_objects;
 mod kn_panel;
@@ -468,6 +469,7 @@ enum Op {
     LegacyPhysicsVector(physics::Command, usize, usize),
     K4LegacyChoice,
     KnPanel(kn_panel::Command),
+    KnKidsMove(kn_kids::Direction, usize),
 }
 #[derive(Clone, Copy, Debug)]
 enum LayerMove {
@@ -488,6 +490,7 @@ struct GlideSpec {
 }
 #[derive(Clone, Debug)]
 enum Anim {
+    KidsMotion(kn_kids::Motion),
     Shake(k4_shake::Shake),
     EntityVisibility {
         start: f64,
@@ -3718,6 +3721,14 @@ impl Compiler {
                     {
                         Op::Execute(self.value(b)?)
                     }
+                    "bcm_translator_text_execution_block"
+                        if self.program.semantics == RuntimeSemantics::KnCurrent =>
+                    {
+                        bail!(
+                            "enabled KN code placeholder has no matching block at {}; replace it with a supported block or disable it",
+                            b["id"]
+                        )
+                    }
                     "microbit_led_clear"
                     | "microbit_led_plot"
                     | "microbit_led_plot_graph"
@@ -4020,6 +4031,19 @@ impl Compiler {
                         true,
                     ),
                     "kitten4_hide_ranking" => Op::Ranking(None, false),
+                    "kids_move_right" | "kids_move_left" | "kids_move_up" | "kids_move_down"
+                        if self.program.semantics == RuntimeSemantics::KnCurrent =>
+                    {
+                        let direction = match kind {
+                            "kids_move_right" => kn_kids::Direction::Right,
+                            "kids_move_left" => kn_kids::Direction::Left,
+                            "kids_move_up" => kn_kids::Direction::Up,
+                            _ => kn_kids::Direction::Down,
+                        };
+                        let steps = self.value(input(b, "steps")?)?;
+                        self.emit(Op::KnKidsMove(direction, steps), b);
+                        Op::AnimStep
+                    }
                     "self_go_forward" => Op::Move(self.arg(b, "steps")?),
                     "self_move_to" => Op::Position(self.arg(b, "x")?, self.arg(b, "y")?),
                     "self_set_position_x" => Op::X(self.arg(b, "value")?),
@@ -9156,6 +9180,7 @@ impl Engine {
             | Op::Physics(..)
             | Op::K4Media(_)
             | Op::KnPanel(_)
+            | Op::KnKidsMove(..)
             | Op::Extension(_)
             | Op::Audio(..)
             | Op::AudioProperty(..)
@@ -10078,7 +10103,15 @@ impl Engine {
                 let Some(anim) = self.tasks[index].anim.clone() else {
                     return Ok(true);
                 };
+                if let Anim::KidsMotion(motion) = anim {
+                    if !self.step_kn_kids_motion(index, actor, motion) {
+                        self.tasks[index].pc = pc;
+                        return Ok(false);
+                    }
+                    return Ok(true);
+                }
                 let (start, duration) = match anim {
+                    Anim::KidsMotion(_) => unreachable!("kids motion stepped above"),
                     Anim::Shake(_) => unreachable!("shake advances at frame end"),
                     Anim::Glide {
                         start, duration, ..
@@ -10097,6 +10130,7 @@ impl Engine {
                 };
                 self.dirty[actor] = true;
                 match anim {
+                    Anim::KidsMotion(_) => unreachable!("kids motion stepped above"),
                     Anim::Shake(_) => unreachable!("shake advances at frame end"),
                     Anim::EntityVisibility { targets, show, .. } => {
                         self.update_entity_visibility(&targets, show, t);

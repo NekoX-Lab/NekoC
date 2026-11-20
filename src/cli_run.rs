@@ -42,6 +42,10 @@ pub fn run_with_input(
     let mut engine = Engine::new(Program::compile(project)?);
     engine.use_virtual_clock();
     engine.set_random_seed(seed);
+    // The headless CLI has no KN login/network service host. Explicitly select
+    // the verified offline rejection branches; the reusable Engine stays strict
+    // unless its caller chooses this profile. No AI result is synthesized.
+    engine.set_kn_offline_anonymous(true);
     if let Some(backend) = cloud.backend() {
         engine.set_cloud_backend(
             backend,
@@ -121,6 +125,7 @@ pub fn run_with_input(
     snapshot["stage_dialog"] = stage_dialog;
     snapshot["extension_requests"] = json!(extension_requests);
     snapshot["k4_media_output"] = json!(device_output);
+    snapshot["kn_panel_notices"] = serde_json::to_value(engine.take_kn_panel_notices())?;
     Ok(snapshot)
 }
 

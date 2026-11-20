@@ -49,6 +49,9 @@ impl Engine {
             Op::KnPanel(command) => {
                 return self.exec_kn_panel(index, actor, command).map(Some);
             }
+            Op::KnKidsMove(direction, value) => {
+                self.start_kn_kids_motion(index, actor, direction, value);
+            }
             Op::LegacyPhysicsVector(command, value, dir) => {
                 let number = |v| match v {
                     Cell::Number(n) => n,
