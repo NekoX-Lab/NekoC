@@ -108,6 +108,17 @@ c.rgb=r*c.a;}
 if(fxA.y!=0.){c.rgb=clamp(c.rgb+fxA.y/100.*c.a,0.,c.a);}}
 outColor=c*(packedTint?tint:vec4(tint.rgb*alpha,alpha));}`;
 
+// Only consecutive, effect-free draws sharing a texture are instanced. Keep
+// the original shader arithmetic (including trig on the GPU) and primitive
+// order: regrouping translucent objects by texture would change the pixels.
+const BATCH_VERTEX = TEXTURE_VERTEX.replace(
+  'uniform vec2 position;uniform vec2 dimensions;uniform float angle;',
+  'layout(location=0) in vec2 position;layout(location=1) in vec2 dimensions;layout(location=2) in float angle;layout(location=3) in vec4 instanceTint;flat out vec4 tint;'
+).replace('uv=corner();','tint=instanceTint;uv=corner();');
+const BATCH_FRAGMENT = TEXTURE_FRAGMENT.replace('uniform vec4 tint;','flat in vec4 tint;');
+const TEXTURE_BATCH_SIZE = 1024;
+const STAMP_CACHE_BYTES = 8 * 1024 * 1024;
+
 // Original screen-space resampling passes. K4 filters rasterize the transformed
 // actor first: cells remain aligned to the filter rectangle, even on rotation.
 const K4_FILTER_VERTEX = `#version 300 es
@@ -207,6 +218,7 @@ export class StageRenderer {
     this.stats = { drawCalls: 0, penInstances: 0, submitMs: 0, framebufferBytes: 0, textureBytes: 0 };
     this.gpuTimer=gl.getExtension('EXT_disjoint_timer_query_webgl2');this.gpuQueries=[];this.stats.gpuMs=null;
     this.textCache = new Map(); this.textCanvas = document.createElement('canvas');
+    this.stampCache = new Map();this.stats.stampTextureBytes=0;this.stats.stampUploads=0;
     this.stats.textTextureBytes=0; this.stats.textUploads=0; this.stats.textStamps=0;
     this.generation = 0; this.lost = false;
     this.videos=new Map();this.mediaPaused=false;
@@ -215,6 +227,7 @@ export class StageRenderer {
   }
 
   async load(project, onProgress=()=>{}) {
+    this.flushTextureBatch();
     this.clearSceneTransition();
     const generation = ++this.generation;
     this.loadController?.abort();this.loadController=new AbortController();const {signal}=this.loadController;
@@ -235,6 +248,8 @@ export class StageRenderer {
     for(const item of this.textCache.values())gl.deleteTexture(item.texture);
     for(const item of this.spriteTexts?.values()||[])gl.deleteTexture(item.texture);this.spriteTexts?.clear();
     this.textCache.clear();this.stats.textTextureBytes=0;
+    for(const item of this.stampCache.values())gl.deleteTexture(item.texture);
+    this.stampCache.clear();this.stats.stampTextureBytes=0;
     for (const surface of this.surfaces?.values() || []) { gl.deleteFramebuffer(surface.framebuffer); gl.deleteTexture(surface.texture); }
     this.surfaces = new Map();
     this.width = Number(project.stageSize?.width || 900); this.height = Number(project.stageSize?.height || 562);
@@ -333,6 +348,7 @@ export class StageRenderer {
   }
 
   drawVideos(){
+    this.flushTextureBatch();
     const gl=this.gl;
     for(const v of this.videos.values()){
       const s=v.state;if(s.visible===false||v.element.readyState<2)continue;
@@ -526,6 +542,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     if(frame.scene&&frame.scene!==this.sceneId)this.switchScene(frame.scene,frame.transition);
     this.stats.drawCalls = 0; this.stats.penInstances = lines.length / 9;
     this.stats.textUploads=0;this.stats.textStamps=stamps.length;
+    this.stats.stampUploads=0;
     this.collectGpuTimes();
     const layerChanged=Number.isInteger(frame.pen_layer)&&frame.pen_layer!==this.penLayer;
     if(layerChanged)this.penLayer=frame.pen_layer;
@@ -543,11 +560,14 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
       gl.bufferSubData(gl.ARRAY_BUFFER,0,lines);
     }
     let cursor=0;
+    this.textureBatchActive=true;
+    try{
     for(const stamp of stamps){
       this.drawLines(cursor,stamp.before_line-cursor);cursor=stamp.before_line;
       if(stamp.fill)this.drawPenFill(stamp);else if(stamp.image)this.drawImageStamp(stamp);else this.drawTextStamp(stamp);
     }
     this.drawLines(cursor,lines.length/9-cursor);
+    }finally{this.flushTextureBatch();this.textureBatchActive=false;}
     gl.bindFramebuffer(gl.FRAMEBUFFER,null);
     let changed=!!frame.reset||layerChanged;
     if(frame.reset){this.sprites=[];this.spriteIndices.clear();}
@@ -582,6 +602,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
 
   drawLines(start,count){
     if(!count)return;
+    this.flushTextureBatch();
     if(this.kitten4)return drawK4PenLines(this,this.k4PenLines,start,count);
     const gl=this.gl;
     gl.useProgram(this.pen);gl.uniform2f(this.penSize,this.width,this.height);
@@ -591,6 +612,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
   }
 
   drawPenFill(fill){
+    this.flushTextureBatch();
     // Canvas supplies nonzero winding and antialiasing for concave/self-crossing
     // paths, just like official Rt.draw_fill_pattern; only this delta is uploaded.
     const gl=this.gl,canvas=this.fillCanvas??=document.createElement('canvas');
@@ -627,6 +649,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     if(width>limit||height>limit||bytes>maxBytes)throw Error('文字印章超过纹理缓存上限');
     while(this.textCache.size>=128||this.stats.textTextureBytes+bytes>maxBytes){
       const [oldKey,old]=this.textCache.entries().next().value;
+      this.flushTextureBatch();
       gl.deleteTexture(old.texture);this.textCache.delete(oldKey);this.stats.textTextureBytes-=old.bytes;
     }
     canvas.width=width;canvas.height=height;
@@ -660,7 +683,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     for(let i=0;i<alpha.length;i++)alpha[i]=rgba[i*4+3];
     item={texture,source:canvas,width:canvas.width,height:canvas.height,alpha};
     this.spriteTexts.set(key,item);
-    if(this.spriteTexts.size>256){const [oldKey,old]=this.spriteTexts.entries().next().value;gl.deleteTexture(old.texture);this.spriteTexts.delete(oldKey);}
+    if(this.spriteTexts.size>256){const [oldKey,old]=this.spriteTexts.entries().next().value;this.flushTextureBatch();gl.deleteTexture(old.texture);this.spriteTexts.delete(oldKey);}
     return item;
   }
   spriteImage(a){return a.text?this.spriteTextImage(a.text):this.images.get(a.style);}
@@ -761,6 +784,8 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     // The native brush rasterizes the transformed destination in Canvas. A
     // transformed GL quad has different edge coverage on rotated/alpha stamps.
     const g=k4ImageStampGeometry(stamp,image),sx=this.canvas.width/this.width,sy=this.canvas.height/this.height;
+    const key=JSON.stringify(['image',stamp.style,this.width,this.height,sx,sy,g.x,g.y,g.width,g.height,g.angle]);
+    if(this.drawCachedStamp(key))return;
     const c=Math.cos(g.angle),s=Math.sin(g.angle),w=Math.abs(g.width),h=Math.abs(g.height);
     if(!w||!h)return;
     const ox=this.width/2+g.x,oy=this.height/2-g.y;
@@ -773,10 +798,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     canvas.width=right-left;canvas.height=bottom-top;
     ctx.setTransform(sx,0,0,sy,-left,-top);ctx.translate(ox,oy);ctx.rotate(g.angle);
     ctx.scale(Math.sign(g.width),Math.sign(g.height));ctx.drawImage(image.source,-w/2,-h/2,w,h);
-    const gl=this.gl,texture=this.stampTexture??=this.makeTexture(1,1);
-    gl.bindTexture(gl.TEXTURE_2D,texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,canvas);
-    this.drawTexture(texture,(left+right)/2/sx-this.width/2,this.height/2-(top+bottom)/2/sy,canvas.width/sx,canvas.height/sy);
+    this.uploadStamp(key,canvas,left,right,top,bottom,sx,sy);
   }
 
   // Costume sizes plus opacity masks (<=128x128, 1 bit per cell) for VM collisions;
@@ -811,11 +833,15 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     // Rt.draw_text_stamp rasterizes AFTER rotating the Canvas context. Rotating
     // a pre-rasterized glyph texture instead applies a second interpolation and
     // changes small/CJK glyphs. Upload just the resulting pixel-aligned bounds.
+    const sx=this.canvas.width/this.width,sy=this.canvas.height/this.height;
+    // Position, scale and clipping are part of the key. Reusing a rotated glyph
+    // at another subpixel phase is not equivalent to Canvas rasterization.
+    const key=JSON.stringify(['text',this.width,this.height,sx,sy,stamp.text,stamp.size,stamp.direction,stamp.align,stamp.x,stamp.y,stamp.color]);
+    if(this.drawCachedStamp(key))return;
     const canvas=this.stampCanvas??=document.createElement('canvas'),ctx=canvas.getContext('2d');
     const font=`bold ${stamp.size}px Arial, "Microsoft YaHei"`,angle=stamp.direction*Math.PI/180;
     ctx.font=font;ctx.textBaseline='middle';ctx.textAlign=stamp.align;
     const m=ctx.measureText(stamp.text),c=Math.cos(angle),s=Math.sin(angle);
-    const sx=this.canvas.width/this.width,sy=this.canvas.height/this.height;
     const ox=this.width/2+stamp.x,oy=this.height/2-stamp.y;
     const corners=[[-m.actualBoundingBoxLeft,-m.actualBoundingBoxAscent],[m.actualBoundingBoxRight,-m.actualBoundingBoxAscent],[-m.actualBoundingBoxLeft,m.actualBoundingBoxDescent],[m.actualBoundingBoxRight,m.actualBoundingBoxDescent]];
     const xs=corners.map(([x,y])=>(ox+c*x-s*y)*sx),ys=corners.map(([x,y])=>(oy+s*x+c*y)*sy);
@@ -826,15 +852,69 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     ctx.setTransform(sx,0,0,sy,-left,-top);ctx.translate(ox,oy);ctx.rotate(angle);
     ctx.font=font;ctx.textBaseline='middle';ctx.textAlign=stamp.align;
     ctx.fillStyle=`rgb(${stamp.color.slice(0,3).map(v=>Math.round(v*255)).join(',')})`;ctx.globalAlpha=stamp.color[3];ctx.fillText(stamp.text,0,0);
-    const gl=this.gl,texture=this.stampTexture??=this.makeTexture(1,1);
+    this.uploadStamp(key,canvas,left,right,top,bottom,sx,sy);
+  }
+
+  drawCachedStamp(key){
+    const item=this.stampCache.get(key);if(!item)return false;
+    this.stampCache.delete(key);this.stampCache.set(key,item);
+    this.drawTexture(item.texture,...item.geometry);return true;
+  }
+
+  uploadStamp(key,canvas,left,right,top,bottom,sx,sy){
+    const gl=this.gl,bytes=canvas.width*canvas.height*4,cacheable=bytes<=STAMP_CACHE_BYTES;
+    while(cacheable&&this.stampCache.size&&(this.stampCache.size>=128||this.stats.stampTextureBytes+bytes>STAMP_CACHE_BYTES)){
+      const [oldKey,old]=this.stampCache.entries().next().value;
+      this.flushTextureBatch();gl.deleteTexture(old.texture);this.stampCache.delete(oldKey);this.stats.stampTextureBytes-=old.bytes;
+    }
+    // Oversized rasters keep the original single scratch texture, not an
+    // unbounded entry. Submit users before overwriting or evicting a texture.
+    if(!cacheable)this.flushTextureBatch();
+    const texture=cacheable?this.makeTexture(1,1):(this.stampTexture??=this.makeTexture(1,1));
     gl.bindTexture(gl.TEXTURE_2D,texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,canvas);
-    this.drawTexture(texture,(left+right)/2/sx-this.width/2,this.height/2-(top+bottom)/2/sy,canvas.width/sx,canvas.height/sy);
+    const geometry=[(left+right)/2/sx-this.width/2,this.height/2-(top+bottom)/2/sy,canvas.width/sx,canvas.height/sy];
+    if(cacheable){this.stampCache.set(key,{texture,geometry,bytes});this.stats.stampTextureBytes+=bytes;}
+    this.stats.stampUploads++;this.drawTexture(texture,...geometry);
+  }
+
+  queueTexture(texture,x,y,width,height,angle,tint){
+    let batch=this.textureBatch;
+    if(!batch){
+      const gl=this.gl,p=program(gl,BATCH_VERTEX,BATCH_FRAGMENT);
+      batch=this.textureBatch={program:p,vao:gl.createVertexArray(),buffer:gl.createBuffer(),
+        data:new Float32Array(TEXTURE_BATCH_SIZE*9),count:0,uniform:Object.fromEntries(Object.keys(this.uniform).map(k=>[k,gl.getUniformLocation(p,k)]))};
+      gl.bindVertexArray(batch.vao);gl.bindBuffer(gl.ARRAY_BUFFER,batch.buffer);
+      gl.bufferData(gl.ARRAY_BUFFER,batch.data.byteLength,gl.DYNAMIC_DRAW);
+      for(const [location,size,offset]of [[0,2,0],[1,2,8],[2,1,16],[3,4,20]]){
+        gl.enableVertexAttribArray(location);gl.vertexAttribPointer(location,size,gl.FLOAT,false,36,offset);gl.vertexAttribDivisor(location,1);
+      }
+      gl.bindVertexArray(null);
+    }
+    if(batch.count&&(batch.texture!==texture||batch.count===TEXTURE_BATCH_SIZE))this.flushTextureBatch();
+    batch.texture=texture;
+    batch.data.set([x,y,width,height,angle,...tint],batch.count++*9);
+  }
+
+  flushTextureBatch(){
+    const batch=this.textureBatch;if(!batch?.count)return;
+    const gl=this.gl,u=batch.uniform;
+    gl.useProgram(batch.program);gl.uniform2f(u.stageSize,this.width,this.height);gl.uniform1i(u.image,0);
+    gl.uniform1i(u.kitten4,this.kitten4?1:0);gl.uniform1i(u.packedTint,0);
+    gl.uniform4f(u.fxA,0,0,0,0);gl.uniform2f(u.fxB,0,0);gl.uniform2f(u.repeatUV,0,0);
+    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,batch.texture);
+    gl.bindVertexArray(batch.vao);gl.bindBuffer(gl.ARRAY_BUFFER,batch.buffer);
+    gl.bufferSubData(gl.ARRAY_BUFFER,0,batch.data.subarray(0,batch.count*9));
+    gl.drawArraysInstanced(gl.TRIANGLES,0,6,batch.count);gl.bindVertexArray(null);
+    this.stats.drawCalls++;batch.count=0;
   }
 
   drawTexture(texture,x,y,width,height,angle=0,tint=[1,1,1,1],effects=null,texSize=null,repeatUV=null,filterCenter=null,packedTint=false) {
+    const batchable=this.textureBatchActive&&!this.k4Filtering&&!repeatUV&&!packedTint&&!effects?.some((value,i)=>i!==1&&value!==0);
+    if(!batchable&&this.textureBatch?.count)this.flushTextureBatch();
     if(this.kitten4&&effects&&(effects[3]>=1||effects[5]>0||effects[7]>=1)&&!this.k4Filtering)return this.drawK4SpatialTexture(texture,x,y,width,height,angle,tint,effects,texSize,repeatUV,filterCenter);
     if(this.sceneTransform){const t=this.sceneTransform;x+=t.x;y-=t.y;tint=[tint[0],tint[1],tint[2],tint[3]*t.alpha];}
+    if(batchable){this.queueTexture(texture,x,y,width,height,angle,tint);return;}
     const gl=this.gl,u=this.uniform,e=effects||NO_EFFECTS;
     gl.useProgram(this.texture); gl.uniform2f(u.stageSize,this.width,this.height); gl.uniform2f(u.position,x,y);
     gl.uniform2f(u.dimensions,width,height); gl.uniform1f(u.angle,angle); gl.uniform1i(u.image,0);
@@ -849,6 +929,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
   }
 
   drawSoftMesh(a,image){
+    this.flushTextureBatch();
     const mesh=a.soft_mesh;
     if(!mesh.triangles.length||!mesh.vertices.length)return;
     const sx=this.canvas.width/this.width,sy=this.canvas.height/this.height;
@@ -1017,6 +1098,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     const gl=this.gl;
     this.sceneTransform=transform;
     this.sceneScreenshot=!!framebuffer;
+    this.textureBatchActive=true;
     try{
     gl.bindFramebuffer(gl.FRAMEBUFFER,framebuffer);gl.viewport(0,0,this.canvas.width,this.canvas.height);
     // Scene layers must stay transparent: white is the stage clear colour, not
@@ -1050,7 +1132,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
       if(image){const {x,y,width,height,angle}=actorGeometry(a,image,this.kitten4);
         this.drawTexture(image.texture,x,y,width,height,angle,[1,1,1,a.opacity??1],a.effects,[image.width,image.height],null,{x:a.x,y:a.y});}
     }
-    }finally{this.sceneTransform=null;this.sceneScreenshot=false;}
+    }finally{this.flushTextureBatch();this.textureBatchActive=false;this.sceneTransform=null;this.sceneScreenshot=false;}
   }
 
   hitTest(x,y){
