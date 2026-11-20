@@ -4,6 +4,7 @@ import path from "node:path";
 import fs from "node:fs";
 import ts from "typescript";
 import { compileFile, checkFile } from "../ts/compile-ts.mjs";
+import { lowerTsMethods } from "../ts/tsfeat-methods.mjs";
 import { assertJsLogs } from "./ts-runtime.mjs";
 import { readManifest } from "../tools/compat/kn-share-player-check.mjs";
 
@@ -40,6 +41,54 @@ test("r3 strings: regex input runs once, including empty patterns and nested pro
     console.log(/^$/.test(input()), calls);
     console.log(nested(input()), calls);
     console.log(/1/.test(String(1)), /true/.test(String(true)));`);
+});
+
+test("r3 strings: regex inputs compose with string methods, arrays and for-of in every check mode", () => {
+  const sources = [
+    'console.log(/a/.test(" a ".trim()));',
+    'console.log(/a/.test("abc".substring(0, 1)));',
+    'console.log(/a/.test("abc".slice(0, 1)));',
+    'console.log(/a/.test("ab".split("b")[0]));',
+    'const values: string[] = ["a"]; console.log(/a/.test(values[0]));',
+    'const values = ["a"]; console.log(/a/.test(values[0]));',
+    'for (const s of ["a"]) console.log(/a/.test(s));',
+    'function check(values: string[]) { for (const s of values) console.log(/a/.test(s)); } check(["a"]);',
+    'console.log(/a/.test(" a ".trim().substring(0, 1)));',
+    'function match(s: string) { console.log(/a/.test(s.trim())); } match(" a ");',
+    'console.log(/a/.test(["a", "b"].join("")));',
+    'let calls = 0; function input(): string { calls++; return " a "; } console.log(/a/.test(input().trim()), calls);',
+  ];
+  for (const source of sources) {
+    compile(source);
+    for (const types of [false, true]) {
+      const checked = checkFile("r3-string.ts", { types, host: host(source) });
+      assert.equal(checked.ok, true, JSON.stringify({ source, types, checked }));
+    }
+    assertJsLogs(source);
+  }
+});
+
+test("r3 strings: composing regex inputs does not admit numeric, unknown or nullable values", () => {
+  const sources = [
+    'console.log(/a/.test(1));',
+    'function match(s: string | null) { return /a/.test(s); } match(null);',
+    'function match(s: string | undefined) { return /a/.test(s); } match(undefined);',
+    'function match(s: unknown) { return /a/.test(s); } match("a");',
+    'function match(s: any) { return /a/.test(s); } match(1);',
+    'const values: (string | null)[] = [null]; console.log(/a/.test(values[0]));',
+    'for (const s of ["a", 1]) console.log(/a/.test(s));',
+    'class Text { trim(): number { return 1; } } console.log(/a/.test(new Text().trim()));',
+  ];
+  for (const source of sources) {
+    assert.throws(() => lowerTsMethods(ts.createSourceFile("r3-string.ts", source, ts.ScriptTarget.Latest, true)), /statically string/, source);
+    const message = /statically string|may be null or undefined/;
+    assert.throws(() => compile(source), message, source);
+    for (const types of [false, true]) {
+      const checked = checkFile("r3-string.ts", { types, host: host(source) });
+      assert.equal(checked.ok, false, source);
+      assert.ok(checked.diagnostics.some(d => message.test(d.message)), JSON.stringify(checked));
+    }
+  }
 });
 
 test("r3 strings: pad, uint32 split limits, replaceAll and templates match Node", () => {

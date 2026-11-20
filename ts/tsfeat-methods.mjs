@@ -21,18 +21,47 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
   sourceFile = ts.createSourceFile(sourceFile.fileName, sourceFile.text,
     sourceFile.languageVersion, true, sourceFile.scriptKind);
   copyClassNodeOrigins(originalFile, sourceFile);
+  // The lexical checker also classifies method results and iterable elements.
+  // Supply only the ambient shapes needed for the supported string subset,
+  // in memory so browser/virtual-host compilation never reads a host TS lib.
+  // These are type facts, not permission to lower an unsupported operation.
+  const lib = ts.createSourceFile("__nekoc_method_types.d.ts", `
+    interface String {
+      readonly length: number;
+      charAt(index?: number): string;
+      substring(start?: number, end?: number): string;
+      slice(start?: number, end?: number): string;
+      trim(): string; trimStart(): string; trimEnd(): string;
+      toUpperCase(): string; toLowerCase(): string;
+      repeat(count: number): string;
+      padStart(length: number, fill?: string): string;
+      padEnd(length: number, fill?: string): string;
+      concat(...items: string[]): string;
+      replace(search: string, replacement: string): string;
+      replaceAll(search: string, replacement: string): string;
+      split(separator?: string, limit?: number): string[];
+      at(index: number): string | undefined;
+    }
+    interface ReadonlyArray<T> {
+      readonly [index: number]: T;
+      readonly length: number;
+      join(separator?: string): string;
+    }
+    interface Array<T> extends ReadonlyArray<T> {}
+  `, ts.ScriptTarget.Latest, true);
   const host = {
-    getSourceFile: name => name === sourceFile.fileName ? sourceFile : undefined,
+    getSourceFile: name => name === sourceFile.fileName ? sourceFile : name === lib.fileName ? lib : undefined,
     getDefaultLibFileName: () => "lib.d.ts",
     writeFile() {}, getCurrentDirectory: () => "", getDirectories: () => [],
-    fileExists: name => name === sourceFile.fileName,
-    readFile: name => name === sourceFile.fileName ? sourceFile.text : undefined,
+    fileExists: name => name === sourceFile.fileName || name === lib.fileName,
+    readFile: name => name === sourceFile.fileName ? sourceFile.text : name === lib.fileName ? lib.text : undefined,
     getCanonicalFileName: name => name, useCaseSensitiveFileNames: () => true,
     getNewLine: () => "\n",
   };
-  // The checker is only used for lexical symbol identity and primitive types;
-  // no filesystem, standard library, or project type-checking is needed.
-  const program = ts.createProgram([sourceFile.fileName], { noLib: true, noResolve: true }, host);
+  // Keep null/undefined in unions: the absence of an ambient lib must not turn
+  // a nullable result into an apparently safe string argument.
+  const program = ts.createProgram([sourceFile.fileName, lib.fileName],
+    { noLib: true, noResolve: true, strictNullChecks: true }, host);
   const checker = program.getTypeChecker();
   const names = new Set();
   const collect = node => {
@@ -241,7 +270,9 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
     }
     const value = constant(node);
     if (value !== UNKNOWN) return Array.isArray(value) ? "array" : typeof value;
-    const type = checker.getTypeAtLocation(node);
+    // Preserve the existing receiver classifier; nullable access diagnostics
+    // belong to lexical lowering. Regex arguments use the strict type below.
+    const type = checker.getNonNullableType(checker.getTypeAtLocation(node));
     if (type.flags & ts.TypeFlags.NumberLike) return "number";
     if (type.flags & ts.TypeFlags.StringLike) return "string";
     return "unknown";
@@ -524,7 +555,9 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
         const pattern = literalRegex(unwrap(receiver), fail);
         const input = unwrap(args[0]);
         const stringConversion = ts.isCallExpression(input) && unshadowed(input.expression, "String");
-        if (kind(input) !== "string" && !stringConversion) fail(args[0], "RegExp.test requires a statically string argument", "convert the argument explicitly with String(value) before matching");
+        const inputType = checker.getTypeAtLocation(input);
+        const stringType = type => type.isUnion() ? type.types.every(stringType) : !!(type.flags & ts.TypeFlags.StringLike);
+        if (!stringType(inputType) && !stringConversion) fail(args[0], "RegExp.test requires a statically string argument", "convert the argument explicitly with String(value) before matching");
         for (const builtin of ["length", "String", "splitText", "join", "selectText"]) {
           if (checker.resolveName(builtin, node, ts.SymbolFlags.Value, false)?.declarations?.length) {
             fail(node, `Cannot lower RegExp.test while ${builtin} is shadowed`, `rename the local ${builtin} binding`);
