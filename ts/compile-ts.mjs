@@ -5943,6 +5943,18 @@ class WorkspaceCompiler {
     if (this.objectHeap && !this.isArrayExpression(expression.expression) && !this.isStringExpression(expression.expression)) {
       return this.compileObjectAccess(expression, parentId);
     }
+    let arrayIndex = expression.argumentExpression;
+    const key = stripParens(arrayIndex);
+    if (this.isArrayExpression(expression.expression) && ts.isStringLiteralLike(key)) {
+      if (key.text === "length") return this.compileLength(expression.expression, parentId);
+      // Array property keys are not numeric coercions: "01", "-0", etc.
+      // are missing properties, not aliases of list positions.
+      const index = Number(key.text);
+      if (!Number.isInteger(index) || index < 0 || index >= 2 ** 32 - 1 || String(index) !== key.text) {
+        this.unsupported(expression, "Array property key must be a canonical nonnegative integer index or length; JS undefined reads are not supported here, so use a valid index or an explicit bounds check with a concrete fallback");
+      }
+      arrayIndex = ts.factory.createNumericLiteral(index);
+    }
     if (ts.isIdentifier(expression.expression) && ts.isStringLiteral(expression.argumentExpression)) {
       const varName = `${expression.expression.text}_${expression.argumentExpression.text}`;
       if (this.globalVariables.has(varName)) {
@@ -5977,11 +5989,12 @@ class WorkspaceCompiler {
     // can be represented without confusing an ordinary string/number value.
     if (expression.pos >= 0 && expression.getSourceFile?.() === this.sourceFile
       && this.isArrayExpression(target)) {
-      const indexNode = stripParens(expression.argumentExpression);
-      const builtinNonfinite = ts.isIdentifier(indexNode) && ["NaN", "Infinity"].includes(indexNode.text)
-        && !this.globalVariables.has(indexNode.text) && !this.functionParams?.has(indexNode.text)
-        && !this.lookupExpressionBinding(indexNode.text);
-      const index = builtinNonfinite ? Number(indexNode.text) : constantNumber(indexNode);
+      const index = constantNumber(arrayIndex, node => {
+        const builtin = ["NaN", "Infinity"].includes(node.text)
+          && !this.globalVariables.has(node.text) && !this.functionParams?.has(node.text)
+          && !this.lookupExpressionBinding(node.text);
+        return builtin ? Number(node.text) : null;
+      });
       const literal = this.arrayLiteralFor(target);
       const dense = literal && !literal.elements.some(element => ts.isOmittedExpression(element) || ts.isSpreadElement(element));
       if (index !== null && (!Number.isInteger(index) || index < 0
@@ -5992,7 +6005,7 @@ class WorkspaceCompiler {
     // list_item works in the share player; private _object_get does not.
     const id = this.addBlock({ type: "list_item", parent_id: parentId, fields: { item: "any" }, is_output: true });
     this.connectInput(id, this.compileExpression(target, id), "list", "value");
-    this.connectInput(id, this.compilePlusOne(expression.argumentExpression, id), "list_index", "value");
+    this.connectInput(id, this.compilePlusOne(arrayIndex, id), "list_index", "value");
     return id;
   }
 
@@ -7217,11 +7230,12 @@ function flattenStringConcat(node, isString) {
   return [node];
 }
 
-function constantNumber(node) {
+function constantNumber(node, identifierValue = () => null) {
   node = stripParens(node);
   if (ts.isNumericLiteral(node)) return Number(node.text);
+  if (ts.isIdentifier(node)) return identifierValue(node);
   if (ts.isPrefixUnaryExpression(node)) {
-    const value = constantNumber(node.operand);
+    const value = constantNumber(node.operand, identifierValue);
     if (value === null) return null;
     switch (node.operator) {
       case ts.SyntaxKind.MinusToken: return -value;
@@ -7231,8 +7245,8 @@ function constantNumber(node) {
     }
   }
   if (ts.isBinaryExpression(node)) {
-    const a = constantNumber(node.left);
-    const b = constantNumber(node.right);
+    const a = constantNumber(node.left, identifierValue);
+    const b = constantNumber(node.right, identifierValue);
     if (a === null || b === null) return null;
     switch (node.operatorToken.kind) {
       case ts.SyntaxKind.PlusToken: return a + b;

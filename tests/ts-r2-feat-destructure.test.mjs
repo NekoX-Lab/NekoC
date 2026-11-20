@@ -53,6 +53,19 @@ const cases = [
   ["mixed scalar assignments", 'onStart(() => { let a=1, b="b"; [a,b]=[2,"c"]; console.log(a); console.log(b); });'],
   ["object handle exchange", 'onStart(() => { let a={x:1}, b={x:2}; [a,b]=[b,a]; console.log(a.x); console.log(b.x); });'],
   ["length remains a property read", 'onStart(() => { const {length: n}=[1,2]; const {"length": m}="cat"; console.log(n); console.log(m); });'],
+  ["canonical array keys and length", `onStart(() => { const {0: x, "1": y, length: n} = [7,8];
+    const a = [7,8]; console.log(x); console.log(y); console.log(n); console.log(a["0"]); console.log(a["length"]); });`],
+  ["noncanonical object keys remain ordinary properties", `onStart(() => {
+    const {"01": a, "-1": b, "0.5": c} = {"01": 7, "-1": 8, "0.5": 9};
+    console.log(a); console.log(b); console.log(c); });`],
+  ["local nonfinite names are shadowed", `onStart(() => { const Infinity = 0, NaN = 0;
+    const a = [7]; console.log(a[-Infinity]); console.log(a[+Infinity]); console.log(a[+NaN]); });`],
+  ["parameter nonfinite names are shadowed", `function read(Infinity: number, NaN: number): number {
+    const a = [7]; return a[-Infinity] + a[+Infinity] + a[+NaN]; }
+    onStart(() => { console.log(read(0, 0)); });`],
+  ["inline nonfinite names are shadowed", `onStart(() => { const a = [7];
+    [0].forEach((Infinity) => { console.log(a[+Infinity]); });
+    [0].forEach((NaN) => { console.log(a[+NaN]); }); });`],
 ];
 
 for (const [name, source] of cases) test(`r2 destructuring: ${name}`, () => {
@@ -122,9 +135,37 @@ for (const [source, pattern] of [
   assert.match(result.diagnostics[0].message, pattern);
 });
 
-for (const index of ["5", "-1", "0.5", "Infinity", "NaN"]) test(`r2 core-162: reject invalid static array index ${index}`, () => {
-  assert.throws(() => compile(`const a = [1]; onStart(() => { console.log(String(a[${index}])); });`),
+for (const index of ["5", "-1", "0.5", "Infinity", "NaN", "-Infinity", "+Infinity", "+NaN", "-NaN", "-(+Infinity)", "1 + Infinity"]) test(`r2 core-162: reject invalid static array index ${index}`, () => {
+  const source = `const a = [1]; onStart(() => { console.log(String(a[${index}])); });`;
+  assert.throws(() => compile(source),
     /Array index is statically out of bounds.*concrete fallback/);
+  const result = checkFile("r2.ts", { types: false, host: { readFile: () => source } });
+  assert.equal(result.ok, false);
+  assert.match(result.diagnostics[0].message, /Array index is statically out of bounds/);
+});
+
+for (const key of ['"01"', '"-1"', '"0.5"', '"-0"', '"1e0"', '"4294967295"', '5', '"5"']) {
+  for (const destructure of [true, false]) test(`r2 array property keys: reject ${key}, destructure=${destructure}`, () => {
+    const source = destructure
+      ? `onStart(() => { const {${key}: b} = [7,8]; console.log(String(b)); });`
+      : `onStart(() => { const a = [7,8]; console.log(String(a[${key}])); });`;
+    const pattern = /Array (property key|index).*concrete fallback/;
+    assert.throws(() => compile(source), error => {
+      assert.ok(error instanceof CompileError);
+      assert.match(error.message, pattern);
+      assert.equal(error.location.line, 1);
+      return true;
+    });
+    const result = checkFile("r2.ts", { types: false, host: { readFile: () => source } });
+    assert.equal(result.ok, false);
+    assert.match(result.diagnostics[0].message, pattern);
+  });
+}
+
+test("r2 array property keys: missing destructured value cannot become a false undefined comparison", () => {
+  const source = 'onStart(() => { const {5: b} = [1]; console.log(b === undefined); });';
+  assert.throws(() => compile(source), /Array index is statically out of bounds/);
+  assert.equal(checkFile("r2.ts", { types: false, host: { readFile: () => source } }).ok, false);
 });
 
 test("r2 object bindings: preserve missing/nullish and erased-shape diagnostics", () => {
