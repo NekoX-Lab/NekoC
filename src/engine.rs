@@ -41,6 +41,7 @@ mod kn_catalog;
 mod kn_conversion;
 mod kn_hardware;
 mod kn_helpers;
+mod kn_lists;
 mod kn_local;
 mod kn_monitors;
 mod kn_objects;
@@ -9626,7 +9627,11 @@ impl Engine {
                 if let (Some(source), Some(target)) =
                     (self.resolve_list(source), self.resolve_list(target))
                 {
-                    let copied = source.borrow().iter().map(Cell::deep_clone).collect();
+                    let copied = if self.program.semantics == RuntimeSemantics::KnCurrent {
+                        kn_lists::copy_items(&source)
+                    } else {
+                        source.borrow().iter().map(Cell::deep_clone).collect()
+                    };
                     *target.borrow_mut() = copied;
                 }
             }

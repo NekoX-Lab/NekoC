@@ -111,6 +111,9 @@ const risks = {
   get_voice_volume: "仅默认权限 pending、拒绝 0、显式停用录音 NaN 与可选浏览器采样；每次读等待下一 update，真实无设备错误与完整平台差异未验证",
 };
 const limitations = {
+  list_copy: "官方0.27.4原生夹具及局部域函数核对深拷贝共享引用、自复制与源隔离，见 docs/kn-r3-partial.md；循环图、特殊JS对象、错误UI及持久化未验证",
+  list_index_of: "官方0.27.4局部域函数核对严格相等、首个位置、NaN及引用身份，见 docs/kn-r3-partial.md；非法列表的VM降级、输入求值顺序及完整原生组合未验证",
+  list_is_exist: "官方0.27.4局部域函数核对严格相等、NaN及引用身份，见 docs/kn-r3-partial.md；非法列表的VM降级、输入求值顺序及完整原生组合未验证",
   convert_type: "常见类型/空值/列表对象的官方0.27.4主路径配对，见 docs/kn-partial2-timers.md；未验证边界：callable原型、Symbol、稀疏数组、孤立UTF-16及错误UI",
   setTimeout: "官方0.27.4原生注册主路径配对，见 docs/kn-partial2-timers.md；callback statement被官方丢弃，不宣称JS闭包支持；未验证边界：墙钟精度、后台节流及跨场景生命周期",
   setInterval: "官方0.27.4原生注册主路径配对，见 docs/kn-partial2-timers.md；callback statement被官方丢弃，不宣称JS闭包支持；未验证边界：墙钟精度、后台节流及跨场景生命周期",
@@ -292,6 +295,7 @@ export function coverageMarkdown(result) {
     "- 第七轮补齐上述45个执行入口，全部保留部分语义：43个硬件项仅无设备降级、属性API仅别名、麦克风音量经可选宿主输入。逐项官方在线取证见 [kn-remaining-official.md](kn-remaining-official.md)，实现和异步限制见 [kn-remaining.md](kn-remaining.md)。不是完整硬件支持或全类型官方一致性认证；第六轮的缺失结论是历史基线。",
     "- 第一轮按[自有作品静态频率](kn-partial-priority.md)修转换、鼠标与克隆属性；后两项改为有执行路径／未完整验证（不是完整认证），见[原生差分及边界](kn-partial.md)。转换深层/循环列表和对象错误见[专项证据](kn-partial-conversion.md)。",
     "- [partial第二轮](kn-partial2.md)按常见输入/空值/列表对象主路径升级8个本地项，115→107；罕见JS边界单列未验证，不再因此保留整项partial。未达到15项：其余47个非硬件服务/设备/宿主项逐项记录降级后跳过，不冒充成功路径；60个硬件项仍保留部分语义。",
+    "- [r3本地列表修复](kn-r3-partial.md)补全list_copy跨元素/对象属性共享引用；基线107个partial已无纯本地候选，不虚报升级数。3个列表项增加官方证据，仍保留有执行路径／未完整验证，完整认证数不变。",
     "- 官方 bundle：`https://creation.bcmcdn.com/neko/web/release/static/js/main.8ccf2442.js`；SHA-256 `58123fcf43cf793d19372fc822750f9899a4375404de61c541f06e915c2b8165`。`_execute` byte 2962264 是空函数；`_array_literal` byte 2962446 使用 `Object.values`。空函数不等于输入不求值，执行管线仍需单独验证。",
     "- 导入层 `src/bcmkn_compiler/graph.rs::nest` 泛型保留 type/fields，再按连接重建 inputs/statements/next；这只能说明能装配/读取，不能证明 VM 支持。`tests/kn_gap.rs::workspace_compiler_preserves_unknown_types_without_claiming_vm_support` 专门覆盖此区别。",
     "- 实现定位只扫描 value_one、expression_one、scripts、chain 的类型分派，排除注释、字段选项、expression_inputs 遍历提示和游离根忽略名单。元数据单独列出。此静态审计不能证明每条 guard 在 KN 模式均可达，也不能替代运行测试。",
