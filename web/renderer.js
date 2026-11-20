@@ -218,7 +218,7 @@ export class StageRenderer {
     this.stats = { drawCalls: 0, penInstances: 0, submitMs: 0, framebufferBytes: 0, textureBytes: 0 };
     this.gpuTimer=gl.getExtension('EXT_disjoint_timer_query_webgl2');this.gpuQueries=[];this.stats.gpuMs=null;
     this.textCache = new Map(); this.textCanvas = document.createElement('canvas');
-    this.stampCache = new Map();this.stats.stampTextureBytes=0;this.stats.stampUploads=0;
+    this.stampCache = new Map();this.stampCandidates = new Set();this.stats.stampTextureBytes=0;this.stats.stampUploads=0;
     this.stats.textTextureBytes=0; this.stats.textUploads=0; this.stats.textStamps=0;
     this.generation = 0; this.lost = false;
     this.videos=new Map();this.mediaPaused=false;
@@ -249,7 +249,7 @@ export class StageRenderer {
     for(const item of this.spriteTexts?.values()||[])gl.deleteTexture(item.texture);this.spriteTexts?.clear();
     this.textCache.clear();this.stats.textTextureBytes=0;
     for(const item of this.stampCache.values())gl.deleteTexture(item.texture);
-    this.stampCache.clear();this.stats.stampTextureBytes=0;
+    this.stampCache.clear();this.stampCandidates.clear();this.stats.stampTextureBytes=0;
     for (const surface of this.surfaces?.values() || []) { gl.deleteFramebuffer(surface.framebuffer); gl.deleteTexture(surface.texture); }
     this.surfaces = new Map();
     this.width = Number(project.stageSize?.width || 900); this.height = Number(project.stageSize?.height || 562);
@@ -494,11 +494,11 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     this.canvas.width=width;this.canvas.height=height;this.usePenSurface(this.sceneId);this.stats.gpuMs=null;this.dirty=true;this.render();
   }
 
-  makeTexture(w,h) {
+  makeTexture(w,h,allocate=true) {
     const gl = this.gl, texture = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D,texture);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
-    gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null); return texture;
+    if(allocate)gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null); return texture;
   }
 
   // present=false only draws pen deltas into the persistent FBO and marks the stage
@@ -834,10 +834,9 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     // a pre-rasterized glyph texture instead applies a second interpolation and
     // changes small/CJK glyphs. Upload just the resulting pixel-aligned bounds.
     const sx=this.canvas.width/this.width,sy=this.canvas.height/this.height;
-    // Position, scale and clipping are part of the key. Reusing a rotated glyph
-    // at another subpixel phase is not equivalent to Canvas rasterization.
-    const key=JSON.stringify(['text',this.width,this.height,sx,sy,stamp.text,stamp.size,stamp.direction,stamp.align,stamp.x,stamp.y,stamp.color]);
-    if(this.drawCachedStamp(key))return;
+    // FontFaceSet events do not cover synchronous add/delete of loaded faces.
+    // Rasterize every text stamp, as before: even within one frame the host can
+    // replace a font. Do not retain glyphs or install incomplete font listeners.
     const canvas=this.stampCanvas??=document.createElement('canvas'),ctx=canvas.getContext('2d');
     const font=`bold ${stamp.size}px Arial, "Microsoft YaHei"`,angle=stamp.direction*Math.PI/180;
     ctx.font=font;ctx.textBaseline='middle';ctx.textAlign=stamp.align;
@@ -852,7 +851,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     ctx.setTransform(sx,0,0,sy,-left,-top);ctx.translate(ox,oy);ctx.rotate(angle);
     ctx.font=font;ctx.textBaseline='middle';ctx.textAlign=stamp.align;
     ctx.fillStyle=`rgb(${stamp.color.slice(0,3).map(v=>Math.round(v*255)).join(',')})`;ctx.globalAlpha=stamp.color[3];ctx.fillText(stamp.text,0,0);
-    this.uploadStamp(key,canvas,left,right,top,bottom,sx,sy);
+    this.uploadStamp(null,canvas,left,right,top,bottom,sx,sy);
   }
 
   drawCachedStamp(key){
@@ -862,15 +861,26 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
   }
 
   uploadStamp(key,canvas,left,right,top,bottom,sx,sy){
-    const gl=this.gl,bytes=canvas.width*canvas.height*4,cacheable=bytes<=STAMP_CACHE_BYTES;
+    const gl=this.gl,bytes=canvas.width*canvas.height*4;
+    // A bounded second-touch admission window keeps moving/one-off rasters on
+    // one reusable scratch texture. A cycle longer than the window cannot churn
+    // the GPU LRU; only demonstrated reuse allocates a retained texture.
+    const cacheable=key!==null&&bytes<=STAMP_CACHE_BYTES&&this.stampCandidates.has(key);
+    if(key!==null&&bytes<=STAMP_CACHE_BYTES){
+      if(cacheable)this.stampCandidates.delete(key);
+      else{
+        if(this.stampCandidates.size>=128)this.stampCandidates.delete(this.stampCandidates.values().next().value);
+        this.stampCandidates.add(key);
+      }
+    }
     while(cacheable&&this.stampCache.size&&(this.stampCache.size>=128||this.stats.stampTextureBytes+bytes>STAMP_CACHE_BYTES)){
       const [oldKey,old]=this.stampCache.entries().next().value;
       this.flushTextureBatch();gl.deleteTexture(old.texture);this.stampCache.delete(oldKey);this.stats.stampTextureBytes-=old.bytes;
     }
-    // Oversized rasters keep the original single scratch texture, not an
-    // unbounded entry. Submit users before overwriting or evicting a texture.
+    // Cold/oversized rasters and text share scratch. Submit its users before
+    // overwrite. Canvas upload supplies storage, so skip the empty 1x1 upload.
     if(!cacheable)this.flushTextureBatch();
-    const texture=cacheable?this.makeTexture(1,1):(this.stampTexture??=this.makeTexture(1,1));
+    const texture=cacheable?this.makeTexture(1,1,false):(this.stampTexture??=this.makeTexture(1,1,false));
     gl.bindTexture(gl.TEXTURE_2D,texture);gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,true);gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL,true);
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,canvas);
     const geometry=[(left+right)/2/sx-this.width/2,this.height/2-(top+bottom)/2/sy,canvas.width/sx,canvas.height/sy];

@@ -18,13 +18,13 @@ test('r3-render comparison source is the renderer used by round-11 pixel evidenc
 function mockRenderer(){
   let id=0;const events=[];
   const gl=new Proxy({getShaderParameter:()=>true,getProgramParameter:()=>true,
-    createTexture:()=>++id,createProgram:()=>++id,createBuffer:()=>++id,createVertexArray:()=>++id,
+    createTexture:()=>{events.push(['create']);return ++id;},createProgram:()=>++id,createBuffer:()=>++id,createVertexArray:()=>++id,
     drawArraysInstanced:(_mode,_start,_vertices,count)=>events.push(['draw',count]),
     deleteTexture:texture=>events.push(['delete',texture]),
     texImage2D:()=>events.push(['upload']),
   },{get:(target,key)=>key in target?target[key]:(()=>{})});
   const r=Object.assign(Object.create(StageRenderer.prototype),{gl,uniform:{},width:320,height:240,
-    stats:{drawCalls:0,stampTextureBytes:0,stampUploads:0},stampCache:new Map(),textureBatchActive:true});
+    stats:{drawCalls:0,stampTextureBytes:0,stampUploads:0},stampCache:new Map(),stampCandidates:new Set(),textureBatchActive:true});
   return {r,events};
 }
 test('r3-render batches consecutive textures, flushes at capacity and before pen/effects',()=>{
@@ -47,7 +47,7 @@ test('r3-render batches consecutive textures, flushes at capacity and before pen
 });
 test('r3-render stamp LRU is bounded by entries and bytes and submits before eviction',()=>{
   const {r,events}=mockRenderer();
-  const upload=(key,size=10)=>r.uploadStamp(key,{width:size,height:size},0,size,0,size,1,1);
+  const upload=(key,size=10)=>{for(let i=0;i<2;i++)r.uploadStamp(key,{width:size,height:size},0,size,0,size,1,1);};
   upload('hot');const hot=r.stampCache.get('hot').texture;
   for(let i=0;i<127;i++)upload(String(i));
   assert.equal(r.stats.stampTextureBytes,128*400);assert.equal(r.drawCachedStamp('hot'),true);
@@ -55,22 +55,41 @@ test('r3-render stamp LRU is bounded by entries and bytes and submits before evi
   // Put the least recently used entry into the pending batch, then force eviction.
   const oldest=r.stampCache.values().next().value;
   r.drawTexture(oldest.texture,0,0,10,10);events.length=0;
-  upload('evict');assert.deepEqual(events.slice(0,2),[['draw',1],['delete',oldest.texture]]);
+  upload('evict');const deletion=events.findIndex(e=>e[0]==='delete');
+  assert.ok(deletion>0);assert.deepEqual(events[0],['draw',1]);assert.deepEqual(events[deletion],['delete',oldest.texture]);
   upload('large',1024);upload('large2',1024);
   assert.equal(r.stampCache.size,2);assert.equal(r.stats.stampTextureBytes,8*1024*1024);
   upload('oversized',2048);assert.equal(r.stampCache.size,2);assert.equal(r.stats.stampTextureBytes,8*1024*1024);
   assert.equal(r.drawCachedStamp('oversized'),false);assert.ok(events.some(e=>e[0]==='delete'&&e[1]===hot));
 });
 
-test('r3-render K4 raster keys include subpixels, colour, alignment and actual resolution',()=>{
+test('r3-render cold moving stamps reuse scratch with one upload each and bounded admission',()=>{
+  const {r,events}=mockRenderer(),canvas={width:20,height:20};
+  for(let round=0;round<7;round++)for(let i=0;i<1000;i++){
+    const key=`image-${i}`;assert.equal(r.drawCachedStamp(key),false);
+    r.uploadStamp(key,canvas,0,20,0,20,1,1);
+  }
+  r.flushTextureBatch();
+  assert.equal(events.filter(e=>e[0]==='create').length,1);
+  assert.equal(events.filter(e=>e[0]==='delete').length,0);
+  assert.equal(events.filter(e=>e[0]==='upload').length,7000);
+  assert.equal(events.filter(e=>e[0]==='draw').length,7000);
+  assert.equal(r.stampCache.size,0);assert.equal(r.stampCandidates.size,128);
+  events.length=0;
+  r.uploadStamp('reused',canvas,0,20,0,20,1,1);
+  assert.equal(r.stampCache.has('reused'),false);
+  r.uploadStamp('reused',canvas,0,20,0,20,1,1);
+  assert.equal(r.stampCache.has('reused'),true);
+  const uploads=r.stats.stampUploads;
+  for(let i=0;i<1000;i++)assert.equal(r.drawCachedStamp('reused'),true);
+  assert.equal(r.stats.stampUploads,uploads);
+  assert.equal(events.filter(e=>e[0]==='create').length,1);
+  assert.equal(events.filter(e=>e[0]==='upload').length,2);
+});
+
+test('r3-render K4 image raster keys include subpixels and actual resolution',()=>{
   const {r}=mockRenderer();const keys=[];
   Object.assign(r,{canvas:{width:320,height:240},drawCachedStamp:key=>{keys.push(key);return true;}});
-  const text={text:'中',size:13,direction:17,align:'center',x:1.25,y:2.5,color:[.1,.2,.3,.4]};
-  r.drawK4TextStamp(text);
-  for(const patch of [{x:1.5},{y:2.25},{color:[.1,.2,.3,.5]},{align:'right'},{direction:18},{size:14},{text:'文'}])r.drawK4TextStamp({...text,...patch});
-  r.canvas.width=480;r.drawK4TextStamp(text);
-  assert.equal(new Set(keys).size,9);
-  keys.length=0;r.canvas.width=320;
   const image={width:16,height:16,centerPoint:{x:0,y:0}},stamp={style:'c',x:1.25,y:2.5,scale:100,direction:17,rotation_type:0};
   r.drawK4ImageStamp(stamp,image);
   for(const patch of [{style:'d'},{x:1.5},{direction:18},{scale:99}])r.drawK4ImageStamp({...stamp,...patch},image);
@@ -121,6 +140,36 @@ test('r3-render pixels match frozen renderer for clones, stamps, eviction, resol
         compare(`${kitten4}/restore`,r=>r.apply({scene:'s',sprites:[]},empty));
         compare(`${kitten4}/text-clones`,r=>r.apply({clear:true,reset:true,order:sprites.map(a=>a.id),sprites:sprites.map(a=>({...a,text:{text:'Text',size:14,color:'#23a5dc'}}))},empty));
       }
+      await Promise.all(rs.map(r=>{r.resolutionScale=1;return r.load({...project,_nekocKitten4:{}});}));
+      // Synchronous FontFaceSet registration/deletion need not emit loadingdone.
+      // Exercise both already-loaded and asynchronously loaded faces without
+      // notifying the renderer, then compare each clear-and-restamp to baseline.
+      const text={text:'iiiiiiiiMMMMWWW',size:24,direction:0,align:'left',x:-100,y:0,color:[0,0,0,1],before_line:0};
+      const textFrame={clear:true,sprites:[],text_stamps:[text]};
+      compare('font/before',r=>r.apply(textFrame,empty));const original=snapshot(rs[0]);
+      const face=await new FontFace('Arial','local("Courier New")',{weight:'bold'}).load();document.fonts.add(face);
+      try{
+        compare('font/synchronous-add',r=>r.apply(textFrame,empty));
+        if(snapshot(rs[0]).every((v,i)=>v===original[i]))throw Error('Font probe did not change glyphs');
+      }finally{document.fonts.delete(face);}
+      compare('font/delete',r=>r.apply(textFrame,empty));
+      const asyncFace=new FontFace('Arial','local("Courier New")',{weight:'bold'});document.fonts.add(asyncFace);
+      try{await asyncFace.load();compare('font/async-loaded',r=>r.apply(textFrame,empty));}
+      finally{document.fonts.delete(asyncFace);}
+      compare('font/restored',r=>r.apply(textFrame,empty));
+      // Instrument real GL calls after scratch allocation. No wall-clock
+      // assertion: a >128-position cycle must never allocate or evict textures.
+      const counts=rs.map(r=>{
+        const count={create:0,delete:0,upload:0};
+        for(const [method,key]of [['createTexture','create'],['deleteTexture','delete'],['texImage2D','upload']]){
+          const original=r.gl[method].bind(r.gl);r.gl[method]=(...args)=>{count[key]++;return original(...args);};
+        }return count;
+      });
+      const moving={clear:true,sprites:[],image_stamps:Array.from({length:1000},(_,i)=>({style:'c',x:-100+i/5,y:0,scale:100,direction:0,rotation_type:0,before_line:0}))};
+      for(let i=0;i<7;i++)compare(`moving/${i}`,r=>r.apply(moving,empty));
+      if(JSON.stringify(counts[0])!==JSON.stringify(counts[1]))throw Error('Cold GL counts differ: '+JSON.stringify(counts));
+      if(counts[1].create!==0||counts[1].delete!==0||counts[1].upload!==7000)throw Error('Cold GL churn: '+JSON.stringify(counts));
+      const movingCounts=counts.map(c=>({...c}));
       // Reuse existing visual baseline scene inputs and all 65 fixed timestamps,
       // including screen-space filters, inherited opacity and screenshot paths.
       for(const [name,spec]of Object.entries(fixtures)){
@@ -134,10 +183,10 @@ test('r3-render pixels match frozen renderer for clones, stamps, eviction, resol
         for(let frame=0;frame<65;frame++)compare(`${name}/${frame}`,r=>{r.transitionClock=()=>frame*1000/60;r.dirty=true;r.render();});
       }
       for(const r of rs)r.gl.getExtension('WEBGL_lose_context').loseContext();
-      return {comparisons:checks.length,reductions};
+      return {comparisons:checks.length,reductions,movingCounts};
     },await transition10Fixtures());
     assert.ok(result.comparisons>200);
-    for(const r of result.reductions){assert.ok(r.current<r.old/100,JSON.stringify(r));assert.equal(r.stampUploads,0);assert.equal(r.textUploads,0);}
+    for(const r of result.reductions){assert.ok(r.current<(r.kitten4?310:r.old/100),JSON.stringify(r));assert.equal(r.stampUploads,r.kitten4?300:0);assert.equal(r.textUploads,0);}
     console.log('r3-render exact RGBA comparison:',JSON.stringify(result));
   }finally{await browser?.close();await new Promise(resolve=>server.close(resolve));}
 });
