@@ -98,30 +98,6 @@ impl Engine {
         }
     }
 
-    /// Rt.set_pen_down tests both stored coordinates for JS truthiness. With
-    /// either coordinate zero a repeated pen-down draws another dot; away from
-    /// the axes it is idempotent. A down brush's stored origin is its position.
-    pub(super) fn k4_pen_down_draws(&self, actor: usize) -> bool {
-        let a = &self.sprites[actor];
-        !a.pen || a.x == 0.0 || a.y == 0.0 || a.x.is_nan() || a.y.is_nan()
-    }
-
-    /// Rt draws a filled origin disk and then a closed two-point stroke. Both
-    /// composite independently, including alpha; a zero-length path has no
-    /// Canvas stroke. The sensing raster remains pixel-centre (not AA) based.
-    pub(super) fn raster_k4_line(
-        &mut self,
-        from: (f64, f64),
-        to: (f64, f64),
-        size: f64,
-        color: [f32; 4],
-    ) {
-        self.raster_line(from, from, size, color);
-        if from != to {
-            self.raster_line(from, to, size, color);
-        }
-    }
-
     pub(super) fn raster_k4_stamp(&mut self, actor: usize) {
         if self.sprites[actor].text.is_some() {
             return;
@@ -218,8 +194,8 @@ mod tests {
         let mut engine =
             Engine::new(Program::compile(&kitten4::to_neko(&native).unwrap()).unwrap());
         let color = [0.0, 0.0, 0.0, 0.5];
-        engine.raster_k4_line((-120.0, 30.0), (-120.0, 30.0), 20.0, color);
-        engine.raster_k4_line((-120.0, 30.0), (-20.0, 30.0), 20.0, color);
+        engine.raster_canvas_line((-120.0, 30.0), (-120.0, 30.0), 20.0, color);
+        engine.raster_canvas_line((-120.0, 30.0), (-20.0, 30.0), 20.0, color);
         let raster = engine.pen_rasters[engine.current_scene].as_ref().unwrap();
         // Canvas quantizes premultiplied alpha slightly differently (223/127);
         // this pixel-centre sensing raster intentionally rounds to 224/128.
@@ -236,14 +212,14 @@ mod tests {
         let mut engine =
             Engine::new(Program::compile(&kitten4::to_neko(&native).unwrap()).unwrap());
         let actor = engine.sprites.iter().position(|a| !a.stage).unwrap();
-        assert!(engine.k4_pen_down_draws(actor));
+        assert!(engine.canvas_pen_down_draws(actor));
         engine.sprites[actor].pen = true;
-        assert!(!engine.k4_pen_down_draws(actor));
+        assert!(!engine.canvas_pen_down_draws(actor));
         engine.sprites[actor].x = 0.0;
-        assert!(engine.k4_pen_down_draws(actor));
+        assert!(engine.canvas_pen_down_draws(actor));
         engine.sprites[actor].x = -120.0;
         engine.sprites[actor].y = 0.0;
-        assert!(engine.k4_pen_down_draws(actor));
+        assert!(engine.canvas_pen_down_draws(actor));
     }
 
     #[test]

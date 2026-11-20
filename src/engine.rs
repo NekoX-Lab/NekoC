@@ -5,6 +5,7 @@ use anyhow::{Context, Result, bail, ensure};
 use serde::Serialize;
 use serde_json::Value;
 mod calculate;
+mod canvas_pen;
 mod cloud;
 pub mod cloud_ui;
 mod collision_geometry;
@@ -8882,11 +8883,7 @@ impl Engine {
             ]);
             if self.program.uses_color {
                 let (to, size, color) = ((a.x, a.y), a.size, a.color);
-                if self.program.semantics == RuntimeSemantics::Kitten4 {
-                    self.raster_k4_line(old, to, size, color);
-                } else {
-                    self.raster_line(old, to, size, color);
-                }
+                self.raster_canvas_line(old, to, size, color);
             }
         }
     }
@@ -9435,12 +9432,7 @@ impl Engine {
                 self.layer_with_pen(actor, above);
             }
             Op::Pen(down) => {
-                let draws = down
-                    && if self.program.semantics == RuntimeSemantics::Kitten4 {
-                        self.k4_pen_down_draws(actor)
-                    } else {
-                        !self.sprites[actor].pen
-                    };
+                let draws = down && self.canvas_pen_down_draws(actor);
                 self.sprites[actor].pen = down;
                 if draws {
                     self.line(actor, old);
