@@ -7,6 +7,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {unzipSync} from 'fflate';
 import {embedAssets,exportPlayer} from '../tools/build-player-export.mjs';
 import {loadPlaywright} from '../tools/probe-kitten4.mjs';
@@ -46,7 +47,7 @@ test('exports stage output atomically, preserve existing files and bundle reloca
   const dir=await scratch(t),wasmDir=path.join(dir,'wasm');await mkdir(wasmDir);
   // A valid empty module exercises packaging; browser E2E below uses the real VM.
   await writeFile(path.join(wasmDir,'nekoc_wasm_bg.wasm'),new Uint8Array([0,97,115,109,1,0,0,0]));
-  await writeFile(path.join(wasmDir,'nekoc_wasm.js'),'export default async function init(){};export const importProject=()=>{};export const checkExtensions=()=>{};export class Player{};');
+  await writeFile(path.join(wasmDir,'nekoc_wasm.js'),'export default async function init(){};export const importProject=text=>JSON.stringify({project:JSON.parse(text),report:{fast_runtime_ready:true}});export const checkExtensions=()=>{};export class Player{ready(){return JSON.stringify({ready:true});}free(){}};');
   const out=path.join(dir,'directory'),zip=path.join(dir,'player.zip');
   await exportPlayer({input:fixture,out,wasmDir});await exportPlayer({input:fixture,out:zip,wasmDir});
   const entries=unzipSync(await readFile(zip));
@@ -73,6 +74,74 @@ test('export rejects missing or invalid WASM before creating the destination',as
   await writeFile(path.join(wasmDir,'nekoc_wasm_bg.wasm'),Buffer.from('not wasm'));
   await assert.rejects(exportPlayer({input:fixture,out,wasmDir}),/不是有效的 WebAssembly/);
   await assert.rejects(access(out));
+});
+
+test('WASM import, runtime readiness and construction failures never publish directory or ZIP',async t=>{
+  const dir=await scratch(t),wasmDir=path.join(dir,'wasm');await mkdir(wasmDir);
+  await writeFile(path.join(wasmDir,'nekoc_wasm_bg.wasm'),new Uint8Array([0,97,115,109,1,0,0,0]));
+  for(const [body,message]of [
+    ['export function importProject(){throw Error("import denied")}','import denied'],
+    ['export const importProject=()=>JSON.stringify({project:{},report:{fast_runtime_ready:false,runtime_error:"unsupported"}})','unsupported'],
+    ['export const importProject=()=>JSON.stringify({project:{},report:{fast_runtime_ready:true}});export class Player{constructor(){throw Error("cannot construct")}}','cannot construct'],
+    ['export const importProject=()=>JSON.stringify({project:{},report:{fast_runtime_ready:true}});export class Player{ready(){return "{}"}free(){}}','未能建立播放器会话'],
+  ])for(const suffix of ['directory','zip']){
+    await writeFile(path.join(wasmDir,'nekoc_wasm.js'),`export default async function init(){};${body}`);
+    const out=path.join(dir,`failed.${suffix}`);
+    await assert.rejects(exportPlayer({input:fixture,out,wasmDir}),new RegExp(message));
+    await assert.rejects(access(out));
+    assert.ok(!(await readdir(dir)).some(file=>file.startsWith('.nekoc-player-')));
+  }
+});
+
+test('real WASM rejects K4 whose source fits but canonical handshake exceeds 64 MiB before publishing', {skip:!process.env.NEKOC_PLAYER_EXPORT_E2E,timeout:300000},async t=>{
+  const dir=await scratch(t),input=path.join(dir,'large.bcm');
+  const work=JSON.parse(await readFile(fixture,'utf8'));
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><!--${'x'.repeat(25*1024*1024)}--></svg>`;
+  work.theatre.styles.background.url=`data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+  const text=JSON.stringify(work),sourceBytes=Buffer.byteLength(text);assert.ok(sourceBytes<64*1024*1024);
+  await writeFile(input,text);
+  for(const name of ['player','player.zip']){
+    const out=path.join(dir,name);
+    await assert.rejects(exportPlayer({input,out}),error=>{
+      assert.match(error.message,/规范作品握手超过播放器 64 MiB 上限/);
+      console.log(JSON.stringify({sourceBytes,output:name,error:error.message}));return true;
+    });
+    await assert.rejects(access(out));
+  }
+  assert.ok(!(await readdir(dir)).some(file=>file.startsWith('.nekoc-player-')));
+});
+
+test('real offline WASM fresh sessions clear every scene pen surface but pause and stop preserve the image', {skip:!process.env.NEKOC_PLAYER_EXPORT_E2E,timeout:300000},async t=>{
+  const dir=await scratch(t),input=path.join(dir,'scenes.bcmkn'),out=path.join(dir,'player');
+  const work=JSON.parse(await readFile(path.join(root,'tests/fixtures/input-kn.bcmkn'),'utf8'));
+  const scene=work.scenes.currentSceneId,actor=work.scenes.scenesDict[scene].actorIds[0],num=value=>({type:'math_number',fields:{NUM:String(value)}});
+  work.actors.actorsDict[actor].nekoBlockJsonList=[{type:'on_running_group_activated',next:{type:'wait',inputs:{time:num(.1)},next:{type:'switch_to_screen',inputs:{screen_id:{type:'get_screens',fields:{screen_id:'scene-b'}}}}}}];
+  work.scenes.scenesDict['scene-b']={...structuredClone(work.scenes.scenesDict[scene]),id:'scene-b',name:'B',screenName:'B',actorIds:['b'],nekoBlockJsonList:[]};work.scenes.sortList.push('scene-b');
+  // Input, not wall-clock timing, gates the stamp. This makes pixel assertions
+  // deterministic even on a slow browser or CI host.
+  work.actors.actorsDict.b={...structuredClone(work.actors.actorsDict[actor]),id:'b',visible:true,nekoBlockJsonList:[{type:'on_keydown',fields:{key:'32',type:'down'},next:{type:'self_set_pen_color',fields:{color:'#ff0000'},next:{type:'stamp',fields:{align:'center'},inputs:{text:{type:'text',fields:{TEXT:'STALE'}},size:num(80)}}}}]};
+  await writeFile(input,JSON.stringify(work));
+  // Keep an owned generated fixture for the required independent editor check.
+  await mkdir(path.join(root,'dist/r2-review'),{recursive:true});await writeFile(path.join(root,'dist/r2-review/scene-stop.bcmkn'),JSON.stringify(work));
+  await exportPlayer({input,out});
+  const browser=await loadPlaywright().chromium.launch({headless:true,channel:process.env.NEKOC_BROWSER_CHANNEL||'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});t.after(()=>browser.close());
+  const context=await browser.newContext({viewport:{width:1280,height:800}});await context.setOffline(true);
+  const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+  await page.goto(pathToFileURL(path.join(out,'index.html')).href);await page.waitForFunction(()=>globalThis.nekoPlayDiagnostics&&!nekoPlayDiagnostics().busy);
+  const settle=()=>page.waitForFunction(()=>!nekoPlayDiagnostics().busy&&!nekoPlayDiagnostics().pending);
+  const shot=async name=>{await settle();const bytes=await page.locator('#stage').screenshot({path:path.join(root,`dist/r2-review/${name}.png`)});return createHash('sha256').update(bytes).digest('hex');};
+  const enter=async()=>{await page.locator('#toggle').click();await page.waitForFunction(()=>nekoPlayDiagnostics().frame?.scene==='scene-b');await page.locator('#toggle').click();await settle();};
+  await enter();const baseline=await shot('baseline');
+  await page.locator('#toggle').click();await page.waitForFunction(()=>!nekoPlayDiagnostics().busy&&nekoPlayDiagnostics().running);await page.locator('#stage').focus();await page.keyboard.down('Space');const sent=await page.evaluate(()=>nekoPlayDiagnostics().totalUpdates);await page.waitForFunction(count=>nekoPlayDiagnostics().totalUpdates>=count+3,sent);await page.keyboard.up('Space');
+  await page.locator('#toggle').click();const stamped=await shot('stamped');assert.notEqual(stamped,baseline);
+  await page.locator('#toggle').click();await page.waitForFunction(()=>nekoPlayDiagnostics().running);await page.locator('#toggle').click();assert.equal(await shot('resumed'),stamped);
+  await page.locator('#stop').click();assert.equal(await shot('stopped'),stamped);
+  await page.evaluate(()=>{globalThis.oldTransition=document.querySelector('#stage').animate([{opacity:1},{opacity:1}],{duration:100000,iterations:Infinity});});
+  await enter();const restarted=await shot('restarted');assert.equal(restarted,baseline);assert.notEqual(restarted,stamped);
+  assert.equal(await page.evaluate(()=>oldTransition.playState),'idle');
+  await page.locator('#restart').click();await page.waitForFunction(()=>nekoPlayDiagnostics().frame?.scene==='scene-b');await page.locator('#toggle').click();assert.equal(await shot('replayed'),baseline);
+  assert.deepEqual(errors,[]);assert.equal(await page.locator('#notice').isVisible(),false);
+  console.log(JSON.stringify({baseline,stamped,restarted,reset:baseline===restarted}));
 });
 
 test('real CLI export runs WASM frames over file:// and nested static hosting, including extracted ZIP', {skip:!process.env.NEKOC_PLAYER_EXPORT_E2E,timeout:300000},async t=>{

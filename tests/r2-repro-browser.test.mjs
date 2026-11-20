@@ -62,6 +62,10 @@ test('r2-repro: browser recording and CLI replay produce the same state', {
           await page.locator('#record').click();
           await page.waitForFunction(()=>window.nekoPlayDiagnostics().recording&&!window.nekoPlayDiagnostics().busy&&window.nekoPlayDiagnostics().totalUpdates>=2);
           assert.equal(await page.locator('#restart').isDisabled(),true);
+          assert.equal(await page.locator('#stop').isDisabled(),true);
+          // Even a stale/programmatic stop must not discard the recording.
+          await page.evaluate(()=>document.querySelector('#stop').onclick());
+          assert.equal(await page.evaluate(()=>window.nekoPlayDiagnostics().recording),true);
           assert.equal(await page.locator('#coalesce').isDisabled(),true);
           await page.keyboard.press('a');
           const bounds=await page.locator('#stage').boundingBox();
@@ -72,6 +76,7 @@ test('r2-repro: browser recording and CLI replay produce the same state', {
           await page.locator('#toggle').click();
           await page.waitForFunction(()=>!window.nekoPlayDiagnostics().running&&!window.nekoPlayDiagnostics().pending);
           const pausedCount=await page.evaluate(()=>window.nekoPlayDiagnostics().totalUpdates);
+          assert.equal(await page.locator('#stop').isDisabled(),true);
           await page.locator('#toggle').click();
           await page.waitForFunction(count=>window.nekoPlayDiagnostics().totalUpdates>count,pausedCount);
           await page.locator('#toggle').click();
@@ -104,6 +109,8 @@ test('r2-repro: browser recording and CLI replay produce the same state', {
           assert.equal(await page.locator('#record').getAttribute('aria-pressed'),'false');
           await page.locator('#toggle').click();
           await page.waitForFunction(()=>window.nekoPlayDiagnostics().running&&!window.nekoPlayDiagnostics().recording);
+          await page.waitForFunction(()=>!window.nekoPlayDiagnostics().busy);
+          assert.equal(await page.locator('#stop').isEnabled(),true);
           assert.deepEqual(errors,[]);
         }finally{await page.close();}
       });
@@ -122,6 +129,7 @@ test('r2-repro: browser recording and CLI replay produce the same state', {
         });
         await page.waitForFunction(()=>!window.nekoPlayDiagnostics().running&&!window.nekoPlayDiagnostics().pending);
         assert.equal(await page.locator('#toggle').isDisabled(),true);
+        assert.equal(await page.locator('#stop').isDisabled(),true);
         const pending=page.waitForEvent('download');await page.locator('#record').click();
         const recording=path.join(dir,'interrupted.json');await(await pending).saveAs(recording);
         const bundle=JSON.parse(await readFile(recording,'utf8'));

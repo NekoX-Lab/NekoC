@@ -61,7 +61,7 @@ fn export_player_keeps_edits_to_canonical_kitten4_projects() {
         [0, 97, 115, 109, 1, 0, 0, 0],
     )
     .unwrap();
-    fs::write(wasm.join("nekoc_wasm.js"), "export default async function init(){}; export function importProject(){}; export function checkExtensions(){}; export class Player{}").unwrap();
+    fs::write(wasm.join("nekoc_wasm.js"), "export default async function init(){}; export const importProject=text=>JSON.stringify({project:JSON.parse(text),report:{fast_runtime_ready:true}}); export function checkExtensions(){}; export class Player{ready(){return JSON.stringify({ready:true});}free(){}}").unwrap();
     let output = dir.path().join("player");
     Command::cargo_bin("nekoc")
         .unwrap()

@@ -95,8 +95,13 @@ async function launch(){
   if(connection?.ready)void connection.requestDevicePermission();
   if(!connection?.ready){
     input?.reset();
+    const next=new PlayerConnection(),devicePermission=next.requestDevicePermission();
+    // A new VM must not inherit other scenes' pen surfaces, transitions or video
+    // state. Keep the stopped final image until this fresh start; resume skips it.
+    for(const animation of canvas.getAnimations?.()||[])animation.cancel();
+    await renderer.load(project,({completed,total})=>feedback.progress('重新加载图片 / 视频…',completed,total));renderer.render();fitStage();
     feedback.progress('正在连接运行时…');
-    const next=new PlayerConnection();connection=next;const devicePermission=next.requestDevicePermission();await next.open(project,backend);void devicePermission;sendCostumes=true;overlay.reset();
+    connection=next;await next.open(project,backend);void devicePermission;sendCostumes=true;overlay.reset();
     // Opt-in observation before any scheduler tick, not an extra simulation frame.
     if(new URLSearchParams(location.search).has('compare'))window.nekoCompareZero=await next.snapshot();
     epoch++;lastFrame=null;totalUpdates=0;
@@ -244,7 +249,7 @@ $('#stop').onclick=()=>action(async()=>{
 });
 $('#restart').onclick=()=>action(async()=>{
   await closeRuntime();lastFrame=null;$('#timer').hidden=true;
-  await renderer.load(project,({completed,total})=>feedback.progress('重新加载图片 / 视频…',completed,total));renderer.render();fitStage();await launch();
+  await launch();
 });
 $('#settings-toggle').onclick=()=>{
   const open=$('#settings').hidden;$('#settings').hidden=!open;$('#settings-toggle').setAttribute('aria-expanded',String(open));

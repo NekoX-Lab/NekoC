@@ -7,12 +7,24 @@ import {fileURLToPath,pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {build} from 'esbuild';
 import {zipSync} from 'fflate';
+import {Worker} from 'node:worker_threads';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const maxAssetBytes=64*1024*1024,maxTotalBytes=256*1024*1024;
 const mimeTypes={'.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.gif':'image/gif','.webp':'image/webp','.avif':'image/avif','.mp3':'audio/mpeg','.wav':'audio/wav','.ogg':'audio/ogg','.m4a':'audio/mp4','.mp4':'video/mp4','.webm':'video/webm'};
 const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
 async function exists(file){try{await access(file);return true;}catch(error){if(error.code==='ENOENT')return false;throw error;}}
+
+// Match the browser import and handshake with the exact runtime being bundled.
+// A short-lived worker releases the WASM heap and large canonical K4 copies.
+async function validateHandshake(binding,wasmBytes,projectText){
+  return new Promise((resolve,reject)=>{
+    const worker=new Worker(new URL('./player-export-preflight.mjs',import.meta.url),{workerData:{binding,wasmBytes,projectText},execArgv:[]});
+    worker.once('message',result=>result.error?reject(Error(result.error)):resolve(result.handshakeBytes));
+    worker.once('error',reject);
+    worker.once('exit',code=>reject(Error(`WASM 导出预检未完成（退出 ${code}）`)));
+  });
+}
 
 async function readAsset(source,base){
   if(source.startsWith('data:')){
@@ -87,6 +99,7 @@ export async function exportPlayer({input,out,assetBase,wasmDir=path.join(root,'
   const {assets,totalBytes}=await embedAssets(project,path.resolve(assetBase||path.dirname(input)));
   const projectText=JSON.stringify(project);
   if(Buffer.byteLength(projectText)>64*1024*1024)throw Error('内嵌素材后的作品超过播放器 64 MiB 握手上限；请先缩小素材');
+  await validateHandshake(binding,wasmBytes,projectText);
   const plugin={name:'standalone-player',setup(build){
     build.onResolve({filter:/\/wasm\/nekoc_wasm\.js$/},()=>({path:binding}));
     // The standalone export always selects WASM, never the extension backend.
