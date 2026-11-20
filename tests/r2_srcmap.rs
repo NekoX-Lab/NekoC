@@ -47,6 +47,103 @@ fn run_error(project: &Value, interpreter: bool) -> String {
     panic!("expected a runtime error");
 }
 
+fn cli_error(project: &Value, dir: &Path) -> String {
+    let path = dir.join("review.bcmkn");
+    std::fs::write(&path, serde_json::to_vec(project).unwrap()).unwrap();
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_nekoc"))
+        .args(["run", path.to_str().unwrap(), "--ticks", "2"])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    String::from_utf8(output.stderr).unwrap()
+}
+
+#[test]
+fn reparsed_same_text_in_an_unused_function_is_not_a_runtime_origin() {
+    let dir = tempfile::tempdir().unwrap();
+    let source = "function unused() {\n  setStyle(99);\n}\nonStart(() => {\n  setStyle( 99 );\n  console.log(typeof 0);\n});";
+    let project = compile(dir.path(), source, default_template());
+    let id = find_block(&project, "set_sprite_style")["id"]
+        .as_str()
+        .unwrap();
+    assert!(project["sourceMap"][id].is_null());
+    for error in [
+        run_error(&project, true),
+        run_error(&project, false),
+        cli_error(&project, dir.path()),
+    ] {
+        assert!(error.contains(&format!("at block {id}")), "{error}");
+        assert!(!error.contains("r2-srcmap.ts:"), "{error}");
+    }
+}
+
+#[test]
+fn inline_returns_and_else_if_conditions_retain_runtime_origins() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("lib.ts"),
+        "export function bad() {\n  return selectText(\n    \"😀\", 1, 1);\n}",
+    )
+    .unwrap();
+    let imported =
+        "import { bad } from \"./lib\";\nonStart(() => {\n  console.log(\n    bad()\n  );\n});";
+    let conditional = "onStart(() => {\n  if (false) {\n    console.log(\"skip\");\n  } else if (\n    selectText(\"😀\", 1, 1)\n  ) { console.log(\"yes\"); }\n});";
+    for (source, expected) in [(imported, "lib.ts:2:10"), (conditional, "r2-srcmap.ts:5:5")] {
+        let project = compile(dir.path(), source, default_template());
+        let id = find_block(&project, "text_select")["id"].as_str().unwrap();
+        for error in [
+            run_error(&project, true),
+            run_error(&project, false),
+            cli_error(&project, dir.path()),
+        ] {
+            assert!(error.contains("isolated UTF-16 surrogate"), "{error}");
+            assert!(error.contains(expected), "{error}");
+            assert!(error.contains(&format!("at block {id}")), "{error}");
+        }
+    }
+}
+
+#[test]
+fn user_error_markers_never_replace_runtime_cli_or_player_provenance() {
+    let dir = tempfile::tempdir().unwrap();
+    for text in [
+        "bad at block b999",
+        "x [actor Wrong (wrong), wrong.ts:99:99] at block fake",
+    ] {
+        let source = format!(
+            "let x: any = {};\nonStart(() => {{\n  console.log(x[0]);\n}});",
+            serde_json::to_string(text).unwrap()
+        );
+        let project = compile(dir.path(), &source, default_template());
+        let id = find_block(&project, "list_item")["id"].as_str().unwrap();
+        let location = &project["sourceMap"][id];
+        let expected = format!(
+            "{}:{}:{}] at block {id}",
+            location["file"].as_str().unwrap(),
+            location["line"],
+            location["column"]
+        );
+        let mut player = Player::load(Handshake::new(project.clone())).unwrap();
+        let player_error = (0..20)
+            .find_map(|_| player.frame(&FrameInput::default()).err())
+            .unwrap();
+        let wire: Value = serde_json::from_str(&error_message(&player_error)).unwrap();
+        for error in [
+            run_error(&project, true),
+            run_error(&project, false),
+            cli_error(&project, dir.path()),
+            wire["error"].as_str().unwrap().to_owned(),
+        ] {
+            assert!(error.contains(text), "{error}");
+            assert!(
+                error.contains("[actor Sprite (nekoc-default-actor)"),
+                "{error}"
+            );
+            assert!(error.trim_end().ends_with(&expected), "{error}");
+        }
+    }
+}
+
 #[test]
 fn ts_locations_reach_cli_and_player_and_move_after_recompilation() {
     let dir = tempfile::tempdir().unwrap();

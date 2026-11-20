@@ -168,8 +168,9 @@ impl Engine {
                 | "__lookupGetter__"
                 | "__lookupSetter__"
         ) {
-            self.value_error
-                .get_or_insert_with(|| format!("unsupported KN inherited object property {key}"));
+            self.value_error.get_or_insert_with(|| {
+                format!("unsupported KN inherited object property {key}").into()
+            });
         }
         Cell::Undefined
     }

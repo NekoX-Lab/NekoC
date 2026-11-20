@@ -3988,7 +3988,7 @@ class WorkspaceCompiler {
 
     if (statement.elseStatement) {
       const firstElseChild = ts.isIfStatement(statement.elseStatement)
-        ? this.compileNativeIfStatement(statement.elseStatement, id)
+        ? this.compileStatement(statement.elseStatement, id)
         : this.compileStatementList(this.statementBodyStatements(statement.elseStatement), id);
       if (firstElseChild) {
         this.connectInput(id, firstElseChild, "ELSE", "statement");
@@ -4724,17 +4724,17 @@ class WorkspaceCompiler {
   }
 
   compileExpression(expression, parentId) {
-    const id = this.compileExpressionUnfolded(expression, parentId);
-    // Prefer the reporter's span to its enclosing statement (multi-line inputs).
-    // An inlined body belongs to its definition, not the outer call expression.
-    const node = blockSourceNodes.get(this.blocks[id]);
-    if (node && expression.pos >= node.pos && expression.end <= node.end
-      && expression.getSourceFile?.() === node.getSourceFile?.()) {
-      const location = runtimeSourceLocation(expression, this.replacementSourceFiles, helperOrigins, path.resolve);
-      if (location) this.sourceMap[id] = location;
+    // Assign provenance at block creation, not to the returned id: inline
+    // expansion can return a block owned by another expression or source file.
+    const savedSource = this.currentStatementNode;
+    this.currentStatementNode = expression;
+    try {
+      const id = this.compileExpressionUnfolded(expression, parentId);
+      this.foldPureNumber(id);
+      return id;
+    } finally {
+      this.currentStatementNode = savedSource;
     }
-    this.foldPureNumber(id);
-    return id;
   }
 
   // Fold after inline expansion, so imported wrappers and local bindings work

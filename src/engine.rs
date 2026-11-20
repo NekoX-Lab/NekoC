@@ -5385,7 +5385,7 @@ pub struct Engine {
     ready: VecDeque<usize>,
     dirty: Vec<bool>,
     reset: bool,
-    value_error: Option<String>,
+    value_error: Option<error_location::Diagnostic>,
     stopped: bool,
     restart: bool,
     reporter_depth: usize,
@@ -6814,7 +6814,7 @@ impl Engine {
             let result = self.exec(index, pc, op, actor);
             self.trace_list_changes(index, pc, lengths);
             if let Err(error) = result {
-                self.value_error = Some(format!("{error:#}"));
+                self.value_error = Some(error.into());
                 break;
             }
             if self.value_error.is_some() {
@@ -7810,10 +7810,13 @@ impl Engine {
         {
             value.clone()
         } else {
-            self.value_error = Some(format!(
-                "entity_variable_operation_out_of_scope: {}",
-                self.program.actor_variable_names[slot]
-            ));
+            self.value_error = Some(
+                format!(
+                    "entity_variable_operation_out_of_scope: {}",
+                    self.program.actor_variable_names[slot]
+                )
+                .into(),
+            );
             Cell::Null
         }
     }
@@ -7826,10 +7829,13 @@ impl Engine {
         {
             *cell = value;
         } else {
-            self.value_error = Some(format!(
-                "entity_variable_operation_out_of_scope: {}",
-                self.program.actor_variable_names[slot]
-            ));
+            self.value_error = Some(
+                format!(
+                    "entity_variable_operation_out_of_scope: {}",
+                    self.program.actor_variable_names[slot]
+                )
+                .into(),
+            );
         }
     }
     fn clone_sprite(&mut self, source: usize, split: Option<(f64, f64)>) -> Result<()> {
@@ -8195,10 +8201,13 @@ impl Engine {
             Some(v)
         } else {
             if self.value_error.is_none() {
-                self.value_error = Some(format!(
-                    "list operation received a non-list value ({})",
-                    value.text().chars().take(80).collect::<String>()
-                ));
+                self.value_error = Some(
+                    format!(
+                        "list operation received a non-list value ({})",
+                        value.text().chars().take(80).collect::<String>()
+                    )
+                    .into(),
+                );
             }
             None
         }
@@ -8215,14 +8224,14 @@ impl Engine {
         match Cell::try_concat(a, b) {
             Ok(value) => value,
             Err(error) => {
-                self.value_error.get_or_insert_with(|| error.to_string());
+                self.value_error.get_or_insert_with(|| error.into());
                 Cell::Undefined
             }
         }
     }
     fn append_join_text(&mut self, text: &mut String, value: &Cell) {
         if let Err(error) = value.append_bounded_text(text) {
-            self.value_error.get_or_insert_with(|| error.to_string());
+            self.value_error.get_or_insert_with(|| error.into());
         }
     }
     fn eval_deep_value(&mut self, root: usize, actor: usize) -> Cell {
@@ -8566,11 +8575,14 @@ impl Engine {
                             if self.program.semantics == RuntimeSemantics::Kitten4
                                 && self.value_error.is_none()
                             {
-                                self.value_error = Some(format!(
-                                    "lists_get_value_bad_index (index {:?}, length {})",
-                                    at.and_then(|i| i.checked_add(1)),
-                                    v.len()
-                                ));
+                                self.value_error = Some(
+                                    format!(
+                                        "lists_get_value_bad_index (index {:?}, length {})",
+                                        at.and_then(|i| i.checked_add(1)),
+                                        v.len()
+                                    )
+                                    .into(),
+                                );
                             }
                             Cell::Number(f64::NAN)
                         }
@@ -8873,7 +8885,7 @@ impl Engine {
                 TextPart::Literal(index) => {
                     let literal = &self.program.strings[index];
                     if let Err(error) = value::check_text_growth(value.len(), literal.len()) {
-                        self.value_error.get_or_insert_with(|| error.to_string());
+                        self.value_error.get_or_insert_with(|| error.into());
                     } else {
                         value.push_str(literal);
                     }

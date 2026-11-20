@@ -41,6 +41,12 @@ fn chain(blocks: Vec<Value>) -> Value {
 }
 fn project(body: Vec<Value>, count: usize, k4: bool) -> Value {
     let mut p = Document::blank().value().clone();
+    p["sourceMap"] = json!({
+        "path-begin":{"file":"jit-path.ts","line":3,"column":5},
+        "path-close":{"file":"jit-path.ts","line":4,"column":5},
+        "fill-color":{"file":"jit-path.ts","line":5,"column":5},
+        "invalid-move":{"file":"jit-path.ts","line":7,"column":9}
+    });
     if k4 {
         let source: Value =
             serde_json::from_str(include_str!("fixtures/kitten4/actor-variables.bcm")).unwrap();
@@ -155,6 +161,21 @@ fn compare_with_raster(
                         x.to_string().contains(error.expect("unexpected failure")),
                         "{x:#}"
                     );
+                    assert!(x.to_string().contains("jit-path.ts:"), "{x:#}");
+                    if error == Some("invalid pen path start") {
+                        assert!(
+                            x.to_string()
+                                .ends_with("jit-path.ts:3:5] at block path-begin"),
+                            "{x:#}"
+                        );
+                    }
+                    if error == Some("invalid pen path position") {
+                        assert!(
+                            x.to_string()
+                                .ends_with("jit-path.ts:7:9] at block invalid-move"),
+                            "{x:#}"
+                        );
+                    }
                     if error.is_some_and(|e| {
                         e.contains("requires an actor") || e == "use_pen_blocks_in_scene"
                     }) {
@@ -376,7 +397,7 @@ fn hot_raster_paths_clear_and_invalid_moves_preserve_tier_boundaries() {
                     }});
                     body.insert(
                         body.len() - 1,
-                        json!({"type":"self_move_to","inputs":{"x":x,"y":num(0.0)}}),
+                        json!({"id":"invalid-move","type":"self_move_to","inputs":{"x":x,"y":num(0.0)}}),
                     );
                 }
                 body.extend([json!({"type":"clear_drawing"}), pos(0.0, 0.0)]);

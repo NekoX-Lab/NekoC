@@ -462,7 +462,7 @@ impl Engine {
             // An explicit instruction error (e.g. cyclic append or stack limit)
             // takes precedence over a pending evaluator error, just as in exec.
             if self.jit_error.is_none() {
-                self.jit_error = Some(self.located_error(&error, next.saturating_sub(1), actor));
+                self.jit_error = Some(self.located_error(error, next.saturating_sub(1), actor));
             }
         }
         (used > 0 || self.jit_error.is_some()).then_some(used)
@@ -808,7 +808,7 @@ unsafe extern "C" fn h_error(c: *mut NativeContext, pc: u64, next: u64) -> u64 {
     let engine = unsafe { &mut *c.engine };
     if let Some(error) = engine.value_error.take() {
         engine.tasks[c.index].pc = next as usize;
-        engine.jit_error = Some(engine.located_error(&error, pc as usize, c.actor));
+        engine.jit_error = Some(engine.located_error(error, pc as usize, c.actor));
         1
     } else {
         0
@@ -914,7 +914,7 @@ unsafe extern "C" fn h_position(c: *mut NativeContext, pc: u64, x: f64, y: f64) 
     engine.dirty[actor] = true;
     engine.set_position(actor, x, y, old);
     if let Some(error) = engine.value_error.take() {
-        engine.jit_error = Some(engine.located_error(&error, pc, actor));
+        engine.jit_error = Some(engine.located_error(error, pc, actor));
         return u64::MAX - 1;
     }
     if engine.output_limit_reached() {
@@ -1047,11 +1047,14 @@ fn assign_item(engine: &mut Engine, target: u64, list: u64, at: Option<f64>) {
                     if engine.program.semantics == RuntimeSemantics::Kitten4
                         && engine.value_error.is_none()
                     {
-                        engine.value_error = Some(format!(
-                            "lists_get_value_bad_index (index {:?}, length {})",
-                            index.and_then(|i| i.checked_add(1)),
-                            values.len()
-                        ));
+                        engine.value_error = Some(
+                            format!(
+                                "lists_get_value_bad_index (index {:?}, length {})",
+                                index.and_then(|i| i.checked_add(1)),
+                                values.len()
+                            )
+                            .into(),
+                        );
                     }
                     Cell::Number(f64::NAN)
                 }

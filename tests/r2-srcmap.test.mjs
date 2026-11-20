@@ -51,8 +51,7 @@ test("r2-srcmap does not mistake printed helper coordinates for original source"
   const original = parse('\n\nsetStyle(99);\n');
   const generated = parse('const generated = 0;\nsetStyle(99);\nsetStyle(123);');
   const files = new Map([[file, original]]);
-  assert.deepEqual(runtimeSourceLocation(generated.statements[1], files, new WeakMap(), path.resolve),
-    { file: original.fileName, line: 3, column: 1 });
+  assert.equal(runtimeSourceLocation(generated.statements[1], files, new WeakMap(), path.resolve), null);
   assert.equal(runtimeSourceLocation(generated.statements[2], files, new WeakMap(), path.resolve), null);
   files.set(file, parse('setStyle(99);\nsetStyle(99);'));
   assert.equal(runtimeSourceLocation(generated.statements[1], files, new WeakMap(), path.resolve), null);
@@ -61,6 +60,42 @@ test("r2-srcmap does not mistake printed helper coordinates for original source"
     'resetStyle(99);\nsetStyle( 99 );']) {
     files.set(file, parse(text));
     assert.equal(runtimeSourceLocation(generated.statements[1], files, new WeakMap(), path.resolve), null);
+  }
+});
+
+test("r2-srcmap never attributes reparsed execution to an unused same-text function", () => {
+  const report = compile('function unused() {\n  setStyle(99);\n}\nonStart(() => {\n  setStyle( 99 );\n  console.log(typeof 0);\n});');
+  const block = allBlocks(report).find(b => b.type === "set_sprite_style");
+  assert.ok(block);
+  assert.equal(report.sourceMap[block.id], undefined);
+});
+
+test("r2-srcmap inline return reporters retain definition origins across nested calls", () => {
+  for (const body of ['return listItem("items", "any", 10);', 'return selectText("😀", 1, 1);']) {
+    for (const nested of [false, true]) {
+      const report = compile('import { bad } from "./r2-srcmap-lib";\nonStart(() => {\n  console.log(\n    bad()\n  );\n});',
+        `export function bad() {\n  ${nested ? 'return inner();' : body}\n}\n${nested ? `function inner() {\n  ${body}\n}` : ''}`);
+      const block = allBlocks(report).find(b => b.type === (body.includes('listItem') ? 'list_item' : 'text_select'));
+      assert.deepEqual(report.sourceMap[block.id], {
+        file: path.resolve("r2-srcmap-lib.ts").replaceAll("\\", "/"), line: nested ? 5 : 2, column: 10,
+      });
+    }
+  }
+  const local = compile('function bad() {\n  return selectText("😀", 1, 1);\n}\nonStart(() => { console.log(bad()); });');
+  const block = allBlocks(local).find(b => b.type === 'text_select');
+  assert.equal(local.sourceMap[block.id].line, 2);
+  assert.equal(local.sourceMap[block.id].column, 10);
+});
+
+test("r2-srcmap recursive else-if reporters never inherit earlier branch statements", () => {
+  for (const condition of ['listItem("items", "any", 10)', 'selectText("😀", 1, 1)']) {
+    for (const prior of ['console.log("skip");', 'console.log("a");\n    console.log("b");']) {
+      const source = `onStart(() => {\n  if (false) {\n    ${prior}\n  } else if (false) {\n    console.log("skip again");\n  } else if (\n    ${condition}\n  ) { console.log("yes"); }\n});`;
+      const report = compile(source);
+      const block = allBlocks(report).find(b => b.type === (condition.startsWith('listItem') ? 'list_item' : 'text_select'));
+      assert.equal(report.sourceMap[block.id].line, source.split('\n').findIndex(l => l.includes(condition)) + 1);
+      assert.equal(report.sourceMap[block.id].column, 5);
+    }
   }
 });
 

@@ -165,7 +165,7 @@ fn r2_srcmap_replacement_errors_keep_the_later_reporter_location() {
         (2, "join".into()),
     ]);
     e.eval_value(2, 1);
-    let error = e.value_error.take().unwrap();
+    let error = e.value_error.take().unwrap().to_string();
     assert!(
         error.starts_with("entity_variable_operation_out_of_scope: second [actor"),
         "{error}"
@@ -213,7 +213,7 @@ fn cold_direct_helper_return_reports_pending_value_error_even_when_true() {
 
         assert_eq!(
             exec_at(&mut e, 0).unwrap_err().to_string(),
-            "pending-layout-error at block interp-layout-block-0"
+            "pending-layout-error [actor Sprite (nekoc-default-actor)] at block interp-layout-block-0"
         );
         assert!(e.value_error.is_none());
         assert_eq!(e.tasks[0].pc, 1);
@@ -233,7 +233,7 @@ fn cold_blocking_early_returns_report_pending_error_and_keep_request_side_effect
 
             assert_eq!(
                 exec_at(&mut e, 0).unwrap_err().to_string(),
-                "pending-layout-error at block interp-layout-block-0"
+                "pending-layout-error [actor Sprite (nekoc-default-actor)] at block interp-layout-block-0"
             );
             assert!(e.value_error.is_none());
             assert_eq!(e.tasks[0].pc, 1);
