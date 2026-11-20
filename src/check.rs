@@ -23,6 +23,10 @@ pub struct Diagnostic {
     pub line: Option<u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub column: Option<u64>,
+    /// Original source line, without a line ending; null when unavailable.
+    pub snippet: Option<String>,
+    /// Actionable guidance, separate from the diagnostic message.
+    pub suggestion: String,
 }
 
 impl Diagnostic {
@@ -37,7 +41,22 @@ impl Diagnostic {
             file: value["file"].as_str().map(str::to_owned),
             line: value["line"].as_u64(),
             column: value["column"].as_u64(),
+            snippet: value["snippet"].as_str().map(str::to_owned),
+            suggestion: text("suggestion"),
         }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn with_source_snippet(mut self) -> Self {
+        if let (Some(file), Some(line)) = (&self.file, self.line) {
+            self.snippet = std::fs::read_to_string(file).ok().and_then(|text| {
+                text.replace("\r\n", "\n")
+                    .split(['\n', '\r', '\u{2028}', '\u{2029}'])
+                    .nth(line.saturating_sub(1) as usize)
+                    .map(str::to_owned)
+            });
+        }
+        self
     }
 }
 
@@ -50,7 +69,26 @@ impl std::fmt::Display for Diagnostic {
             }
             write!(f, ": ")?;
         }
-        write!(f, "{} {}: {}", self.severity, self.code, self.message)
+        write!(
+            f,
+            "{} {}: {} [{}]",
+            self.severity, self.code, self.message, self.source
+        )?;
+        if let (Some(snippet), Some(line), Some(column)) = (&self.snippet, self.line, self.column) {
+            // TypeScript columns count UTF-16 code units, including astral
+            // characters. Preserve tabs just as the frontend formatter does.
+            let padding: String = snippet
+                .encode_utf16()
+                .take(column.saturating_sub(1) as usize)
+                .map(|unit| if unit == 9 { '\t' } else { ' ' })
+                .collect();
+            let gutter = " ".repeat(line.to_string().len());
+            write!(f, "\n  {line} | {snippet}\n  {gutter} | {padding}^")?;
+        }
+        if !self.suggestion.is_empty() {
+            write!(f, "\n  help: {}", self.suggestion)?;
+        }
+        Ok(())
     }
 }
 
@@ -128,7 +166,9 @@ pub fn check_file(input: &Path, options: &CheckOptions) -> Result<CheckReport> {
                                 file: issue["source"]["file"].as_str().map(str::to_owned),
                                 line: issue["source"]["line"].as_u64(),
                                 column: issue["source"]["column"].as_u64(),
-                            }));
+                                snippet: None,
+                                suggestion: "Use the name or ID of a sprite declared in the same scene; see docs/api.md for supported actor targets.".into(),
+                            }.with_source_snippet()));
                             None
                         } else {
                             return Err(error);
@@ -173,6 +213,8 @@ pub fn project_diagnostics(project: &Value, file: Option<&str>) -> Result<Vec<Di
             file: file.map(str::to_owned),
             line: None,
             column: None,
+            snippet: None,
+            suggestion: "Fix the reported project structure and rerun nekoc check; regenerate the work from corrected source when available.".into(),
         });
     }
     Ok(out)

@@ -13,7 +13,7 @@ export const docs = [
   "install.md", "compiler-only.md", "syntax.md", "ts-support-audit.md", "api.md", "self-api.md",
   "operators.md", "web-studio.md", "cli-run.md", "pack.md", "extensions.md",
   "kitten-n-compatibility.md", "kitten4.md", "kitten4-block-coverage.md",
-  "kn-block-coverage.md", "player-sdk.md",
+  "kn-block-coverage.md", "player-sdk.md", "ts-diagnostics.md",
 
 ];
 export const samples = [
@@ -67,7 +67,7 @@ export async function checksums(directory) {
 // The frontend is plain ESM that only imports `typescript`, which has no
 // dependencies of its own. Ship the sources plus the parts of the typescript
 // package it loads at runtime: no bundler, no npm install for users.
-export const frontendFiles = ["compile-ts.mjs", "compile-target.mjs", "bitwise.mjs", "control-flow.mjs", "control-expressions.mjs", "share-objects.mjs", "class-metadata.mjs", "test-ts.mjs", "kitten-n.mjs", "portable-path.mjs", "tsstr-types.mjs", "nullable-reads.mjs", "tsstr-numeric.mjs", "tsfeat-values.mjs", "tsfeat-sequences.mjs", "ts-r2-destructure.mjs", "tsfeat-lowering.mjs", "tsfeat-methods.mjs", "tsfeat-classes.mjs", "tsfeat-class-inherit.mjs", "tsfeat-nullable.mjs", "nil-intrinsics.mjs", "tsmap.mjs", "tsmap-types.mjs", "nekoc.d.ts"];
+export const frontendFiles = ["compile-ts.mjs", "diagnostics.mjs", "compile-target.mjs", "bitwise.mjs", "control-flow.mjs", "control-expressions.mjs", "share-objects.mjs", "class-metadata.mjs", "test-ts.mjs", "kitten-n.mjs", "portable-path.mjs", "tsstr-types.mjs", "nullable-reads.mjs", "tsstr-numeric.mjs", "tsfeat-values.mjs", "tsfeat-sequences.mjs", "ts-r2-destructure.mjs", "tsfeat-lowering.mjs", "tsfeat-methods.mjs", "tsfeat-classes.mjs", "tsfeat-class-inherit.mjs", "tsfeat-nullable.mjs", "nil-intrinsics.mjs", "tsmap.mjs", "tsmap-types.mjs", "nekoc.d.ts"];
 const typescriptFiles = ["package.json", "LICENSE.txt", "ThirdPartyNoticeText.txt", "lib/typescript.js"];
 
 async function copyFrontend(copy) {

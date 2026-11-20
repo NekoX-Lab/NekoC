@@ -24,6 +24,8 @@ import { lowerTsCollections } from "./tsmap.mjs";
 import { compileNilIntrinsic, nilIntrinsic } from "./nil-intrinsics.mjs";
 import { classFunctionNames, classSourceOrigins, markClassHelpers } from "./class-metadata.mjs";
 import { bitwiseAssignments, bitwisePlan, bitwiseTokens } from "./bitwise.mjs";
+import { enrichDiagnostic, formatDiagnostic } from "./diagnostics.mjs";
+export { formatDiagnostic } from "./diagnostics.mjs";
 
 /** A compile error. `location` is { file, line, column } (1-based) when known. */
 export class CompileError extends Error {
@@ -140,7 +142,7 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity) {
     return lowered;
   } catch (error) {
     if (error instanceof CompileError) throw error;
-    throw new CompileError(error.message, error.location ?? nodeLocation(sourceFile));
+    throw new CompileError(error.message, error.location ?? nodeLocation(sourceFile), error.code ?? "NEKOC");
   }
 }
 
@@ -7684,13 +7686,12 @@ export function compileFile(inputPath, host = defaultHost, { target = "kitten-n"
     for (const [block, node] of compiler.targetBlocks) checkTargetBlock(compiler, block, node);
     return report;
   } catch (error) {
-    if (error instanceof CompileError) {
-      // Unknown coordinates stay unknown instead of pointing at 1:1.
-      error.location ??= nodeLocation(compiler?.currentStatementNode) ?? { file: inputPath };
-      throw error;
-    }
-    fail(`Internal compiler error: ${error?.message ?? String(error)}`, nodeLocation(compiler?.currentStatementNode)
-      ?? { file: inputPath }, "NEKOC_INTERNAL");
+    const failure = error instanceof CompileError ? error : new CompileError(
+      `Internal compiler error: ${error?.message ?? String(error)}`, null, "NEKOC_INTERNAL");
+    // Unknown coordinates stay unknown instead of pointing at 1:1.
+    failure.location ??= nodeLocation(compiler?.currentStatementNode) ?? { file: inputPath };
+    failure.diagnostics = compileErrorDiagnostics(failure, inputPath, host);
+    throw failure;
   }
 }
 
@@ -7728,6 +7729,8 @@ export function checkTypes(inputPath, host) {
   }
   const program = ts.createProgram([DECLARATIONS, path.resolve(inputPath)], options, compilerHost);
   const declarations = path.resolve(DECLARATIONS);
+  const syntaxKey = d => JSON.stringify([d.file?.fileName, d.start, d.code]);
+  const syntax = new Set(program.getSyntacticDiagnostics().map(syntaxKey));
   return ts.getPreEmitDiagnostics(program)
     .filter((diagnostic) => !diagnostic.file || path.resolve(diagnostic.file.fileName) !== declarations)
     .map((diagnostic) => {
@@ -7736,13 +7739,13 @@ export function checkTypes(inputPath, host) {
         const { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start ?? 0);
         location = { file: diagnostic.file.fileName, line: line + 1, column: character + 1 };
       }
-      return {
+      return enrichDiagnostic({
         severity: diagnostic.category === ts.DiagnosticCategory.Error ? "error" : "warning",
-        source: "types",
+        source: syntax.has(syntaxKey(diagnostic)) ? "syntax" : "types",
         code: `TS${diagnostic.code}`,
         message: ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n"),
         ...location,
-      };
+      }, () => diagnostic.file?.text);
     });
 }
 
@@ -7758,13 +7761,14 @@ export function checkFile(inputPath, { types = true, host, target = "kitten-n" }
     report = compileFile(inputPath, host, { target });
   } catch (error) {
     if (!(error instanceof CompileError)) {
-      diagnostics.push({ severity: "error", source: "compat", code: "NEKOC_INTERNAL",
-        message: `Internal compiler error: ${error?.message ?? String(error)}`, file: inputPath });
+      diagnostics.push(enrichDiagnostic({ severity: "error", source: "compat", code: "NEKOC_INTERNAL",
+        message: `Internal compiler error: ${error?.message ?? String(error)}`, file: inputPath },
+      name => (host ?? defaultHost).readFile(path.resolve(name))));
       return { ok: false, diagnostics, report };
     }
-    for (const item of compileErrorDiagnostics(error, inputPath)) {
+    for (const item of compileErrorDiagnostics(error, inputPath, host)) {
       const duplicate = item.source === "syntax" && diagnostics.some(existing =>
-        existing.source === "types" && existing.severity === item.severity
+        existing.source === "syntax" && existing.severity === item.severity
         && existing.code === item.code && existing.message === item.message
         && existing.line === item.line && existing.column === item.column
         && existing.file && item.file && path.resolve(existing.file) === path.resolve(item.file));
@@ -7775,14 +7779,14 @@ export function checkFile(inputPath, { types = true, host, target = "kitten-n" }
 }
 
 /** Structured compile diagnostics, with messages kept separate from source locations. */
-export function compileErrorDiagnostics(error, file) {
-  return error.diagnostics ?? [{
+export function compileErrorDiagnostics(error, file, host = defaultHost) {
+  return (error.diagnostics ?? [{
     severity: "error",
     source: error.code.startsWith("TS") ? "syntax" : "compat",
     code: error.code,
     message: error.message,
     ...(error.location ?? (file ? { file } : {})),
-  }];
+  }]).map(d => enrichDiagnostic(d, name => host.readFile(path.resolve(name))));
 }
 
 function runtimeContainsIdentifier(expression, name) {
@@ -7830,11 +7834,6 @@ function isConstantDefault(node) {
     || node.kind === ts.SyntaxKind.TrueKeyword || node.kind === ts.SyntaxKind.FalseKeyword;
 }
 
-export function formatDiagnostic(d) {
-  const where = d.file ? d.line && d.column ? `${d.file}:${d.line}:${d.column}` : d.file : "";
-  return `${where ? `${where}: ` : ""}${d.severity} ${d.code}: ${d.message}`;
-}
-
 function main(argv) {
   const flags = new Set(argv.filter((arg) => arg.startsWith("--") && !arg.includes("=")));
   const reportOut = argv.find((arg) => arg.startsWith("--report-out="))?.slice("--report-out=".length);
@@ -7866,10 +7865,13 @@ function main(argv) {
     report = compileFile(inputPath, defaultHost, { target });
   } catch (error) {
     if (!(error instanceof CompileError)) throw error;
-    compileErrorDiagnostics(error, inputPath).forEach((d) => console.error(formatDiagnostic(d)));
+    const diagnostics = compileErrorDiagnostics(error, inputPath);
+    if (flags.has("--json")) console.log(JSON.stringify({ ok: false, diagnostics }));
+    else diagnostics.forEach((d) => console.error(formatDiagnostic(d)));
     process.exit(1);
   }
   fs.writeFileSync(outputPath, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+  if (flags.has("--json")) console.log(JSON.stringify({ ok: true, diagnostics: [] }));
 }
 
 // Compare real paths: Node resolves symlinks for import.meta.url but not for

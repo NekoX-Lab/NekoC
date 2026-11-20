@@ -6,6 +6,10 @@ export interface Diagnostic {
   file?: string;
   line?: number;
   column?: number;
+  /** Original source line without its line ending; null if unavailable. */
+  snippet: string | null;
+  /** Suggested correction, separate from the plain error message. */
+  suggestion: string;
 }
 export type Project = Record<string, unknown>;
 export interface CompileOptions {
