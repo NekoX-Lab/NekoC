@@ -17,7 +17,7 @@ import { compileTarget, checkTargetBlock } from "./compile-target.mjs";
 import { lowerTsValues } from "./tsfeat-values.mjs";
 import { lowerTsSequences } from "./tsfeat-sequences.mjs";
 import { lowerTsDestructuring } from "./ts-r2-destructure.mjs";
-import { lowerTsFeatures } from "./tsfeat-lowering.mjs";
+import { lowerTsFeatures, staticFunctionBindings } from "./tsfeat-lowering.mjs";
 import { lowerTsMethods } from "./tsfeat-methods.mjs";
 import { lowerTsClasses } from "./tsfeat-classes.mjs";
 import { lowerTsNullable } from "./tsfeat-nullable.mjs";
@@ -112,6 +112,9 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity) {
       ts.forEachChild(node, validateRawSyntax);
     };
     validateRawSyntax(sourceFile);
+    // Sequence errors must refer to the user's AST, not reparsed class/nullable
+    // helpers whose virtual lines and columns do not exist in the input.
+    lowerTsSequences(sourceFile, { validateOnly: true });
     // Generated names use the entry-relative module identity, never the machine
     // path. Keep SourceFile.fileName intact for resolution and diagnostics.
     const destructured = lowerTsDestructuring(sourceFile, sourceIdentity);
@@ -539,10 +542,13 @@ class WorkspaceCompiler {
       const originalModule = moduleSourceFile;
       moduleSourceFile = lowerFrontendFeatures(moduleSourceFile,
         path.relative(path.dirname(this.entryPath), resolvedPath).replaceAll("\\", "/"));
+      const staticBindings = staticFunctionBindings.get(moduleSourceFile);
       // Modules only register functions; never silently omit initialization.
       for (const statement of originalModule.statements) {
         if (this.isTypeOnlyStatement(statement) || ts.isImportDeclaration(statement)
           || this.isInlineFunctionDefinition(statement)) continue;
+        if (ts.isVariableStatement(statement) && statement.declarationList.declarations.every(
+          declaration => ts.isIdentifier(declaration.name) && staticBindings?.has(declaration.name.text))) continue;
         // Instance class factories are registered as module-private functions.
         // Static initialization would need source-ordered module execution.
         if (ts.isClassDeclaration(statement) && !statement.members.some(member =>

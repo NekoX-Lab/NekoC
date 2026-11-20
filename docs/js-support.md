@@ -336,7 +336,9 @@ console.log(counter.advance(), counter.value);
 ## 6. 模块与宿主环境
 
 仅支持相对路径、同名 named function imports，导入模块只含函数与类型声明及
-其他此类 imports；模块内供函数使用的普通实例 class 可生成私有工厂，带 static
+其他此类 imports。静态函数绑定包括 function expression、带括号 arrow、多声明
+函数绑定和 const 函数别名；它们不产生要丢弃的模块运行期初始化。模块内供函数
+使用的普通实例 class 可生成私有工厂，带 static
 成员的模块类不在此范围。不能静默丢弃模块顶层初始化：把它移入显式 init 函数。
 不支持默认/namespace/空/副作用 imports、导入别名、value export lists/re-export、
 循环依赖、import=require、动态 import、npm/Node 模块。

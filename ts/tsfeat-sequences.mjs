@@ -2,7 +2,7 @@ import ts from "typescript";
 
 // Statement-level lowering keeps mutable lexical bindings in their original
 // scope; no lifted closure or reporter containing a statement block is needed.
-export function lowerTsSequences(sourceFile) {
+export function lowerTsSequences(sourceFile, { validateOnly = false } = {}) {
   const f = ts.factory;
   const names = new Set();
   const collect = node => { if (ts.isIdentifier(node)) names.add(node.text); ts.forEachChild(node, collect); };
@@ -100,6 +100,9 @@ export function lowerTsSequences(sourceFile) {
     return root => ts.visitNode(root, visit);
   }]);
   try {
+    // Run the identical context checks on the user's tree before nullable/class
+    // passes reparse generated text. Do not print or reparent that dry run.
+    if (validateOnly) return sourceFile;
     const output = result.transformed[0];
     const printer = ts.createPrinter();
     const fix = node => { if (node.pos < 0 || ts.getOriginalNode(node) !== node) node.getText = () => printer.printNode(ts.EmitHint.Unspecified, node, output); ts.forEachChild(node, fix); };
