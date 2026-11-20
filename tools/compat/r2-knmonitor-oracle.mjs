@@ -7,6 +7,12 @@ import { pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { loadPlaywright } from '../probe-kitten4.mjs';
 
+export function stylesheetEvidence(url, body) {
+  const text = body.toString('utf8');
+  const components = ['VariableContent', 'ListWidget', 'StageList'].filter(name => text.includes(name + '_'));
+  return { url, sha256: createHash('sha256').update(body).digest('hex'), components };
+}
+
 export function measureWidgets() {
   const properties = ['fontFamily','fontSize','fontWeight','color','backgroundColor','border','borderRadius','boxShadow','padding','width','height','transform','transformOrigin','lineHeight'];
   return [...document.querySelectorAll('[class*=VariableContent],[class*=ListWidget],[class*=StageList]')]
@@ -26,9 +32,15 @@ export async function main(ids = process.argv.slice(2)) {
   try {
     for (const id of ids) {
       const page = await browser.newPage({ viewport: { width: 1200, height: 800 }, deviceScaleFactor: 1 });
-      const report = { id, url: `https://kn.codemao.cn/player?type=2&workId=${id}`, errors: [], sources: [],
+      const report = { id, url: `https://kn.codemao.cn/player?type=2&workId=${id}`, errors: [], sources: [], stylesheets: [],
         comparison: 'Isolated monitor DOM on the same blank stage; live official display values fed to NekoC StageOverlay, not a whole-VM equivalence claim.' };
       page.on('pageerror', error => report.errors.push(error.message));
+      await page.route(/\.css(?:\?.*)?$/, async route => {
+        const response = await route.fetch(), body = await response.body();
+        const evidence = stylesheetEvidence(route.request().url(), body);
+        if (evidence.components.length) report.stylesheets.push(evidence);
+        await route.fulfill({ response, body });
+      });
       await page.route(/\/main\.[\w-]+\.js(?:\?.*)?$/, async route => {
         const response = await route.fetch(), body = await response.body(), original = body.toString('utf8');
         const marker = 'var __webpack_exports__=';
@@ -68,6 +80,7 @@ export async function main(ids = process.argv.slice(2)) {
         await page.evaluate(() => {
           const store = window.__knMonitorStore;
           const update = store.setStageVariableProperty;
+          window.__knMonitorUpdate = update;
           store.setStageVariableProperty = patch => { const { value, ...display } = patch; update.call(store, display); };
           const canvas = document.getElementById('STAGE_CANVAS'); canvas.style.visibility = 'hidden';
           document.getElementById('PLAYER_STAGE_CONTAINER').style.background = '#fff';
@@ -97,6 +110,21 @@ export async function main(ids = process.argv.slice(2)) {
           await listButton.click(); await page.waitForTimeout(350);
           report.opened = await page.evaluate(measureWidgets);
           await stage.screenshot({ path: path.join(out, `official-${id}-open.png`), timeout: 90000 });
+          report.rowFormatProbe = await page.evaluate(async () => {
+            const format = window.__knMonitorRequire(45578).Qz;
+            const values = [null, [], ['x','y'], [[1],2], ['',null], undefined, [null,undefined], true, { x: 1 }];
+            const store = window.__knMonitorStore, list = store.getStageVariableList().find(v => v.visible && Array.isArray(v.value));
+            const saved = list.value, update = window.__knMonitorUpdate;
+            const wait = () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            // Bypass only our value-freezing wrapper for this in-memory probe;
+            // restore before the same-value NekoC comparison. Never save/publish.
+            update.call(store, { id: list.id, value: values });
+            try {
+              await wait();
+              return { formatted: values.map(value => format(value)),
+                dom: [...document.querySelectorAll('[class*=ListWidget_listValue]')].map(e => e.textContent) };
+            } finally { update.call(store, { id: list.id, value: saved }); await wait(); }
+          });
         }
         await page.evaluate(async ({ source, display }) => {
           const { StageOverlay } = await import('data:text/javascript;base64,' + btoa(unescape(encodeURIComponent(source))));

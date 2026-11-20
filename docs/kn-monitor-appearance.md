@@ -14,7 +14,8 @@
 
 - JS：`https://creation.bcmcdn.com/neko/web/release/static/js/main.d0a9bd01.js`
 - SHA-256：`5082351d82cdd430e91da7f8b3b076f998a89d37395f57adbd3f73f17e7b075f`
-- CSS：`https://creation.bcmcdn.com/neko/web/release/static/css/459.cfc9844a.chunk.css`
+- 组件 CSS：`https://creation.bcmcdn.com/neko/web/release/static/css/main.8f3874f5.css`，包含 `VariableContent`、`ListWidget`、`StageList` 规则；`459.cfc9844a.chunk.css` 不含这些组件规则，不作为本页数值来源。取证工具将实际命中的 CSS URL、SHA-256 和组件名写入 `evidence-<id>.json` 的 `stylesheets`。
+- 2026-11-21 复测该 CSS SHA-256：`6c98aef90b99b34655a99a9e788843fb2b86fb1188cca17dc083e7dd2a7e08c3`。
 - JS 字符偏移：`VariableContent_wrapper` 为 11402582；`ListWidget_slideWrapper` 为 11361464。定位后只检查对应组件及常量模块，不提交 bundle 或官方图像。
 - JS 常量模块 `94521` 的 `g6 = 0.8`；变量组件的 `transform` 使用保存倍率乘以它。
 
@@ -62,6 +63,8 @@ KN_MONITOR_INTEGRATION=1 NEKOC_NODE_MODULES=<同上> node --test tests/r2-knmoni
 `web/overlay.js` 的 KN 分支独立于 K4 canvas／DOM 监视器。节点按变量 ID 保留，列表更新和其它变量变化不重建滚动容器。重载作品、重置、隐藏当前列表会关闭面板；按钮、滚轮和键盘事件不泄漏到作品输入。专用按钮重置宿主播放器的 `gap` 和 hover 背景，避免 Studio／独立播放器的通用按钮 CSS 改变胶囊宽度与颜色；浏览器回归同时加载 `web/play.css` 核对。
 
 旧 `Monitor { id, name, list, value }` 保持四字段不变。旧列表文本最多 100 项，且无法区分 `[]`、`[""]` 或含换行元素，不能拆换行反推行。新增的 `Frame.monitor_lists` 是 `id -> string[]`，来自**实时**全局／角色私有列表，保持元素边界和完整长度，仅 KN 可见列表发送；空 map 不序列化，K4 不发送此字段。旧前端可忽略新增字段，展开列表需前后端版本一同更新。
+
+展开行使用官方模块 `45578` 的 `Qz` 有限深度格式，不使用旧 `Cell::text` 的数组强制转换：顶层 null 为 `null`、undefined 为 `undefined`；数组外包 `[]`，其中子数组直接显示 `[...]`，其它元素按 JS `String(value)`。例如 `[]` → `[]`、`["x","y"]` → `[x,y]`、`[[1],2]` → `[[...],2]`、`["",null]` → `[,null]`。旧摘要及 K4 的转换不变。取证工具同时记录官方格式化函数输出和官方展开 DOM 行，临时值只修改当前页面内存，不保存或发布作品。
 
 ## 已知差异／后续
 

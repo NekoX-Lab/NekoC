@@ -3,11 +3,19 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { knMonitorAppearance, knListGeometry } from '../web/overlay.js';
 import { loadPlaywright } from '../tools/probe-kitten4.mjs';
-import { measureWidgets } from '../tools/compat/r2-knmonitor-oracle.mjs';
+import { measureWidgets, stylesheetEvidence } from '../tools/compat/r2-knmonitor-oracle.mjs';
 
 test('KN oracle exports a self-contained browser measurement without live network at import', () => {
   assert.equal(typeof measureWidgets, 'function');
   assert.ok(measureWidgets.toString().includes('getComputedStyle'));
+});
+
+test('KN CSS evidence identifies component rules rather than assuming a chunk filename', () => {
+  const evidence = stylesheetEvidence('https://example.test/main.css', Buffer.from('.VariableContent_wrapper{x:0}.ListWidget_row{}.StageList_panel{}'));
+  assert.deepEqual(evidence.components, ['VariableContent', 'ListWidget', 'StageList']);
+  assert.match(evidence.sha256, /^[0-9a-f]{64}$/);
+  assert.equal(evidence.url, 'https://example.test/main.css');
+  assert.deepEqual(stylesheetEvidence('other.css', Buffer.from('.unrelated{}')).components, []);
 });
 
 test('KN saved scale, text style and actor label follow the official DOM contract', () => {

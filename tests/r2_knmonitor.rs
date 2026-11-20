@@ -1,6 +1,6 @@
 //! KN list panel payloads use original in-memory projects, not corpus works.
 use nekoc::{
-    engine::{Engine, Frame, Program, encode_frame},
+    engine::{Cell, Engine, Frame, Program, encode_frame},
     kitten4,
     studio::document::Document,
 };
@@ -85,7 +85,7 @@ fn kn_rows_preserve_empty_items_newlines_types_and_full_length() {
         assert!(frame.monitor_lists["empty"].is_empty());
         assert_eq!(frame.monitor_lists["blank"], [""]);
         assert_eq!(frame.monitor_lists["local"], ["", "x\ny"]);
-        assert_eq!(frame.monitor_lists["typed"], ["7", "true", "", "x,y"]);
+        assert_eq!(frame.monitor_lists["typed"], ["7", "true", "null", "[x,y]"]);
         assert!(!frame.monitor_lists.contains_key("hidden"));
         assert!(!frame.monitor_lists.contains_key("scalar"));
         let wire = wire(&frame);
@@ -98,6 +98,60 @@ fn kn_rows_preserve_empty_items_newlines_types_and_full_length() {
             let monitor = frame.monitors.iter().find(|m| m.id == id).unwrap();
             assert_eq!(monitor.value, items[..100].join("\n") + "\n…");
         }
+    }
+}
+
+#[test]
+fn kn_rows_use_official_shallow_array_format_for_global_and_private_lists() {
+    let mut project = project();
+    let values = json!([null, [], ["x", "y"], [[1], 2], ["", null], [null, [2], [[3]]],
+        {"x": 1}, "", "first\nsecond", true]);
+    let expected = [
+        "null",
+        "[]",
+        "[x,y]",
+        "[[...],2]",
+        "[,null]",
+        "[null,[...],[...]]",
+        "[object Object]",
+        "",
+        "first\nsecond",
+        "true",
+    ];
+    project["variables"]["variablesDict"]["global"] =
+        declaration("global", "list", values.clone(), true);
+    project["variables"]["variablesDict"]["private"] = private_list(values);
+    for jit in [false, true] {
+        let mut vm = engine(&project, jit);
+        for list in [
+            vm.variable_value("global"),
+            vm.entity_variable_value(ACTOR, "private"),
+        ] {
+            let Cell::List(items) = list else {
+                panic!("expected live list");
+            };
+            // JSON declarations cannot represent undefined. Insert typed live
+            // values through the SDK's shared list handle, for both owners.
+            items.borrow_mut().push(Cell::Undefined);
+            items
+                .borrow_mut()
+                .push(Cell::List(std::rc::Rc::new(std::cell::RefCell::new(vec![
+                    Cell::Null,
+                    Cell::Undefined,
+                ]))));
+        }
+        let mut expected = expected.to_vec();
+        expected.extend(["undefined", "[null,undefined]"]);
+        let frame = frame(&mut vm);
+        for id in ["global", "private"] {
+            assert_eq!(frame.monitor_lists[id], expected);
+        }
+        let encoded = wire(&frame);
+        assert_eq!(encoded["monitor_lists"]["global"], json!(expected));
+        assert_eq!(encoded["monitor_lists"]["private"], json!(expected));
+        assert_legacy_monitors(&encoded);
+        let legacy = frame.monitors.iter().find(|m| m.id == "global").unwrap();
+        assert!(legacy.value.starts_with("\n\nx,y\n1,2\n,\n"));
     }
 }
 
