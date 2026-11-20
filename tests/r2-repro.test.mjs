@@ -107,3 +107,15 @@ test('r2-repro: an older backend fails negotiation before any input frame',async
     assert.equal(sent.length,1);assert.equal(connection.ready,false);
   }finally{connection.close();}
 });
+
+test('r2-repro: idle failure notifies once; intentional close does not notify',async()=>{
+  let socket;const failures=[];
+  const backend={connect(){socket={send(){},close(){}};queueMicrotask(()=>socket.onopen());return socket;}};
+  const connection=new PlayerConnection(new ExtensionRegistry(),null);
+  connection.onFailure=error=>failures.push(error.message);
+  const open=async()=>{const pending=connection.open({toolType:'KN'},backend,{seed:'1'});await flush();socket.onmessage({data:JSON.stringify({ready:true,repro:metadata})});await pending;};
+  try{
+    await open();socket.onclose();socket.onclose();assert.deepEqual(failures,['运行时连接已关闭']);assert.equal(connection.ready,false);
+    await open();connection.close();socket.onclose();assert.equal(failures.length,1);
+  }finally{connection.close();}
+});

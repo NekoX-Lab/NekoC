@@ -86,13 +86,15 @@ export class PlayerConnection {
   // Read-only request on this VM's loopback, same-origin protected socket.
   snapshot(){return this.frame({debug_snapshot:true});}
   reproStatus(){if(!this.repro)return Promise.reject(Error('当前会话没有录制'));return this.frame({repro_status:true});}
-  fail(error){
+  fail(error,notify=true){
+    const active=!!(this.socket||this.ready||this.pending||this.openReject);
     this.microphone?.close();this.microphone=null;
     this.device?.close?.();
     this.extensionSession?.close();this.extensionSession=null;
     this.ready=false;clearTimeout(this.timer);this.openReject?.(error);this.openReject=null;
     this.pending?.reject(error);this.pending=null;
     const socket=this.socket;this.socket=null;socket?.close();
+    if(active&&notify)this.onFailure?.(error);
   }
-  close(){this.fail(Error('运行已停止'));}
+  close(){this.fail(Error('运行已停止'),false);}
 }

@@ -528,6 +528,33 @@ pub fn canonical_sha256(value: &Value) -> Result<String> {
     Ok(format!("{hash:x}", hash = hash.finalize()))
 }
 
+/// Match JSON.parse/stringify's numeric transport semantics in the actual
+/// executable input, not only its fingerprint. Keep the ordinary runner's
+/// signed-zero and integer behavior unchanged outside repro sessions.
+pub fn normalize_browser_numbers(value: &mut Value) -> Result<()> {
+    let mut pending = vec![value];
+    while let Some(value) = pending.pop() {
+        match value {
+            Value::Number(number) => {
+                let number = number
+                    .as_f64()
+                    .context("repro JSON number cannot be represented as f64")?;
+                // Reparse the browser's serialized spelling: integral metadata
+                // (e.g. K4 version 25) must stay an integer, not become 25.0.
+                *value = if number.is_finite() {
+                    serde_json::from_str(&crate::js_number::text(number))?
+                } else {
+                    Value::Null
+                };
+            }
+            Value::Array(array) => pending.extend(array.iter_mut()),
+            Value::Object(object) => pending.extend(object.values_mut()),
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
 #[derive(Default)]
 pub struct ReplayOptions {
     pub ticks: Option<usize>,

@@ -84,6 +84,10 @@ async function install(report){
 }
 async function launch(){
   if(!playable)return;
+  if(recorder&&(recorder.interrupted||!connection?.ready||!connection.repro)){
+    recorder.interrupt();pause('录制已中断 · 请停止并导出');return;
+  }
+  if(document.hidden){pause('已暂停 · 页面切到后台');return;}
   if(connection?.ready)void connection.requestDevicePermission();
   if(!connection?.ready){
     input?.reset();
@@ -93,6 +97,7 @@ async function launch(){
     if(new URLSearchParams(location.search).has('compare'))window.nekoCompareZero=await next.snapshot();
     epoch++;lastFrame=null;totalUpdates=0;
   }
+  if(document.hidden){pause('已暂停 · 页面切到后台');return;}
   clearKeys();resetMeter();running=true;lastTick=performance.now();nextDue=lastTick;queueMicrotask(pump);
   if(!recorder){audio.resume();renderer.pauseMedia(false);}extension?.reportStatus('connected');
   status(recorder?'录制中 · 固定 60 Hz / 种子 1':'运行中');focusStage();syncControls();
@@ -216,9 +221,14 @@ $('#record').onclick=()=>action(async()=>{
   renderer.pauseMedia();
   input.mouse={x:0,y:0};
   const next=new PlayerConnection();connection=next;
+  next.onFailure=error=>{
+    if(connection!==next||!recorder)return;
+    recorder.interrupt();epoch++;pause('录制已中断 · 请停止并导出');notice(error.message);
+  };
   try{
     const ready=await next.open(project,backend,{seed:'1'});
     recorder=new ReproRecorder(ready.repro,await next.reproStatus(),input.queueStats);
+    if(!next.ready)throw Error('录制会话已断开');
   }catch(error){next.close();connection=null;throw error;}
   epoch++;lastFrame=null;totalUpdates=0;sendCostumes=false;overlay.reset();
   await launch();

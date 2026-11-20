@@ -32,7 +32,25 @@ test('r2-repro: browser recording and CLI replay produce the same state', {
     browser=await loadPlaywright().chromium.launch({headless:true,
       ...(process.env.NEKOC_BROWSER_CHANNEL?{channel:process.env.NEKOC_BROWSER_CHANNEL}:process.platform==='win32'?{channel:'msedge'}:{}),
       args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox']});
-    for(const fixture of ['tests/fixtures/input-kn.bcmkn','tests/fixtures/kitten4/input.bcm']){
+    // Keep literal JSON numbers in the original file: stringify would erase -0
+    // and round the large integers before the browser ever imports them.
+    const numericSource=JSON.parse(await readFile('tests/fixtures/input-kn.bcmkn','utf8'));
+    numericSource.variables.variablesDict['a-down'].value='NEGATIVE_ZERO';
+    numericSource.actors.actorsDict['nekoc-default-actor'].nekoBlockJsonList=[{
+      type:'on_running_group_activated',next:{type:'variables_set',fields:{variable:'ready'},inputs:{value:{
+        type:'text_join',mutation:'<mutation items="2"></mutation>',inputs:{
+          ADD0:{type:'text',fields:{TEXT:'result='}},
+          ADD1:{type:'math_arithmetic',fields:{type:'divide'},inputs:{A:{type:'math_number',fields:{NUM:1}},B:{type:'variables_get',fields:{variable:'a-down'}}}},
+        },
+      }}},
+    }];
+    numericSource.numeric_edges='NUMERIC_EDGES';
+    for(const [name,value] of Object.entries({large:'LARGE_INTEGER',unsigned:'UNSIGNED_INTEGER',tiny:5e-324,max:Number.MAX_VALUE})){
+      numericSource.variables.variablesDict[`edge-${name}`]={...numericSource.variables.variablesDict['a-down'],id:`edge-${name}`,name:`edge-${name}`,value};
+    }
+    const numericFixture=path.join(dir,'numeric-edges.bcmkn');
+    await writeFile(numericFixture,JSON.stringify(numericSource).replace('"NEGATIVE_ZERO"','-0').replace('"LARGE_INTEGER"','9007199254740993').replace('"UNSIGNED_INTEGER"','18446744073709551615').replace('"NUMERIC_EDGES"','[-0,9007199254740993,18446744073709551615,5e-324,1.7976931348623157e308]'));
+    for(const fixture of ['tests/fixtures/input-kn.bcmkn','tests/fixtures/kitten4/input.bcm',numericFixture]){
       await t.test(fixture,async()=>{
         const page=await browser.newPage({viewport:{width:1280,height:900},acceptDownloads:true}),errors=[];
         page.on('pageerror',error=>errors.push(error.message));
@@ -59,6 +77,12 @@ test('r2-repro: browser recording and CLI replay produce the same state', {
           await page.locator('#toggle').click();
           await page.waitForFunction(()=>!window.nekoPlayDiagnostics().running&&!window.nekoPlayDiagnostics().pending);
           const before=await page.evaluate(()=>window.nekoPlaySnapshot());
+          if(fixture===numericFixture){
+            assert.equal(before.variables.ready,'result=Infinity');
+            assert.equal(before.variables['edge-large'],9007199254740992);
+            assert.equal(before.variables['edge-unsigned'],18446744073709552000);
+            assert.equal(before.variables['edge-tiny'],5e-324);assert.equal(before.variables['edge-max'],Number.MAX_VALUE);
+          }
           const downloadPromise=page.waitForEvent('download');await page.locator('#record').click();
           const download=await downloadPromise;assert.equal(download.suggestedFilename(),'neko-repro.json');
           const recording=path.join(dir,`${path.basename(fixture)}.json`);await download.saveAs(recording);
@@ -106,5 +130,81 @@ test('r2-repro: browser recording and CLI replay produce the same state', {
         assert.equal(result.repro.matched,true);assert.equal(result.repro.complete_recording,false);
       }finally{await page.close();}
     });
+    for(const resume of [false,true])await t.test(`idle disconnect ${resume?'rejects resume':'exports directly'} without a new host session`,async()=>{
+      const page=await browser.newPage({acceptDownloads:true});
+      try{
+        await instrumentTransport(page);
+        await page.goto(`${origin}/play`);
+        await page.waitForFunction(()=>window.nekoPlayDiagnostics&&!window.nekoPlayDiagnostics().busy);
+        await page.locator('#record').click();
+        await page.waitForFunction(()=>window.nekoPlayDiagnostics().totalUpdates>=3);
+        await page.locator('#toggle').click();
+        await page.waitForFunction(()=>!window.nekoPlayDiagnostics().pending&&!window.nekoPlayDiagnostics().busy);
+        const before=await page.evaluate(()=>window.nekoPlaySnapshot());
+        await page.evaluate(async()=>{
+          const {K4DeviceHost}=await import('/k4-device.js');
+          const {KnMicrophone}=await import('/kn-microphone.js');
+          window.hostStarts=0;
+          K4DeviceHost.prototype.requestPermission=()=>{window.hostStarts++;throw Error('unexpected device initialization');};
+          KnMicrophone.prototype.start=()=>{window.hostStarts++;throw Error('unexpected microphone initialization');};
+          window.testSockets.at(-1).close();
+        });
+        await page.waitForFunction(()=>document.querySelector('#toggle').disabled);
+        // Even a stale/programmatic invocation must not take launch's normal path.
+        if(resume)await page.evaluate(()=>document.querySelector('#toggle').onclick());
+        assert.equal(await page.evaluate(()=>window.nekoPlayDiagnostics().running),false);
+        assert.equal(await page.evaluate(()=>window.testSent.filter(v=>v.toolType||v.nekoc_extension_handshake).length),1);
+        assert.equal(await page.evaluate(()=>window.hostStarts),0);
+        const pending=page.waitForEvent('download');await page.locator('#record').click();
+        const recording=path.join(dir,`idle-${resume}.json`);await(await pending).saveAs(recording);
+        const bundle=JSON.parse(await readFile(recording,'utf8'));
+        assert.equal(bundle.diagnostics.interrupted,true);
+        const result=JSON.parse((await exec(binary('nekoc'),['run','tests/fixtures/input-kn.bcmkn','--input-script',recording])).stdout);
+        assert.equal(result.repro.matched,true);assert.equal(result.repro.complete_recording,false);assert.deepEqual(result.snapshot,before);
+      }finally{await page.close();}
+    });
+    await t.test('hidden during ready handshake keeps a zero-frame paused recording',async()=>{
+      const page=await browser.newPage({acceptDownloads:true});
+      try{
+        await instrumentTransport(page);
+        await page.goto(`${origin}/play`);
+        await page.waitForFunction(()=>window.nekoPlayDiagnostics&&!window.nekoPlayDiagnostics().busy);
+        await page.evaluate(()=>window.delayReady=true);
+        await page.locator('#record').click();
+        await page.waitForFunction(()=>!!window.releaseReady);
+        await page.evaluate(()=>{
+          Object.defineProperty(document,'hidden',{configurable:true,get:()=>true});
+          document.dispatchEvent(new Event('visibilitychange'));window.releaseReady();
+        });
+        await page.waitForFunction(()=>!window.nekoPlayDiagnostics().busy);
+        const state=await page.evaluate(()=>window.nekoPlayDiagnostics());
+        assert.equal(state.recording,true);assert.equal(state.running,false);assert.equal(state.totalUpdates,0);assert.equal(state.pending,false);
+        assert.equal(await page.evaluate(()=>window.testSent.filter(v=>'dt' in v).length),0);
+        const pending=page.waitForEvent('download');await page.locator('#record').click();
+        const recording=path.join(dir,'hidden-zero.json');await(await pending).saveAs(recording);
+        const bundle=JSON.parse(await readFile(recording,'utf8'));assert.equal(bundle.timeline.length,0);assert.equal(bundle.diagnostics.interrupted,false);
+        const result=JSON.parse((await exec(binary('nekoc'),['run','tests/fixtures/input-kn.bcmkn','--input-script',recording])).stdout);
+        assert.equal(result.repro.matched,true);
+      }finally{await page.close();}
+    });
   }finally{await browser?.close();child.kill();await rm(dir,{recursive:true,force:true});}
 });
+
+// Only inject at the real transport boundary; the page, protocol and Rust VM
+// remain unmodified. The ready gate models visibility changing during await.
+async function instrumentTransport(page){
+  await page.addInitScript(()=>{
+    const Native=window.WebSocket;window.testSockets=[];window.testSent=[];
+    window.WebSocket=class extends Native{
+      constructor(...args){
+        super(...args);window.testSockets.push(this);
+        this.addEventListener('message',event=>{
+          if(window.delayReady&&typeof event.data==='string'&&JSON.parse(event.data).ready){
+            event.stopImmediatePropagation();window.releaseReady=()=>{window.delayReady=false;this.onmessage(event);};
+          }
+        });
+      }
+      send(text){window.testSent.push(JSON.parse(text));return super.send(text);}
+    };
+  });
+}

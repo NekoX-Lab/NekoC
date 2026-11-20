@@ -337,7 +337,12 @@ impl Player {
         let (project, repro) = if let Some(config) = handshake.repro {
             // Match /api/import for both raw CLI works and already-imported Web
             // projects. Reimporting canonical KN data is deliberately stable.
-            let (project, _) = import(handshake.project)?;
+            let mut source = handshake.project;
+            crate::repro::normalize_browser_numbers(&mut source)?;
+            let (mut project, _) = import(source)?;
+            // The browser also serializes the import response before sending
+            // its handshake; normalize converter-created numbers as well.
+            crate::repro::normalize_browser_numbers(&mut project)?;
             let metadata = crate::repro::Metadata {
                 runner: crate::repro::Runner::default(),
                 work_sha256: crate::repro::canonical_sha256(&project)?,

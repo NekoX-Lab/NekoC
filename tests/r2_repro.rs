@@ -666,3 +666,48 @@ fn old_input_scripts_keep_their_engine_path_and_explicit_ticks() {
     let report: Value = serde_json::from_slice(&output.stdout).unwrap();
     assert_eq!(report["ticks"], 1);
 }
+
+#[test]
+fn repro_execution_normalizes_browser_numbers_not_only_the_fingerprint() {
+    let mut source = project();
+    source["variables"]["variablesDict"]["down"]["value"] = json!(-0.0);
+    source["numeric_edges"] = serde_json::from_str::<Value>(
+        r#"[-0.0,9007199254740993,18446744073709551615,5e-324,1.7976931348623157e308]"#,
+    )
+    .unwrap();
+    source["actors"]["actorsDict"][ACTOR]["nekoBlockJsonList"] = json!([{
+        "type":"on_running_group_activated","next":set("wait_done", json!({
+            "type":"text_join","mutation":"<mutation items=\"2\"></mutation>","inputs":{
+                "ADD0":{"type":"text","fields":{"TEXT":"result="}},
+                "ADD1":{"type":"math_arithmetic","fields":{"type":"divide"},"inputs":{
+                    "A":num(1.0),"B":{"type":"variables_get","fields":{"variable":"down"}}
+                }}
+            }
+        }))
+    }]);
+    let mut browser = source.clone();
+    repro::normalize_browser_numbers(&mut browser).unwrap();
+    assert!(
+        !browser["numeric_edges"][0]
+            .as_f64()
+            .unwrap()
+            .is_sign_negative()
+    );
+    assert_eq!(
+        browser["numeric_edges"][1].as_f64(),
+        Some(9007199254740992.0)
+    );
+    assert_eq!(
+        browser["numeric_edges"][3].as_f64(),
+        Some(f64::from_bits(1))
+    );
+    assert_eq!(browser["numeric_edges"][4].as_f64(), Some(f64::MAX));
+    let (package, snapshot) = record(&browser, &inputs()[..1]);
+    assert_eq!(snapshot["variables"]["wait_done"], "result=Infinity");
+    assert_eq!(
+        repro::replay(&source, &package, &ReplayOptions::default()).unwrap()["snapshot"],
+        snapshot
+    );
+    let ordinary = nekoc::cli_run::run(&source, 1, &[], 1, &Default::default()).unwrap();
+    assert_eq!(ordinary["variables"]["wait_done"], "result=-Infinity");
+}
