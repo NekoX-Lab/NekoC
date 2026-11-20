@@ -59,7 +59,8 @@ test("r2-determinism diagnostics retain real imported source paths", () => {
   assert.throws(() => compileAt(root, 'import { invalid } from "../lib"; invalid();', {
     "lib.ts": 'export function invalid() { class Inner {} return new Inner(); }',
   }), error => error instanceof CompileError
-    && error.location?.file === path.resolve(root, "lib.ts")
+    && typeof error.location?.file === "string"
+    && path.resolve(error.location.file) === path.resolve(root, "lib.ts")
     && error.location.line > 0);
 });
 
