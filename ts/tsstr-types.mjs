@@ -5,7 +5,7 @@ import { createNullableReadAnalysis } from "./nullable-reads.mjs";
 // Reuse the exact ASTs compiled by the frontend, including imported functions.
 // A small ambient library keeps this usable in the browser and memory hosts;
 // it supplies only type information, never runtime implementations.
-const ambient = `
+export const expressionTypeAmbient = `
 interface Array<T> {
   [n: number]: T; length: number;
   join(separator?: string): string;
@@ -27,19 +27,26 @@ interface Array<T> {
   splice(start: number, count?: number, ...values: T[]): T[];
   fill(value: T): T[];
 }
-interface ReadonlyArray<T> { readonly [n: number]: T; readonly length: number; }
+interface ReadonlyArray<T> {
+  readonly [n: number]: T; readonly length: number;
+  join(separator?: string): string; slice(start?: number, end?: number): T[];
+}
+interface Number { toString(radix?: number): string; toFixed(digits?: number): string; }
 interface String {
   readonly length: number; [n: number]: string;
+  toString(): string; concat(...items: string[]): string;
+  at(index: number): string | undefined;
   replace(search: string, replacement: string): string;
   replaceAll(search: string, replacement: string): string;
   trim(): string; trimStart(): string; trimEnd(): string;
   toUpperCase(): string; toLowerCase(): string;
   padStart(length: number, fill?: string): string;
   padEnd(length: number, fill?: string): string; repeat(count: number): string;
-  charAt(index: number): string;
+  charAt(index?: number): string; charCodeAt(index: number): number;
   slice(start?: number, end?: number): string;
-  substring(start: number, end?: number): string;
-  split(separator: string): string[]; indexOf(search: string): number;
+  substring(start?: number, end?: number): string;
+  split(separator?: string, limit?: number): string[]; indexOf(search: string, from?: number): number;
+  lastIndexOf(search: string, from?: number): number;
   includes(search: string): boolean; startsWith(search: string): boolean;
   endsWith(search: string): boolean;
 }
@@ -64,6 +71,8 @@ declare namespace Array {
   function from<T>(value: { length: number }, fn: (value: any, index: number) => T): T[];
 }
 declare function String(value?: any): string;
+declare namespace String { function fromCharCode(...codes: number[]): string; }
+declare namespace JSON { function stringify(value: any): string; }
 declare function Number(value?: any): number;
 declare function parseInt(value: any, radix?: number): number;
 declare function parseFloat(value: any): number;
@@ -80,7 +89,7 @@ export function createExpressionTypes(files, declarations = "", path = portableP
   const libPath = ts.sys ? ts.getDefaultLibFilePath(options) : path.resolve("/lib.es2020.d.ts");
   const hasLibrary = typeof readLibrary(libPath) === "string";
   if (!hasLibrary) options.noLib = true;
-  sources.set(ambientPath, ts.createSourceFile(ambientPath, (hasLibrary ? "" : ambient) + declarations, ts.ScriptTarget.Latest, true));
+  sources.set(ambientPath, ts.createSourceFile(ambientPath, (hasLibrary ? "" : expressionTypeAmbient) + declarations, ts.ScriptTarget.Latest, true));
   const source = name => {
     const key = path.resolve(name);
     if (sources.has(key)) return sources.get(key);

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import path from "node:path";
 import fs from "node:fs";
+import vm from "node:vm";
+import { spawnSync } from "node:child_process";
 import ts from "typescript";
 import { compileFile, checkFile } from "../ts/compile-ts.mjs";
 import { lowerTsMethods } from "../ts/tsfeat-methods.mjs";
@@ -87,6 +89,110 @@ test("r3 strings: composing regex inputs does not admit numeric, unknown or null
       const checked = checkFile("r3-string.ts", { types, host: host(source) });
       assert.equal(checked.ok, false, source);
       assert.ok(checked.diagnostics.some(d => message.test(d.message)), JSON.stringify(checked));
+    }
+  }
+});
+
+test("r3 strings: numeric formatting and string indexes compose without host libraries", () => {
+  const sources = [
+    'console.log(/1/.test((1).toString()));',
+    'console.log(/1/.test((1).toFixed(0)));',
+    'function match(n: number) { console.log(/1/.test(n.toString())); } match(1);',
+    'const s: string = "abc"; console.log(/a/.test(s[0]));',
+    'const s = (1).toString(); console.log(/1/.test(s));',
+    'const s = (1).toFixed(0); console.log(/1/.test(s));',
+    'function match(n: number) { const s = n.toString(10); console.log(/1/.test(s.trim())); } match(1);',
+    'console.log(/a/.test(["a", "b"].slice(0, 1).join("")));',
+    'console.log(/a/.test("a".concat("b")));',
+    'console.log(/a/.test(String.fromCharCode(97)));',
+    'console.log(/a/.test(JSON.stringify("a")));',
+    'function match(s: string | null) { if (s !== null) console.log(/a/.test(s)); } match("a");',
+    'function match(s: "a" | "b") { console.log(/a/.test(s)); } match("a");',
+    'let calls = 0; function next(): number { calls++; return 1; } console.log(/1/.test(next().toString()), calls);',
+  ];
+  for (const source of sources) {
+    const memory = { readFile: name => name === path.resolve("r3-string.ts") ? source : undefined };
+    compileFile("r3-string.ts", memory);
+    assert.equal(checkFile("r3-string.ts", { types: false, host: memory }).ok, true, source);
+    for (const types of [false, true]) {
+      const checked = checkFile("r3-string.ts", { types, host: host(source) });
+      assert.equal(checked.ok, true, JSON.stringify({ source, types, checked }));
+    }
+    assertJsLogs(source);
+  }
+});
+
+test("r3 strings: trusted string DSL producers compose with regex and match the Node adapter", () => {
+  const sources = [
+    'console.log(/a/.test(join("a", "b")));',
+    'const s = join("a", "b"); console.log(/a/.test(s));',
+    'console.log(/a/.test(selectText("abc", 1, 1)));',
+    'console.log(/a/.test(String(splitText("ab", "b")[0])));',
+    'console.log(/1/.test(toString(1)));',
+    'console.log(/a/.test(join(" a", " " ).trim()));',
+    'let calls = 0; function input(): string { calls++; return "a"; } console.log(/a/.test(join(input(), "b")), calls);',
+    'setVar("text", "a"); console.log(/a/.test(getVar<string>("text")));',
+    'setVar("text", "a"); const text = getVar<string>("text"); console.log(/a/.test(text));',
+  ];
+  for (const source of sources) {
+    compile(source);
+    for (const types of [false, true]) {
+      const checked = checkFile("r3-string.ts", { types, host: host(source) });
+      assert.equal(checked.ok, true, JSON.stringify({ source, types, checked }));
+    }
+  }
+  const source = sources.join("\n");
+  const expected = [];
+  const variables = new Map();
+  vm.runInNewContext(ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText, {
+    join: (...values) => values.join(""),
+    selectText: (text, start, end) => text.slice(start - 1, end),
+    splitText: (text, separator) => text.split(separator), toString: String,
+    setVar: (name, value) => variables.set(name, value), getVar: name => variables.get(name),
+    console: { log: (...args) => expected.push(args.map(String).join(" ")) },
+  }, { timeout: 5000 });
+  const dir = fs.mkdtempSync(path.resolve("target/r3-string-dsl-"));
+  try {
+    const input = path.join(dir, "main.ts"), output = path.join(dir, "main.bcmkn");
+    fs.writeFileSync(input, source);
+    const bin = path.resolve("target/debug", process.platform === "win32" ? "nekoc.exe" : "nekoc");
+    for (const args of [["build", input, "-o", output], ["run", output, "--ticks", "120"]]) {
+      const result = spawnSync(bin, args, { encoding: "utf8", env: { ...process.env, NEKOC_FRONTEND: path.resolve("ts") } });
+      assert.equal(result.status, 0, result.stderr);
+      if (args[0] === "run") assert.deepEqual(JSON.parse(result.stdout).logs, expected);
+    }
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("r3 strings: shared ambient facts do not trust user producers or erase nullable results", () => {
+  for (const source of [
+    'class Text { toString(): number { return 1; } } console.log(/1/.test(new Text().toString()));',
+    'class Text { toFixed(n: number): number { return n; } } console.log(/1/.test(new Text().toFixed(1)));',
+    'console.log(/a/.test(splitText("ab", "b")[0]));',
+    'console.log(/a/.test(getVar("text")));',
+    'console.log(/a/.test(getVar<string | null>("text")));',
+    'function value(): string | null { return null; } console.log(/a/.test(value()));',
+    'function value(): string | undefined { return undefined; } console.log(/a/.test(value()));',
+    'function value(): any { return 1; } console.log(/a/.test(value()));',
+    'function value(): unknown { return 1; } console.log(/a/.test(value()));',
+    'function value(): string | number { return 1; } console.log(/a/.test(value()));',
+  ]) {
+    assert.throws(() => lowerTsMethods(ts.createSourceFile("r3-string.ts", source, ts.ScriptTarget.Latest, true), fs.readFileSync("ts/nekoc.d.ts", "utf8")), /statically string/, source);
+    assert.throws(() => compile(source), /statically string|may be null or undefined/, source);
+    for (const types of [false, true]) assert.equal(checkFile("r3-string.ts", { types, host: host(source) }).ok, false, source);
+  }
+  for (const source of [
+    'function join(a: string, b: string): number { return 1; } console.log(/1/.test(join("a", "b")));',
+    'function join(a: string, b: string): string { return a + b; } console.log(/a/.test(join("a", "b")));',
+    'function f(join: any) { return /a/.test("a"); }',
+    'function f(String: any, n: number) { return /1/.test(n.toString()); }',
+  ]) {
+    assert.throws(() => compile(source), /shadowed/, source);
+    for (const types of [false, true]) {
+      const checked = checkFile("r3-string.ts", { types, host: host(source) });
+      assert.ok(checked.diagnostics.some(d => /shadowed/.test(d.message)), JSON.stringify(checked));
     }
   }
 });

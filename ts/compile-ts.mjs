@@ -198,10 +198,11 @@ function rejectAsyncSyntax(node, scopes = new WeakMap()) {
   ts.forEachChild(node, child => rejectAsyncSyntax(child, scopes));
 }
 
-function lowerFrontendFeatures(sourceFile, sourceIdentity) {
+function lowerFrontendFeatures(sourceFile, sourceIdentity, declarations) {
   try {
     rejectAsyncSyntax(sourceFile);
     validateUnsupportedSyntax(sourceFile, (node, message) => fail(message, nodeLocation(node)));
+    let hasRegexTest = false;
     // Validate raw entry/module identifiers before lexical renaming or helper
     // registration can hide a collision with the compiler's bitwise procedures.
     const validateRawSyntax = node => {
@@ -217,6 +218,7 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity) {
         const member = receiver.parent, call = member?.parent;
         const directTest = member && ts.isPropertyAccessExpression(member) && member.expression === receiver
           && member.name.text === "test" && call && ts.isCallExpression(call) && call.expression === member;
+        hasRegexTest ||= directTest;
         // Keep existing, original-call diagnostics for unsupported String
         // overloads (especially replacement calls inside class/nullable code).
         const stringOverload = member && ts.isCallExpression(member) && member.arguments.includes(receiver)
@@ -239,6 +241,8 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity) {
     // Sequence errors must refer to the user's AST, not reparsed class/nullable
     // helpers whose virtual lines and columns do not exist in the input.
     lowerTsSequences(sourceFile, { validateOnly: true });
+    // Validate before nullable lowering erases null/undefined type arguments.
+    if (hasRegexTest) lowerTsMethods(sourceFile, declarations, { validateRegexOnly: true, sourceIdentity });
     // Generated names use the entry-relative module identity, never the machine
     // path. Keep SourceFile.fileName intact for resolution and diagnostics.
     const destructured = lowerTsDestructuring(sourceFile, sourceIdentity);
@@ -248,7 +252,7 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity) {
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
       .map(node => node.name.text));
-    const lowered = lowerTsFeatures(lowerTsSequences(lowerTsValues(lowerTsMethods(classes, sourceIdentity))), sourceIdentity);
+    const lowered = lowerTsFeatures(lowerTsSequences(lowerTsValues(lowerTsMethods(classes, declarations, { sourceIdentity }))), sourceIdentity);
     if (names.size) {
       const file = ts.getOriginalNode(lowered);
       markClassHelpers(file, names);
@@ -710,7 +714,8 @@ class WorkspaceCompiler {
       rejectParseDiagnostics(moduleSourceFile);
       const originalModule = moduleSourceFile;
       moduleSourceFile = lowerFrontendFeatures(moduleSourceFile,
-        path.relative(path.dirname(this.entryPath), resolvedPath).replaceAll("\\", "/"));
+        path.relative(path.dirname(this.entryPath), resolvedPath).replaceAll("\\", "/"),
+        this.host.readFile(DECLARATIONS) ?? defaultHost.readFile(DECLARATIONS) ?? "");
       const staticBindings = staticFunctionBindings.get(moduleSourceFile);
       // Modules only register functions; never silently omit initialization.
       for (const statement of originalModule.statements) {
@@ -7997,7 +8002,8 @@ export function compileFile(inputPath, host = defaultHost, { target = "kitten-n"
     );
     rejectParseDiagnostics(sourceFile);
     sourceFile = lowerFrontendFeatures(sourceFile,
-      path.relative(path.dirname(path.resolve(inputPath)), path.resolve(inputPath)).replaceAll("\\", "/"));
+      path.relative(path.dirname(path.resolve(inputPath)), path.resolve(inputPath)).replaceAll("\\", "/"),
+      host.readFile(DECLARATIONS) ?? defaultHost.readFile(DECLARATIONS) ?? "");
     compiler = new WorkspaceCompiler(inputPath, sourceFile, host, compileTarget(target));
     const report = compiler.compile(sourceFile);
     // Preserve target-independent source errors (including helper validation)

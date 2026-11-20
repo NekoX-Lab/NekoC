@@ -17,8 +17,15 @@ ES2020 类型声明；动态调用、越界 undefined 和孤立代理项结果�
 不再把标签丢弃后编译模板体；这避免漏掉标签副作用，以及 raw/cooked 转义差异。
 正则值也不再作为正则源码字符串输出。
 
-匹配参数的静态分析使用内存中的最小 String/Array 声明，因而支持既有字符串
-方法的返回值（如 trim、substring）、字符串数组元素及 for-of 的字符串元素；
+匹配参数的静态分析复用表达式检查器的内存类型事实，因而支持既有字符串
+方法的返回值（如 trim、substring）、Number.toString/toFixed 的字符串结果、
+String 数值索引、字符串数组元素及 for-of 的字符串元素；公开字符串 DSL
+（join、selectText、toString 等）也保留返回类型和推断的中间变量；显式
+getVar<string> 等泛型 DSL 读取共享现有 API 声明，未注解的 any 不放行。
+splitText 仍返回 unknown[]，其元素需要显式转换。原始参数还会在可空类型
+降级之前验证，避免 string | null 泛型实参被擦除后误放行。
+这些类型事实不放宽原操作的边界（例如动态 toFixed 仍不支持）。仅内存库中的
+内建声明受信任，用户同名声明仍触发遮蔽检查，用户方法按实际返回类型判断。
 无需读取宿主标准库，compile/check 的类型检查开关不影响这项能力。正则参数
 使用保留 null/undefined 的严格类型判断，不将 unknown、any、数字或可空联合
 当作字符串放行；这些输入需要先缩窄类型或显式转换。
