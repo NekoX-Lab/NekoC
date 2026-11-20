@@ -337,7 +337,9 @@ console.log(counter.advance(), counter.value);
 
 仅支持相对路径、同名 named function imports，导入模块只含函数与类型声明及
 其他此类 imports。静态函数绑定包括 function expression、带括号 arrow、多声明
-函数绑定和 const 函数别名；它们不产生要丢弃的模块运行期初始化。模块内供函数
+函数绑定和 const 函数别名；仅允许原始初始化器为函数或静态别名（可带括号/类型
+包装）。`(effect(), fn)` 等需要求值的初始化仍拒绝，即使最后得到静态函数；
+把副作用移到显式 init 函数中调用。模块内供函数
 使用的普通实例 class 可生成私有工厂，带 static
 成员的模块类不在此范围。不能静默丢弃模块顶层初始化：把它移入显式 init 函数。
 不支持默认/namespace/空/副作用 imports、导入别名、value export lists/re-export、

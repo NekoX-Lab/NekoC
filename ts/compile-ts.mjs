@@ -547,8 +547,19 @@ class WorkspaceCompiler {
       for (const statement of originalModule.statements) {
         if (this.isTypeOnlyStatement(statement) || ts.isImportDeclaration(statement)
           || this.isInlineFunctionDefinition(statement)) continue;
-        if (ts.isVariableStatement(statement) && statement.declarationList.declarations.every(
-          declaration => ts.isIdentifier(declaration.name) && staticBindings?.has(declaration.name.text))) continue;
+        if (ts.isVariableStatement(statement) && statement.declarationList.declarations.every(declaration => {
+          if (!ts.isIdentifier(declaration.name) || !staticBindings?.has(declaration.name.text)) return false;
+          // Resolving the final binding as a function does not prove its original
+          // initialization is erasable: sequence lowering may have extracted a
+          // call/write from (effect(), fn). Only transparent wrappers around a
+          // function literal or a resolved const alias require no execution.
+          let initializer = declaration.initializer;
+          while (initializer && (ts.isParenthesizedExpression(initializer) || ts.isAsExpression(initializer)
+            || ts.isTypeAssertionExpression(initializer) || ts.isNonNullExpression(initializer)
+            || ts.isSatisfiesExpression(initializer))) initializer = initializer.expression;
+          return !!initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)
+            || ts.isIdentifier(initializer) && !!(statement.declarationList.flags & ts.NodeFlags.Const));
+        })) continue;
         // Instance class factories are registered as module-private functions.
         // Static initialization would need source-ordered module execution.
         if (ts.isClassDeclaration(statement) && !statement.members.some(member =>

@@ -11,6 +11,8 @@ const modules = [
   ["multiple-declarations", "export const f = (n: number) => n + 1, g = () => 9;"],
   ["static-alias", "function original(n: number) { return n + 1; } const helper = original; export function f(n: number) { return helper(n); }"],
   ["wrapped-alias-chain", "const original = function(n: number) { return n + 1; }; const first = (original), helper = (first); export function f(n: number) { return helper(n); }"],
+  ["type-wrapped-function", "export const f = ((function(n: number) { return n + 1; }) satisfies ((n: number) => number));"],
+  ["type-wrapped-alias", "const original = (n: number) => n + 1; const helper = ((original) as ((n: number) => number)); export function f(n: number) { return helper(n); }"],
 ];
 for (const [id, library] of modules) {
   test(`r2-tsdiag review module registration: ${id}`, () => {
@@ -51,6 +53,75 @@ test("r2-tsdiag review module guard retains mixed declarations and side effects"
     assert.equal(result.diagnostics[0].file, lib.replaceAll("\\", "/"));
   }
 });
+
+const effectfulModules = [
+  ["call-before-arrow", 'export const f = (console.log(99), (n: number) => n + 1);'],
+  ["call-before-function", 'export const f = (console.log(99), function(n: number) { return n + 1; });'],
+  ["random-before-function", 'export const f = (Math.random(), function(n: number) { return n + 1; });'],
+  ["effectful-expression", 'export const f = (Math.random() + 1, (n: number) => n + 1);'],
+  ["multiple-effects", 'export const f = (console.log(99), Math.random(), (n: number) => n + 1);'],
+  ["mixed-function-declarations", 'export const g = () => 9, f = (console.log(99), (n: number) => n + 1), h = () => 8;'],
+  ["wrapped-sequence", 'export const f = (((console.log(99), (n: number) => n + 1)));'],
+  ["sequenced-alias", 'const original = (n: number) => n + 1; const helper = (console.log(99), original); export function f(n: number) { return helper(n); }'],
+  ["private-function-initializer", 'const helper = (console.log(99), function(n: number) { return n + 1; }); export function f(n: number) { return helper(n); }'],
+];
+for (const [id, library] of effectfulModules) {
+  test(`r2-tsdiag review rejects original module initialization effects: ${id}`, () => {
+    const parent = path.resolve("dist/r2-tsdiag-review");
+    fs.mkdirSync(parent, { recursive: true });
+    const dir = fs.mkdtempSync(path.join(parent, `${id}-`));
+    try {
+      const entry = path.join(dir, "main.ts"), lib = path.join(dir, "lib.ts");
+      const output = path.join(dir, "report.json"), work = path.join(dir, "main.bcmkn");
+      fs.writeFileSync(entry, 'import { f } from "./lib"; console.log(f(2));');
+      fs.writeFileSync(lib, library);
+      const checked = checkFile(entry);
+      const untyped = checkFile(entry, { types: false });
+      for (const result of [checked, untyped]) {
+        assert.equal(result.ok, false, id);
+        assert.equal(result.report, null, "never return a partial work");
+        assert.equal(result.diagnostics.length, 1);
+        const [d] = result.diagnostics;
+        assert.equal(d.source, "compat");
+        assert.notEqual(d.code, "NEKOC_INTERNAL");
+        assert.match(d.message, /Imported modules cannot execute top-level values or side effects/);
+        assert.match(d.message, /move initialization into an exported function/);
+        assert.equal(d.file, lib.replaceAll("\\", "/"));
+        assert.equal(d.line, 1);
+        assert.ok(d.column >= 1 && d.column <= library.length);
+      }
+      assert.deepEqual(untyped.diagnostics, checked.diagnostics);
+      const [diagnostic] = checked.diagnostics;
+      assert.throws(() => compileFile(entry), error => {
+        assert.ok(error instanceof CompileError);
+        assert.equal(error.message, diagnostic.message);
+        assert.deepEqual(error.location, { file: diagnostic.file, line: diagnostic.line, column: diagnostic.column });
+        return true;
+      });
+      for (const flags of [[], ["--no-types"]]) {
+        const result = spawnSync(process.execPath, ["ts/compile-ts.mjs", "--check", ...flags, "--json", entry], { encoding: "utf8" });
+        assert.equal(result.status, 1, result.stderr);
+        const json = JSON.parse(result.stdout);
+        assert.equal(json.ok, false);
+        assert.deepEqual(json.diagnostics, checked.diagnostics);
+        assert.ok(!json.report, "CLI must not expose a partial work");
+      }
+      const compiled = spawnSync(process.execPath, ["ts/compile-ts.mjs", entry, output], { encoding: "utf8" });
+      assert.equal(compiled.status, 1, compiled.stderr);
+      assert.equal(compiled.stderr.trim(), formatDiagnostic(diagnostic));
+      assert.equal(fs.existsSync(output), false);
+      const bin = path.resolve("target/debug", process.platform === "win32" ? "nekoc.exe" : "nekoc");
+      const built = spawnSync(bin, ["build", entry, "-o", work], { encoding: "utf8", env: { ...process.env, NEKOC_FRONTEND: path.resolve("ts") } });
+      assert.equal(built.status, 1, built.stderr);
+      assert.match(built.stderr, /Imported modules cannot execute top-level values or side effects/);
+      assert.equal(fs.existsSync(work), false);
+      fs.writeFileSync(output, "keep existing output");
+      const retry = spawnSync(process.execPath, ["ts/compile-ts.mjs", entry, output], { encoding: "utf8" });
+      assert.equal(retry.status, 1, retry.stderr);
+      assert.equal(fs.readFileSync(output, "utf8"), "keep existing output");
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+}
 
 test("r2-tsdiag review preflight retains supported class and nullable sequences", () => {
   for (const source of [
