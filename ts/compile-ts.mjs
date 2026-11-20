@@ -15,6 +15,7 @@ import * as controlFlow from "./control-flow.mjs";
 import { compileTarget, checkTargetBlock } from "./compile-target.mjs";
 import { lowerTsValues } from "./tsfeat-values.mjs";
 import { lowerTsSequences } from "./tsfeat-sequences.mjs";
+import { lowerTsDestructuring } from "./ts-r2-destructure.mjs";
 import { lowerTsFeatures } from "./tsfeat-lowering.mjs";
 import { lowerTsMethods } from "./tsfeat-methods.mjs";
 import { lowerTsClasses } from "./tsfeat-classes.mjs";
@@ -106,7 +107,7 @@ function lowerFrontendFeatures(sourceFile) {
       ts.forEachChild(node, validateRawSyntax);
     };
     validateRawSyntax(sourceFile);
-    const classes = lowerTsClasses(lowerTsNullable(lowerTsCollections(sourceFile)));
+    const classes = lowerTsClasses(lowerTsNullable(lowerTsCollections(lowerTsDestructuring(sourceFile))));
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
       .map(node => node.name.text));
@@ -5942,6 +5943,18 @@ class WorkspaceCompiler {
     if (this.objectHeap && !this.isArrayExpression(expression.expression) && !this.isStringExpression(expression.expression)) {
       return this.compileObjectAccess(expression, parentId);
     }
+    let arrayIndex = expression.argumentExpression;
+    const key = stripParens(arrayIndex);
+    if (this.isArrayExpression(expression.expression) && ts.isStringLiteralLike(key)) {
+      if (key.text === "length") return this.compileLength(expression.expression, parentId);
+      // Array property keys are not numeric coercions: "01", "-0", etc.
+      // are missing properties, not aliases of list positions.
+      const index = Number(key.text);
+      if (!Number.isInteger(index) || index < 0 || index >= 2 ** 32 - 1 || String(index) !== key.text) {
+        this.unsupported(expression, "Array property key must be a canonical nonnegative integer index or length; JS undefined reads are not supported here, so use a valid index or an explicit bounds check with a concrete fallback");
+      }
+      arrayIndex = ts.factory.createNumericLiteral(index);
+    }
     if (ts.isIdentifier(expression.expression) && ts.isStringLiteral(expression.argumentExpression)) {
       const varName = `${expression.expression.text}_${expression.argumentExpression.text}`;
       if (this.globalVariables.has(varName)) {
@@ -5970,12 +5983,29 @@ class WorkspaceCompiler {
       this.connectInput(id, this.compilePlusOne(expression.argumentExpression, id), "end_index", "value");
       return id;
     }
+    // Reject statically invalid user reads instead of silently substituting KN's
+    // empty-list value for JS undefined. Generated helpers own their bounds;
+    // dynamic reads retain the documented list semantics until typed undefined
+    // can be represented without confusing an ordinary string/number value.
+    if (expression.pos >= 0 && expression.getSourceFile?.() === this.sourceFile
+      && this.isArrayExpression(target)) {
+      const index = constantNumber(arrayIndex, node => {
+        const builtin = ["NaN", "Infinity"].includes(node.text)
+          && !this.globalVariables.has(node.text) && !this.functionParams?.has(node.text)
+          && !this.lookupExpressionBinding(node.text);
+        return builtin ? Number(node.text) : null;
+      });
+      const literal = this.arrayLiteralFor(target);
+      const dense = literal && !literal.elements.some(element => ts.isOmittedExpression(element) || ts.isSpreadElement(element));
+      if (index !== null && (!Number.isInteger(index) || index < 0
+        || dense && index >= literal.elements.length && !this.arrayLengthChanged(target))) {
+        this.unsupported(expression, "Array index is statically out of bounds or not a nonnegative integer; JS undefined reads are not supported here, so use a valid index or an explicit bounds check with a concrete fallback");
+      }
+    }
     // list_item works in the share player; private _object_get does not.
-    // Out-of-range reads therefore follow KN list semantics, not JS undefined
-    // (tests/ts-js-semantics/known-diff.md).
     const id = this.addBlock({ type: "list_item", parent_id: parentId, fields: { item: "any" }, is_output: true });
     this.connectInput(id, this.compileExpression(target, id), "list", "value");
-    this.connectInput(id, this.compilePlusOne(expression.argumentExpression, id), "list_index", "value");
+    this.connectInput(id, this.compilePlusOne(arrayIndex, id), "list_index", "value");
     return id;
   }
 
@@ -7200,11 +7230,12 @@ function flattenStringConcat(node, isString) {
   return [node];
 }
 
-function constantNumber(node) {
+function constantNumber(node, identifierValue = () => null) {
   node = stripParens(node);
   if (ts.isNumericLiteral(node)) return Number(node.text);
+  if (ts.isIdentifier(node)) return identifierValue(node);
   if (ts.isPrefixUnaryExpression(node)) {
-    const value = constantNumber(node.operand);
+    const value = constantNumber(node.operand, identifierValue);
     if (value === null) return null;
     switch (node.operator) {
       case ts.SyntaxKind.MinusToken: return -value;
@@ -7214,8 +7245,8 @@ function constantNumber(node) {
     }
   }
   if (ts.isBinaryExpression(node)) {
-    const a = constantNumber(node.left);
-    const b = constantNumber(node.right);
+    const a = constantNumber(node.left, identifierValue);
+    const b = constantNumber(node.right, identifierValue);
     if (a === null || b === null) return null;
     switch (node.operatorToken.kind) {
       case ts.SyntaxKind.PlusToken: return a + b;

@@ -40,7 +40,7 @@ for (const name of ["probe", "return", "order", "local", "alias", "import"]) {
 for (const [source, message] of [
   ["const [a = 1] = [2];", /defaults.*explicit/],
   ["const [[a]] = [[2]];", /Nested.*explicitly/],
-  ["const {a} = {a: 1};", /simple variable|Object destructuring/],
+  ["const {a: {b}} = {a: {b: 1}};", /Object destructuring.*nested/],
   ["const [a, a] = [1, 2];", /Duplicate variable/],
   ["const a = 1; const [a] = [2];", /Duplicate variable/],
 ]) test(`tstopdestructure: unsupported patterns remain located errors: ${source}`, () => {

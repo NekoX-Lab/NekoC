@@ -55,7 +55,7 @@ test("unsupported object features retain actionable compile diagnostics", () => 
   try {
     for (const [source, message] of [
       ["const p = { method() {} };", /Object methods/],
-      ["onStart(() => { const {x} = {x: 1}; });", /Object destructuring/],
+      ["onStart(() => { const {x: {y}} = {x: {y: 1}}; });", /Object destructuring.*nested/],
       ["let key = \"n\"; const p = {n: 1}; console.log(p[key]);", /Dynamic object keys/],
       ["const p = {n: 1}; p.n?.toString();", /Unsupported|Optional/],
       ["console.log(JSON.stringify({n: 1}, null, 2));", /JSON.stringify/],
