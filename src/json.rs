@@ -292,9 +292,17 @@ pub(crate) fn sort_objects(value: &mut Value) {
     while let Some((value, keep_order)) = pending.pop() {
         match value {
             Value::Object(object) => {
-                // KN code-view arrays use Object.values(args), so their socket
-                // order is observable. All other maps retain legacy ordering.
-                let array = object.get("type").and_then(Value::as_str) == Some("_array_literal");
+                // KN code-view arrays and conversion placeholders expose their
+                // socket order through Object.values/compile_params. All other
+                // maps retain legacy ordering. See kn-r3-translator-evidence.md.
+                let array = matches!(
+                    object.get("type").and_then(Value::as_str),
+                    Some(
+                        "_array_literal"
+                            | "bcm_translator_text_return_boolean_block"
+                            | "bcm_translator_text_return_value_block"
+                    )
+                );
                 if !keep_order {
                     object.sort_keys();
                 }

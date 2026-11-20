@@ -1780,6 +1780,7 @@ impl Compiler {
         let mut work = vec![(root, false)];
         let mut output = BTreeMap::new();
         while let Some((node, exit)) = work.pop() {
+            self.check_kn_conversion_reporter(node)?;
             ensure!(
                 node["type"] != "_compiled_value",
                 "reserved internal expression type"
@@ -1931,6 +1932,12 @@ impl Compiler {
             return Ok(index);
         }
         let value = match b["type"].as_str().unwrap_or("") {
+            "bcm_translator_text_return_boolean_block"
+            | "bcm_translator_text_return_value_block"
+                if self.program.semantics == RuntimeSemantics::KnCurrent =>
+            {
+                ValueExpr::KnPanel(self.kn_panel_reporter(b)?)
+            }
             "translate_result"
             | "user_ranking_info"
             | "user_info_of_th"
@@ -2774,6 +2781,12 @@ impl Compiler {
             kind
         };
         let op = match kind {
+            "bcm_translator_text_return_boolean_block"
+            | "bcm_translator_text_return_value_block"
+                if self.program.semantics == RuntimeSemantics::KnCurrent =>
+            {
+                return self.expression_value(b);
+            }
             "camera_alpha_slider" if self.program.semantics == RuntimeSemantics::KnCurrent => {
                 ExprOp::Constant(
                     b["fields"]
@@ -3681,6 +3694,25 @@ impl Compiler {
                 );
                 let kind = b["type"].as_str().unwrap_or("");
                 let op = match kind {
+                    // Official compile_statement skips disabled conversion
+                    // placeholders including obsolete sockets and bodies.
+                    // Evidence: docs/kn-r3-translator-evidence.md.
+                    "bcm_translator_text_execution_block"
+                    | "bcm_translator_text_event_block"
+                    | "bcm_translator_text_return_boolean_block"
+                    | "bcm_translator_text_return_value_block"
+                        if self.program.semantics == RuntimeSemantics::KnCurrent
+                            && b["disabled"] == true =>
+                    {
+                        block = b.get("next");
+                        continue;
+                    }
+                    "bcm_translator_text_return_boolean_block"
+                    | "bcm_translator_text_return_value_block"
+                        if self.program.semantics == RuntimeSemantics::KnCurrent =>
+                    {
+                        Op::Execute(self.value(b)?)
+                    }
                     "microbit_led_clear"
                     | "microbit_led_plot"
                     | "microbit_led_plot_graph"
