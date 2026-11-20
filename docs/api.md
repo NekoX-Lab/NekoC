@@ -360,6 +360,45 @@ for its side effects and its result is ignored.
 Timer callbacks cannot capture outer invocation locals across scheduling; move
 that state to a top-level binding or use explicit event state instead.
 
+### TypeScript timers and asynchronous boundaries
+
+`setTimeout(callback, ms?)` and `setInterval(callback, ms?)` accept ordinary
+inline callbacks without parameters in the root workspace. Numeric milliseconds
+are normalized before conversion to seconds: omitted delays, values below 1,
+above 2147483647 and NaN become 1; other fractional values truncate toward zero.
+The delay expression evaluates once, when scheduling. Non-numeric/unknown delays
+are compile errors even without type checking; omit explicit `undefined` or use
+`Number(value)`. `clearTimeout(handle)` and `clearInterval(handle)` cancel either
+kind of NekoTimer. Handles are opaque references; their readonly `delay` is in
+seconds and `active` records whether another callback may start.
+The numeric bounds/truncation follow the [Node timer API](https://nodejs.org/api/timers.html#scheduling-timers),
+not the browser timer overflow conversion algorithm.
+
+Timers lower to broadcast/receive, wait, list-backed state and custom procedures,
+not native JS timer blocks. Scheduling is frame-quantized; an interval waits
+again after its callback finishes, including cooperative waits. This does not
+promise Node event-loop timing or microtask ordering. Event registration is a
+compile-time declaration, not a general runtime event-listener API.
+Native TypeScript `for`, `for...of`, `for...in`, `while` and `do...while` loops
+cannot coexist with timers anywhere in the same import graph, including unused
+functions and loops before scheduling. Kitten loops implicitly yield, allowing
+a timer to observe intermediate state or fire before synchronous cancellation.
+Until run-to-return scheduling is implemented, this conservative combination is
+a compile error with the original loop location; use an explicit cooperative
+event state machine instead. No automatic atomic wrapper is added around waits.
+
+`async`/`await`, generators (including callbacks), global runtime `Promise` and
+`queueMicrotask` references are rejected before lowering, including unused code
+and imported modules. Type-only Promise annotations and locally shadowed names
+do not by themselves invoke Promise scheduling. Use ordinary synchronous
+functions or explicit event state machines; `wait(seconds)` cooperatively pauses
+the current block task and is not a Promise. See `tests/ts-r3-async.test.mjs` for
+Node-backed regression cases and the boundaries of the scheduling oracle.
+Official native timer evidence is recorded separately in
+[KN async services](kn-async-services.md#timer块转换运行时不是同一件事): native
+callback statement execution is not established by the mere presence of sockets.
+Editor import checks for generated works do not prove general scheduler equivalence.
+
 ### `onStart(body)`
 
 Runs when the project starts.

@@ -20,8 +20,8 @@ const errors = {
   197: "Cannot determine JavaScript + / += semantics for any, union or non-primitive operands",
   199: "Namespaces containing runtime values",
   204: "async / await are not supported",
-  205: "Generator functions are not supported: calling a generator creates an iterator",
-  207: "Functions cannot be stored or returned as runtime values",
+  205: "Generator functions are not supported: gen",
+  207: "Promise is not supported: Promise and microtask semantics are not implemented",
 };
 const diffs = {};
 const extraErrors = {

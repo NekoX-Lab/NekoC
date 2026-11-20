@@ -96,7 +96,14 @@ interface String {
 // remains shared. Timer callbacks cannot capture outer invocation locals across
 // scheduling (use explicit shared state instead).
 type NekoStatementBody = () => void;
-/** Cooperative Kitten N timer handle; delays are milliseconds, frame-quantized. */
+/** Cooperative Kitten N timer handle; scheduling is frame-quantized.
+ * Numeric input delays are milliseconds: values below 1, above 2147483647 or
+ * NaN become 1; remaining fractions are truncated. `delay` stores seconds.
+ * Callbacks must be ordinary inline functions, not async/generator functions.
+ * Omit undefined delays; non-numeric/unknown delays require Number(value).
+ * Native TS loops and timers in the same import graph are rejected: implicit
+ * loop yields cannot preserve JS run-to-return/cancellation boundaries.
+ */
 interface NekoTimer { readonly active: boolean; readonly delay: number; }
 declare function setTimeout(callback: () => void, ms?: number): NekoTimer;
 declare function setInterval(callback: () => void, ms?: number): NekoTimer;
