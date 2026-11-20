@@ -2,6 +2,7 @@
 //! after each operation, then converted back to a JS Number. Not display rounding.
 use num_bigint::BigInt;
 use num_traits::{Signed, Zero};
+mod compact;
 
 pub(super) fn cells(op: super::Binary, a: &super::Cell, b: &super::Cell) -> f64 {
     // Decimal rejects booleans/null/objects instead of applying Number coercion
@@ -166,6 +167,9 @@ pub(super) fn apply(op: Operation, a: f64, b: f64) -> f64 {
             return if result == 0.0 { 0.0 } else { result };
         }
     }
+    if let Some(result) = compact::apply(op, a, b) {
+        return result;
+    }
     calculate(op, decimal(a), decimal(b))
 }
 
@@ -204,3 +208,7 @@ fn calculate(op: Operation, (a, ae): (BigInt, i32), (b, be): (BigInt, i32)) -> f
     }
     format!("{coefficient}e{exponent}").parse().unwrap()
 }
+
+#[cfg(test)]
+#[path = "../../tests/r2_perf/decimal_internal.rs"]
+mod r2_perf_tests;

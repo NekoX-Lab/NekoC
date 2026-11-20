@@ -16,6 +16,8 @@
 
 `src/engine/k4decimal.rs` 用任意精度整数表示十进制系数/指数，四则运算后截断到 20 位有效数字，再由 Rust 正确舍入的十进制解析转回 f64。没有 epsilon、固定小数位或对显示文本的补丁。整数安全范围内的加减乘使用可证明精确的快路径；小数仍走十进制。
 
+有限 Number 的加减乘还可由 `src/engine/k4decimal/compact.rs` 使用 i128 精确系数计算；缩放或运算溢出即回退原 BigInt，除法和字符串操作数不走此路径。仍从 JS 最短十进制文本构造系数，只在完整结果上截断，保留精确零规范化及负数下溢的有符号零。`tests/r2_perf/decimal_internal.rs` 与原 BigInt 算法做位级差分，CI 不设置耗时断言。
+
 K4 编译为专用 typed arithmetic / Binary 操作，解释器、深层求值、JIT 数值守卫、`Numeric::Add`、JIT helper 和 change_variable 共用规则；KN 的 Binary 加减乘除保持原有实现。布尔/null/对象不先偷偷变成 Decimal Number，而是保留构造失败时的原生回退。普通有限数字字符串也保留 Decimal 的精确十进制输入；超大字符串指数（超出本适配器 ±2048）仍在原有 Number 回退范围，不作为本轮兼容性结论。
 
 原创夹具由 `tools/compat/k4decimal-fixtures.mjs` 生成，官方结果及资源 SHA-256 保存在 [k4decimal-evidence.json](k4decimal-evidence.json)。不携带官方源码或第三方作品。
