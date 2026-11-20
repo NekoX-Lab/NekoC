@@ -34,20 +34,27 @@ async function browserMeasure({kind,frames,warmup,budget}){
     await renderer.load(report.project);renderer.render();const assets=now();
     await connection.open(report.project,backend);const opened=now();
     const payload={dt:1/60,budget_ms:budget,coalesce:false};
-    const first=decodeFrame(await connection.frame({...payload,costumes:renderer.costumeInfo(sensesColor(report.project))}));
+    // Match play.js: decoded video duration/geometry are runtime inputs, not
+    // just renderer assets. Omitting them can leave play-until-end suspended.
+    const first=decodeFrame(await connection.frame({...payload,costumes:renderer.costumeInfo(sensesColor(report.project)),videos:renderer.videoInfo()}));
     renderer.apply(first.frame,first.lines,false);renderer.render();renderer.gl.finish();const drawn=now();
-    const samples=[];let instructions=0,bytes=0,yields=0;
+    const samples=[];let instructions=0,bytes=0,yields=0,lastFrame=first.frame;
     for(let i=0;i<warmup+frames;i++){
-      const begin=now(),buffer=await connection.frame(payload),received=now();
+      const begin=now(),buffer=await connection.frame({...payload,videos:renderer.videoInfo()}),received=now();
       const {frame,lines}=decodeFrame(buffer),decoded=now();
       renderer.apply(frame,lines,false);renderer.render();const submitted=now();
+      lastFrame=frame;
       if(i>=warmup){
         samples.push({roundtrip:received-begin,decode:decoded-received,submit:submitted-decoded,total:submitted-begin,vm:frame.execute_us/1000});
         instructions+=frame.instructions;bytes+=buffer.byteLength;yields+=Number(frame.budget_yield);
       }
     }
     // Do not embed user projects/private variables in a performance report.
-    return {startup:{projectDownload:download-start,jsParse:parsed-download,workerImport:imported-parsed,assets:assets-imported,handshake:opened-assets,firstFrame:drawn-opened,total:drawn-start},samples,instructions,bytes,yields,errors};
+    // Aggregate progress lets probes distinguish completed work from a cheap
+    // permanently suspended script without leaking logs or private variables.
+    const videos=lastFrame.videos||[];
+    const progress={activeTasks:lastFrame.active,playingVideos:videos.filter(v=>v.playing).length,endedVideos:videos.filter(v=>v.ended).length,visibleVideos:videos.filter(v=>v.visible).length};
+    return {startup:{projectDownload:download-start,jsParse:parsed-download,workerImport:imported-parsed,assets:assets-imported,handshake:opened-assets,firstFrame:drawn-opened,total:drawn-start},samples,instructions,bytes,yields,errors,progress};
   }finally{connection.close();backend.terminate?.();}
 }
 
