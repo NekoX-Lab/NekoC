@@ -108,7 +108,7 @@ function nullableChecker(sourceFile) {
   return ts.createProgram([...files.keys()], { noLib: true, noResolve: true, strictNullChecks: true }, host).getTypeChecker();
 }
 
-export function lowerTsNullable(input) {
+export function lowerTsNullable(input, sourceIdentity = input.fileName) {
   if (!mentionsNullish(input)) return input;
   const text = input.text;
   const sourceFile = ts.createSourceFile(input.fileName, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
@@ -128,7 +128,7 @@ export function lowerTsNullable(input) {
   scanReserved(sourceFile);
 
   let salt = 2166136261;
-  for (const ch of sourceFile.fileName.replaceAll("\\", "/")) salt = Math.imul(salt ^ ch.charCodeAt(0), 16777619) >>> 0;
+  for (const ch of sourceIdentity.replaceAll("\\", "/")) salt = Math.imul(salt ^ ch.charCodeAt(0), 16777619) >>> 0;
   salt %= 100000;
 
   // ---------- types and domains ----------

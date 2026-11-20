@@ -3,7 +3,7 @@ import { objectTypes } from "./share-objects.mjs";
 
 // Lower collections before nullable/classes: every link is an ordinary typed
 // object reference, and get's missing result uses the existing nullable pass.
-export function lowerTsCollections(input) {
+export function lowerTsCollections(input, sourceIdentity = input.fileName) {
   if (!/\b(?:Map|Set|WeakMap|WeakSet)\b/.test(input.text)) return input;
   const file = ts.createSourceFile(input.fileName, input.text, ts.ScriptTarget.Latest, true);
   const { checker } = objectTypes([file]);
@@ -15,7 +15,7 @@ export function lowerTsCollections(input) {
     throw error;
   };
   let hash = 2166136261;
-  for (const c of file.fileName.replaceAll("\\", "/")) hash = Math.imul(hash ^ c.charCodeAt(0), 16777619) >>> 0;
+  for (const c of sourceIdentity.replaceAll("\\", "/")) hash = Math.imul(hash ^ c.charCodeAt(0), 16777619) >>> 0;
   let serial = 0;
   const fresh = hint => `__nekocMap_${hash}_${++serial}_${hint}`;
   const records = new Map();
@@ -52,7 +52,7 @@ export function lowerTsCollections(input) {
   if (inferred.length) {
     let text = file.text;
     for (const edit of inferred.sort((a, b) => b.at - a.at)) text = text.slice(0, edit.at) + edit.text + text.slice(edit.at);
-    return lowerTsCollections(ts.createSourceFile(input.fileName, text, ts.ScriptTarget.Latest, true));
+    return lowerTsCollections(ts.createSourceFile(input.fileName, text, ts.ScriptTarget.Latest, true), sourceIdentity);
   }
   const record = (t, node) => {
     const kind = nameOf(t);

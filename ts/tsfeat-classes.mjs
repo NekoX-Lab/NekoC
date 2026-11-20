@@ -5,8 +5,8 @@ import { needsClassInheritance, lowerClassInheritance } from "./tsfeat-class-inh
 
 // Classes are statically bound functions plus ordinary share-object handles.
 // No prototype lookup, method values or host objects reach the block compiler.
-export function lowerTsClasses(input) {
-  if (needsClassInheritance(input)) return lowerClassInheritance(input);
+export function lowerTsClasses(input, sourceIdentity = input.fileName) {
+  if (needsClassInheritance(input)) return lowerClassInheritance(input, sourceIdentity);
   const ambient = node => !!(node.flags & ts.NodeFlags.Ambient)
     || node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.DeclareKeyword);
   const hasClasses = node => !ambient(node) && !ts.isTypeNode(node) && (ts.isClassDeclaration(node) || ts.isClassExpression(node)
@@ -38,7 +38,7 @@ export function lowerTsClasses(input) {
   const names = new Set();
   walk(sourceFile, node => { if (ts.isIdentifier(node)) names.add(node.text); });
   let salt = 2166136261;
-  for (const ch of sourceFile.fileName.replaceAll("\\", "/")) salt = Math.imul(salt ^ ch.charCodeAt(0), 16777619) >>> 0;
+  for (const ch of sourceIdentity.replaceAll("\\", "/")) salt = Math.imul(salt ^ ch.charCodeAt(0), 16777619) >>> 0;
   let serial = 0;
   const fresh = hint => {
     let name;

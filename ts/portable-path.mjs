@@ -15,4 +15,11 @@ export const portablePath = {
   resolve,
   join: (...parts) => resolve(...parts),
   dirname: (name) => resolve(name, ".."),
+  relative: (from, to) => {
+    const left = resolve(from).split("/").filter(Boolean);
+    const right = resolve(to).split("/").filter(Boolean);
+    let common = 0;
+    while (common < left.length && common < right.length && left[common] === right[common]) common++;
+    return [...left.slice(common).map(() => ".."), ...right.slice(common)].join("/");
+  },
 };

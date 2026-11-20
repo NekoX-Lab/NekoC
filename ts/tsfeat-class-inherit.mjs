@@ -29,7 +29,7 @@ export function needsClassInheritance(file) {
 // This pass uses only parsed TS types and emits data interfaces and ordinary
 // functions. Runtime identity, including virtual calls during construction, is
 // stored in the same official-list heap as the stage-one object handles.
-export function lowerClassInheritance(input) {
+export function lowerClassInheritance(input, sourceIdentity = input.fileName) {
   const file = ts.createSourceFile(input.fileName, input.text, input.languageVersion, true, input.scriptKind);
   const { checker, program } = objectTypes([file]);
   const f = ts.factory, printer = ts.createPrinter();
@@ -41,7 +41,7 @@ export function lowerClassInheritance(input) {
     throw error;
   };
   let salt = 2166136261, serial = 0;
-  for (const ch of file.fileName.replaceAll(String.fromCharCode(92), "/")) salt = Math.imul(salt ^ ch.charCodeAt(0), 16777619) >>> 0;
+  for (const ch of sourceIdentity.replaceAll(String.fromCharCode(92), "/")) salt = Math.imul(salt ^ ch.charCodeAt(0), 16777619) >>> 0;
   const fresh = hint => `__nekocClass_${salt}_${++serial}_${hint.replace(/[^\w$]/g, "_")}`;
   const tag = fresh("typeId");
   const records = [], byNode = new Map(), bySymbol = new Map();

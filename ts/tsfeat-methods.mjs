@@ -12,7 +12,7 @@ const f = ts.factory;
  * Throws an Error with CompileError-compatible name/code/location properties.
  * The integration layer can wrap it in its own CompileError if required.
  */
-export function lowerTsMethods(sourceFile) {
+export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName) {
   const originalFile = sourceFile;
   // Binding a SourceFile caches checker symbols on it. Do not hand those caches
   // to the independent checker in the following lexical-lowering pass.
@@ -116,7 +116,7 @@ export function lowerTsMethods(sourceFile) {
   };
   let serial = 0;
   let fileSalt = 2166136261;
-  for (const ch of sourceFile.fileName.replaceAll("\\", "/")) fileSalt = Math.imul(fileSalt ^ ch.charCodeAt(0), 16777619) >>> 0;
+  for (const ch of sourceIdentity.replaceAll("\\", "/")) fileSalt = Math.imul(fileSalt ^ ch.charCodeAt(0), 16777619) >>> 0;
   const fresh = () => {
     let name;
     do { name = `__tsfeatMethods${fileSalt}_${++serial}`; } while (names.has(name));
