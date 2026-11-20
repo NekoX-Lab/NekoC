@@ -173,7 +173,12 @@ export class VirtualControls {
     root.addEventListener('keyup',event=>{
       if(['Enter',' '].includes(event.key)){event.preventDefault();this.lift(`button:${event.code||event.key}`);}
     });
-    root.addEventListener('focusout',()=>this.release());
+    // Moving focus to the stage ends keyboard activation, not captured fingers.
+    root.addEventListener('focusout',event=>{
+      for(const [source,hold] of this.holds){
+        if(source.startsWith('button:')&&hold.button===event.target)this.lift(source);
+      }
+    });
     // Assistive technology can activate a button without a pointer/key pair.
     root.addEventListener('click',event=>{
       const button=buttonFor(event);if(button&&event.detail===0){this.press('activation',button);this.lift('activation');}

@@ -144,7 +144,7 @@ body.fullscreen-fallback-active{overflow:hidden}
   .virtual-controls-visible .keyboard-hint{display:none}
 }
 #player-shell:is(:fullscreen,.fullscreen-fallback){height:100dvh;min-height:0}
-@media(min-width:901px) and (max-width:1200px) and (orientation:landscape){
+@media(min-width:901px) and (orientation:landscape){
   #player-shell.virtual-controls-visible{height:100dvh;min-height:0;grid-template-columns:minmax(0,1fr) 280px;grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"stage controls" "notice notice"}
   .virtual-controls-visible .brand-tile,.virtual-controls-visible .fps-tile,.virtual-controls-visible .timings-tile,.virtual-controls-visible .settings-tile{display:none}
   .virtual-controls-visible .controls-tile{overflow:auto}

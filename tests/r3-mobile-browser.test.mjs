@@ -115,6 +115,30 @@ test('r3-mobile phone/tablet production player', {skip:!process.env.NEKOC_R3_MOB
         await touch('touchStart',[space,{...stage,id:3}]);
         await page.waitForFunction(()=>window.mobileFrames.some(f=>f.events?.some(e=>e.state==='mouse_down')));
         await touch('touchEnd',[{...stage,id:3}]);await touch('touchEnd',[]);await keySeen('32',false);
+        // Review regression: canvas.focus() must not lift a captured virtual
+        // finger when focus starts inside the button panel (with/without a key).
+        await page.setViewportSize(portrait);await fit();
+        for(const keyboardHeld of [false,true]){
+          await page.locator('#virtual-toggle').focus();await page.keyboard.press('Tab');
+          assert.equal(await page.locator('[data-key="38"]').evaluate(el=>el===document.activeElement),true);
+          await clear();
+          if(keyboardHeld){await page.keyboard.down('Space');await keySeen('38',true);}
+          const finger={...await center('[data-key="37"]'),id:1},canvasFinger={...await center('#stage'),id:2};
+          await touch('touchStart',[finger]);await keySeen('37',true);
+          await touch('touchStart',[finger,canvasFinger]);
+          await page.waitForFunction(()=>window.mobileFrames.some(f=>f.events?.some(e=>e.state==='mouse_down')));
+          assert.equal(await page.locator('#stage').evaluate(el=>el===document.activeElement),true);
+          assert.equal(await page.locator('[data-key="37"]').getAttribute('aria-pressed'),'true');
+          assert.equal(await page.evaluate(()=>window.mobileFrames.some(f=>f.events?.some(e=>e.kind==='key'&&e.key==='37'&&!e.down))),false);
+          await page.waitForFunction(()=>window.mobileFrames.at(-1)?.pressed?.includes('37'));
+          if(keyboardHeld){await keySeen('38',false);await page.keyboard.up('Space');}
+          await touch('touchEnd',[canvasFinger]);
+          assert.equal(await page.locator('[data-key="37"]').getAttribute('aria-pressed'),'true');
+          await touch('touchEnd',[]);await keySeen('37',false);
+          const pair=await page.evaluate(()=>window.mobileFrames.flatMap(f=>f.events||[]).filter(e=>e.kind==='key'&&e.key==='37').map(e=>e.down));
+          assert.deepEqual(pair,[true,false]);
+        }
+        await page.setViewportSize(landscape);await fit();
         // Lifecycle paths release admitted holds; no late touchEnd duplicates.
         for(const end of ['hide','blur','orientation','pause','restart','background','capture']){
           t.diagnostic(`${name}: release on ${end}`);
@@ -180,6 +204,22 @@ test('r3-mobile phone/tablet production player', {skip:!process.env.NEKOC_R3_MOB
         const portraitPoint=await center('#stage');await page.touchscreen.tap(portraitPoint.x,portraitPoint.y);
         await page.waitForFunction(()=>window.mobileFrames.some(f=>f.events?.some(e=>e.state==='mouse_click'&&Math.abs(e.x)<3&&Math.abs(e.y)<3)));
         await screenshot('portrait-work');
+        // Wide tablets must also contain portrait works with controls open in
+        // normal mode. Compare to the real visual viewport, not just its parent.
+        for(const size of [{width:1280,height:720},{width:1280,height:800},{width:1366,height:768}]){
+          await page.setViewportSize(size);await page.evaluate(()=>scrollTo(0,0));
+          assert.equal(await page.locator('#virtual-toggle').getAttribute('aria-expanded'),'true');
+          await page.waitForFunction(()=>{
+            const box=document.querySelector('#stage').getBoundingClientRect();
+            return box.width>0&&box.height>0&&Math.abs(box.width/box.height-620/900)<.01&&
+              box.left>=0&&box.top>=0&&box.right<=innerWidth+1&&box.bottom<=innerHeight+1&&scrollY===0;
+          });
+          assert.equal(await page.evaluate(()=>!!document.fullscreenElement||document.querySelector('#player-shell').classList.contains('fullscreen-fallback')),false);
+          const boxes=await page.locator('#virtual-controls button').evaluateAll(nodes=>nodes.map(el=>{const b=el.getBoundingClientRect();return {x:b.x,y:b.y,right:b.right,bottom:b.bottom};}));
+          assert.ok(boxes.every(b=>b.x>=0&&b.y>=0&&b.right<=size.width+1&&b.bottom<=size.height+1),JSON.stringify({size,boxes}));
+          await screenshot(`wide-portrait-work-${size.width}x${size.height}`);
+        }
+        await page.setViewportSize(portrait);
         // Exported pure-stage mode must not inherit the phone shell's height
         // cap or show controls intended for the normal player.
         await page.goto(`${origin}/play?app`);await ready();await running();await fit();

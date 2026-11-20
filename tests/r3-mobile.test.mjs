@@ -53,13 +53,12 @@ test('r3-mobile keyboard and multiple touch owners release only their own hold',
   f.window.emit('keyup',{keyCode:96,code:'Numpad0'});assert.deepEqual(f.input.take().events,[key(48,false)]);
 });
 
-for(const end of ['hide','blur','reset','release','focusout','lostpointercapture','pointercancel']){
+for(const end of ['hide','blur','reset','release','lostpointercapture','pointercancel']){
   test(`r3-mobile ${end} clears visual holds and capture without duplicate key-up`,t=>{
     const f=fixture(t),button=f.button(39);f.controls.setVisible(true);f.touch('pointerdown',button);f.input.take();
     if(end==='hide')f.controls.setVisible(false);
     else if(end==='blur')f.window.emit('blur');
     else if(end==='reset'||end==='release')f.input[end]();
-    else if(end==='focusout')f.root.emit('focusout');
     else f.touch(end,button);
     f.touch('pointerup',button);
     assert.deepEqual(f.input.take().events,end==='reset'?[]:[key(39,false)]);
@@ -68,6 +67,32 @@ for(const end of ['hide','blur','reset','release','focusout','lostpointercapture
     assert.deepEqual(f.input.take().events,[key(39,true),key(39,false)]);
   });
 }
+
+test('r3-mobile button focusout releases only its keyboard hold, preserving captured fingers',t=>{
+  const f=fixture(t),up=f.button(38),left=f.button(37);f.controls.setVisible(true);
+  f.root.emit('keydown',{target:up,key:' ',code:'Space'});
+  f.touch('pointerdown',left);f.touch('pointerdown',up,2);f.input.take();
+  f.root.emit('focusout',{target:up});
+  assert.deepEqual(f.input.take().events,[]);
+  assert.deepEqual([...f.input.pressed],['38','37']);
+  assert.equal(up.attributes['aria-pressed'],'true');assert.equal(left.attributes['aria-pressed'],'true');
+  assert.equal(up.hasPointerCapture(2),true);assert.equal(left.hasPointerCapture(1),true);
+  assert.equal(f.controls.holds.has('button:Space'),false);
+  f.touch('pointerup',up,2);assert.deepEqual(f.input.take().events,[key(38,false)]);
+  f.window.emit('blur');assert.deepEqual(f.input.take().events,[key(37,false)]);
+  assert.equal(f.controls.holds.size,0);assert.equal(left.captures.size,0);
+  f.root.emit('keyup',{target:up,key:' ',code:'Space'});f.touch('pointerup',left);
+  assert.deepEqual(f.input.take().events,[]);
+});
+
+test('r3-mobile leaving a keyboard-activated button releases its key without lifting another touch',t=>{
+  const f=fixture(t),up=f.button(38),left=f.button(37);f.controls.setVisible(true);
+  f.root.emit('keydown',{target:up,key:' ',code:'Space'});f.touch('pointerdown',left);f.input.take();
+  f.root.emit('focusout',{target:up});
+  assert.deepEqual(f.input.take().events,[key(38,false)]);assert.deepEqual([...f.input.pressed],['37']);
+  assert.equal(left.hasPointerCapture(1),true);
+  f.touch('pointercancel',left);assert.deepEqual(f.input.take().events,[key(37,false)]);
+});
 
 test('r3-mobile rejected/inactive keys never acquire holds; admitted keys can release a full queue',t=>{
   const f=fixture(t),left=f.button(37),space=f.button(32);f.controls.setVisible(true);
