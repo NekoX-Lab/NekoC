@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 /// Directories searched for the frontend scripts, in order: `NEKOC_FRONTEND`,
 /// `frontend/` beside the executable (prebuilt packages), then the source
@@ -26,20 +26,64 @@ fn frontend_script(name: &str) -> Result<PathBuf> {
     if let Some(script) = dirs.iter().map(|dir| dir.join(name)).find(|p| p.is_file()) {
         return Ok(script);
     }
-    bail!(
-        "TypeScript frontend {name} not found; keep frontend/ beside the nekoc executable or set NEKOC_FRONTEND to its directory (searched {})",
-        dirs.iter()
-            .map(|dir| dir.display().to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    )
+    Err(FrontendError::NotFound {
+        name: name.to_owned(),
+        dirs,
+    }
+    .into())
 }
 
-fn node_error(script: &Path) -> String {
-    format!(
-        "failed to run {} with node; install Node.js 18 or newer and put node on PATH",
-        script.display()
-    )
+/// Identifies a frontend failure independently of user-controlled paths.
+#[derive(Debug)]
+pub enum FrontendError {
+    NotFound {
+        name: String,
+        dirs: Vec<PathBuf>,
+    },
+    Failed {
+        action: &'static str,
+        stderr: String,
+    },
+}
+
+impl std::fmt::Display for FrontendError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NotFound { name, dirs } => write!(
+                f,
+                "TypeScript frontend {name} not found; keep frontend/ beside the nekoc executable or set NEKOC_FRONTEND to its directory (searched {})",
+                dirs.iter()
+                    .map(|dir| dir.display().to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Self::Failed { action, stderr } => {
+                write!(f, "TypeScript frontend{action} failed: {stderr}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for FrontendError {}
+
+/// Context for a failed Node launch; the underlying I/O error is retained.
+#[derive(Debug)]
+pub struct NodeLaunchError(PathBuf);
+
+impl std::fmt::Display for NodeLaunchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "failed to run {} with node; install Node.js 18 or newer and put node on PATH",
+            self.0.display()
+        )
+    }
+}
+
+impl std::error::Error for NodeLaunchError {}
+
+fn node_error(script: &Path) -> NodeLaunchError {
+    NodeLaunchError(script.to_path_buf())
 }
 
 pub fn compile_ts(input: impl AsRef<Path>, output: impl AsRef<Path>) -> Result<()> {
@@ -83,10 +127,11 @@ pub fn compile_ts_for_target(
         .with_context(|| node_error(&script))?;
 
     if !result.status.success() {
-        bail!(
-            "TypeScript frontend failed: {}",
-            String::from_utf8_lossy(&result.stderr).trim()
-        );
+        return Err(FrontendError::Failed {
+            action: "",
+            stderr: String::from_utf8_lossy(&result.stderr).trim().to_owned(),
+        }
+        .into());
     }
 
     let compiled = std::fs::read_to_string(output)
@@ -160,12 +205,11 @@ pub fn check_ts_for_target(
         .output()
         .with_context(|| node_error(&script))?;
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let result: serde_json::Value = serde_json::from_str(stdout.trim()).with_context(|| {
-        format!(
-            "TypeScript frontend check failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        )
-    })?;
+    let result: serde_json::Value =
+        serde_json::from_str(stdout.trim()).with_context(|| FrontendError::Failed {
+            action: " check",
+            stderr: String::from_utf8_lossy(&output.stderr).trim().to_owned(),
+        })?;
     let diagnostics = result["diagnostics"]
         .as_array()
         .cloned()
@@ -197,6 +241,17 @@ pub fn test_ts(input: impl AsRef<Path>) -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Capture the test runner's streams for the CLI's JSON output mode.
+pub fn test_ts_output(input: impl AsRef<Path>) -> Result<std::process::Output> {
+    let script = frontend_script("test-ts.mjs")?;
+    Command::new("node")
+        .arg(&script)
+        .arg(input.as_ref())
+        .stdin(Stdio::inherit())
+        .output()
+        .with_context(|| node_error(&script))
 }
 
 #[cfg(test)]

@@ -155,12 +155,16 @@ mod native {
     /// never from a project or a browser request.
     #[derive(Clone, Debug, Default, clap::Args)]
     pub struct CloudOptions {
+        /// 本地云变量存储文件（不连接官方云服务；需指定命名空间）
         #[arg(long, requires = "cloud_namespace", conflicts_with = "cloud_memory")]
         pub cloud_file: Option<PathBuf>,
+        /// 仅在内存中模拟云变量（需指定命名空间）
         #[arg(long, requires = "cloud_namespace")]
         pub cloud_memory: bool,
+        /// 隔离本地云变量的作品命名空间
         #[arg(long)]
         pub cloud_namespace: Option<String>,
+        /// 本地私有云变量用户标识（不是官方账号登录）
         #[arg(long, default_value = "anonymous")]
         pub cloud_user: String,
     }

@@ -668,6 +668,129 @@ fn old_input_scripts_keep_their_engine_path_and_explicit_ticks() {
 }
 
 #[test]
+fn cli_json_replay_keeps_reports_and_classifies_conflicts_and_package_failures() {
+    let source = project();
+    let dir = tempfile::tempdir().unwrap();
+    let work = dir.path().join("work.json");
+    let script = dir.path().join("repro.json");
+    let out = dir.path().join("snapshot.json");
+    write(&work, &source);
+    let parse = |output: std::process::Output, code| {
+        assert_eq!(output.status.code(), Some(code), "{output:?}");
+        assert!(output.stderr.is_empty(), "{output:?}");
+        let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+        assert_eq!(report["ok"], code == 0);
+        report
+    };
+    for frames in [&[][..], &inputs()[..3]] {
+        let (package, snapshot) = record(&source, frames);
+        write(&script, &package);
+        let report = parse(
+            cli(&work, &script)
+                .arg("--json")
+                .arg("--out")
+                .arg(&out)
+                .output()
+                .unwrap(),
+            0,
+        );
+        assert_eq!(report["command"], "run");
+        let raw = &report["result"]["snapshot"];
+        assert_eq!(raw["schema"], "nekoc-repro-run-v1");
+        assert_eq!(raw["repro"]["matched"], true);
+        assert_eq!(raw["repro"]["frame_count"], frames.len());
+        assert_eq!(raw["snapshot"], snapshot);
+        assert_eq!(
+            *raw,
+            serde_json::from_slice::<Value>(&fs::read(&out).unwrap()).unwrap()
+        );
+        let matched = parse(
+            cli(&work, &script)
+                .arg("--expect")
+                .arg(&out)
+                .arg("--json")
+                .output()
+                .unwrap(),
+            0,
+        );
+        assert_eq!(matched["result"]["snapshot"], *raw);
+    }
+    for args in [
+        vec!["--ticks", "1"],
+        vec!["--frames", "0"],
+        vec!["--seed", "1"],
+        vec!["--event", "key-down:a"],
+        vec!["--cloud-memory", "--cloud-namespace", "test"],
+        vec!["--cloud-namespace", "test"],
+        vec!["--cloud-user", "anonymous"],
+        vec![
+            "--cloud-file",
+            "not-created.json",
+            "--cloud-namespace",
+            "test",
+        ],
+    ] {
+        let report = parse(
+            cli(&work, &script)
+                .args(&args)
+                .arg("--json")
+                .output()
+                .unwrap(),
+            2,
+        );
+        assert_eq!(report["error"]["kind"], "usage", "{args:?}: {report}");
+        assert!(
+            report["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("conflicts"),
+            "{args:?}: {report}"
+        );
+        assert!(report["error"]["hint"].as_str().unwrap().contains("复现包"));
+    }
+    for field in [
+        "/work_sha256",
+        "/diagnostics/state_sha256",
+        "/runner/version",
+        "/runner/protocol",
+    ] {
+        let (package, _) = record(&source, &[]);
+        let mut bad = serde_json::to_value(package).unwrap();
+        *bad.pointer_mut(field).unwrap() = match field {
+            "/runner/version" => json!("0.0.0"),
+            "/runner/protocol" => json!(0),
+            _ => json!("0".repeat(64)),
+        };
+        write(&script, &bad);
+        let report = parse(cli(&work, &script).arg("--json").output().unwrap(), 1);
+        assert_ne!(report["error"]["kind"], "usage");
+        assert!(
+            report["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("mismatch")
+        );
+        assert!(report["error"]["hint"].as_str().unwrap().contains("复现包"));
+    }
+    write(&script, &json!({"schema":"nekoc-repro-v1","events":[]}));
+    parse(cli(&work, &script).arg("--json").output().unwrap(), 1);
+    write(&script, &json!({"schema":"nekoc-input-v1","events":[]}));
+    let legacy = parse(
+        cli(&work, &script)
+            .args(["--frames", "2", "--seed", "7", "--json"])
+            .output()
+            .unwrap(),
+        0,
+    );
+    assert_eq!(
+        legacy["result"]["snapshot"]["schema"],
+        "nekoc-engine-run-v1"
+    );
+    assert_eq!(legacy["result"]["snapshot"]["ticks"], 2);
+    assert_eq!(legacy["result"]["snapshot"]["seed"], 7);
+}
+
+#[test]
 fn repro_execution_normalizes_browser_numbers_not_only_the_fingerprint() {
     let mut source = project();
     source["variables"]["variablesDict"]["down"]["value"] = json!(-0.0);

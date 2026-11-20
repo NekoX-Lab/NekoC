@@ -147,7 +147,11 @@ fn summarize_value(value: &Value) -> String {
     let raw = serde_json::to_string(value).unwrap_or_else(|_| "<unprintable>".to_owned());
     const MAX_LEN: usize = 120;
     if raw.len() > MAX_LEN {
-        format!("{}...", &raw[..MAX_LEN])
+        let mut end = MAX_LEN;
+        while !raw.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}...", &raw[..end])
     } else {
         raw
     }
