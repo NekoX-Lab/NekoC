@@ -3,32 +3,36 @@ import {playerExtensions,SUPPORTED_API_VERSIONS,negotiateVersion} from './extens
 import {KnMicrophone,needsMicrophone} from './kn-microphone.js';
 import {K4DeviceHost} from './k4-device.js';
 import {httpBackend} from './backend.js';
+import {reproInput,REPRO_DT} from './repro.js';
 export class PlayerConnection {
   constructor(extensions=playerExtensions,device=new K4DeviceHost()){this.extensions=extensions;this.extensionSession=null;this.socket=null;this.pending=null;this.ready=false;this.openReject=null;this.timer=null;this.microphone=null;this.device=device;}
   // backend: an object from backend.js; a string is the local Rust backend origin.
-  async open(project=null,backend=location.origin){
+  async open(project=null,backend=location.origin,repro=null){
     if(this.socket||this.ready||this.pending||this.microphone)this.close();
+    this.repro=repro;
     const schemas=this.extensions.schemas();
+    if(repro&&(!project||schemas.length))throw Error('复现录制需要作品，且不支持远程扩展');
     const usesV2=schemas.some(schema=>schema.api_version===2);
     if(schemas.length&&!project)throw Error('Extensions require a private player project snapshot');
     this.extensionSession=this.extensions.session();
-    if(project&&needsMicrophone(project)){this.microphone=new KnMicrophone();void this.microphone.start();}
+    if(project&&!repro&&needsMicrophone(project)){this.microphone=new KnMicrophone();void this.microphone.start();}
     const socket=(typeof backend==='string'?httpBackend(backend):backend).connect(project);
     this.socket=socket;
     return new Promise((resolve,reject)=>{
       this.openReject=reject;
       this.timer=setTimeout(()=>this.fail(Error('运行时连接超时')),30000);
-      socket.onopen=()=>{if(project&&this.socket===socket)socket.send(JSON.stringify(schemas.length?{nekoc_extension_handshake:1,project,extensions:schemas,...(usesV2?{extension_api_versions:SUPPORTED_API_VERSIONS}:{})}:project));};
+      socket.onopen=()=>{if(project&&this.socket===socket)socket.send(JSON.stringify(schemas.length||repro?{nekoc_extension_handshake:1,project,extensions:schemas,...(usesV2?{extension_api_versions:SUPPORTED_API_VERSIONS}:{}),...(repro?{nekoc_repro:{seed:repro.seed}}:{})}:project));};
       socket.onmessage=event=>{
         if(this.socket!==socket)return;
         try{
           if(typeof event.data==='string'){
             const message=JSON.parse(event.data);
             if(message.ready){
+              if(repro&&(!message.repro||message.repro.runner?.protocol!==2))throw Error('运行时不支持复现录制，请更新播放器后端');
               if(usesV2&&(negotiateVersion([message.extension_api_version])!==2))throw Error('Extension API v2 negotiation failed');
               clearTimeout(this.timer);this.openReject=null;this.ready=true;resolve(message);
             }
-            else if(message.snapshot){const pending=this.pending;this.pending=null;clearTimeout(this.timer);pending?.resolve(message.snapshot);}
+            else if(message.snapshot||message.repro_status){const pending=this.pending;this.pending=null;clearTimeout(this.timer);pending?.resolve(message.repro_status||message.snapshot);}
             else if(message.error)this.fail(Error(message.error));
           }else{
             if(schemas.length){
@@ -48,20 +52,24 @@ export class PlayerConnection {
     if(!this.ready||!this.extensionSession)throw Error('运行时尚未连接');
     this.extensionSession.emit(opcode,value);
   }
-  requestDevicePermission(){return this.device?.requestPermission?.()||Promise.resolve('unavailable');}
+  requestDevicePermission(){return !this.repro&&this.device?.requestPermission?.()||Promise.resolve('unavailable');}
   pauseDevice(){this.device?.stop?.();}
   sendDeviceEvent(...args){return this.device?.sendDeviceEvent?.(...args)||false;}
   sendButton(...args){return this.device?.sendButton?.(...args)||false;}
   sendSlide(...args){return this.device?.sendSlide?.(...args)||false;}
   sendSlope(...args){return this.device?.sendSlope?.(...args)||false;}
   sendShake(...args){return this.device?.sendShake?.(...args)||false;}
-  applyFrame(frame){this.device?.apply(frame);}
+  applyFrame(frame){if(!this.repro)this.device?.apply(frame);}
   frame(payload){
     if(!this.ready)return Promise.reject(Error('运行时尚未连接'));
     if(this.pending)return Promise.reject(Error('已有运行帧等待响应'));
     return new Promise((resolve,reject)=>{
       this.pending={resolve,reject};this.timer=setTimeout(()=>this.fail(Error('运行帧响应超时')),10000);
       try{
+        if(this.repro){
+          const input=payload.repro_status?{repro_status:true}:payload.debug_snapshot?{debug_snapshot:true}:{...reproInput(payload),dt:REPRO_DT};
+          this.socket.send(JSON.stringify(input));return;
+        }
         const results=payload.debug_snapshot?[]:this.extensionSession?.drain()||[];
         const events=[...(payload.events||[])];
         // Backend accepts at most 256 events. Preserve input order and requeue
@@ -77,6 +85,7 @@ export class PlayerConnection {
   }
   // Read-only request on this VM's loopback, same-origin protected socket.
   snapshot(){return this.frame({debug_snapshot:true});}
+  reproStatus(){if(!this.repro)return Promise.reject(Error('当前会话没有录制'));return this.frame({repro_status:true});}
   fail(error){
     this.microphone?.close();this.microphone=null;
     this.device?.close?.();
