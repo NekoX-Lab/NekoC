@@ -252,7 +252,7 @@ enum Command {
     },
     /// 导出无需服务器的独立浏览器播放器目录或 ZIP
     ExportPlayer {
-        /// 输入 Kitten N 作品路径
+        /// 输入作品路径（.bcmkn / .bcm / JSON）
         input: PathBuf,
         /// 新输出目录或 .zip 文件路径；不覆盖已有路径
         #[arg(long)]
@@ -502,11 +502,12 @@ fn main() -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
+            let exit_code = if error.is::<clap::Error>() { 2 } else { 1 };
             if !error.is::<cli_output::ReportedFailure>() {
                 let report = cli_output::error_report(Some(&command), &error);
                 let _ = cli_output::print_error(&report, json_requested);
             }
-            ExitCode::FAILURE
+            ExitCode::from(exit_code)
         }
     }
 }
@@ -784,16 +785,21 @@ fn execute(cli: Cli, explicit_cloud: bool) -> Result<()> {
                     .map(nekoc::repro::Script::read_file)
                     .transpose()?;
                 match script {
-                    Some(nekoc::repro::Script::Repro(package)) => nekoc::repro::replay(
-                        &project.value,
-                        &package,
-                        &nekoc::repro::ReplayOptions {
+                    Some(nekoc::repro::Script::Repro(package)) => {
+                        let options = nekoc::repro::ReplayOptions {
                             ticks,
                             seed,
                             has_events: !events.is_empty(),
                             has_cloud: explicit_cloud,
-                        },
-                    )?,
+                        };
+                        options.validate().map_err(|error| {
+                            clap::Error::raw(
+                                clap::error::ErrorKind::ArgumentConflict,
+                                error.to_string(),
+                            )
+                        })?;
+                        nekoc::repro::replay(&project.value, &package, &options)?
+                    }
                     legacy => {
                         let script = match &legacy {
                             Some(nekoc::repro::Script::Legacy(script)) => Some(script),
@@ -912,6 +918,23 @@ fn execute(cli: Cli, explicit_cloud: bool) -> Result<()> {
             out,
             wasm_dir,
         } => {
+            if json {
+                let output =
+                    nekoc::player_export::export_output(&input, &out, wasm_dir.as_deref())?;
+                let report = json!({
+                    "out": out, "stdout": String::from_utf8_lossy(&output.stdout),
+                    "stderr": String::from_utf8_lossy(&output.stderr)
+                });
+                if output.status.success() {
+                    return cli_output::success("export-player", report);
+                }
+                return cli_output::failure(
+                    "export-player",
+                    "播放器导出失败",
+                    "查看 result.stdout 和 result.stderr；确认 Node.js 22+、npm 依赖及 --wasm-dir 中的 Web 绑定已就绪，并使用新的输出路径。",
+                    report,
+                );
+            }
             nekoc::player_export::export(&input, &out, wasm_dir.as_deref())?;
         }
         Command::BenchImport {

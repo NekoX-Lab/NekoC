@@ -23,6 +23,7 @@ const COMMANDS: &[&str] = &[
     "validate",
     "pack",
     "unpack",
+    "export-player",
     "analyze-ir",
     "watch",
 ];
@@ -80,6 +81,8 @@ fn usage_errors_are_exit_two_even_with_json_before_or_after_command() {
         vec!["--json", "run", "a", "--legacy-runtime", "--seed", "1"],
         vec!["coverage", "--json"],
         vec!["bench-import", "--json"],
+        vec!["export-player", "--json"],
+        vec!["--json", "export-player", "project.bcmkn"],
     ] {
         let result = report(nekoc().args(&args).output().unwrap(), 2);
         assert_eq!(result["error"]["kind"], "usage", "{args:?}");

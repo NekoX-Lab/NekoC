@@ -37,7 +37,17 @@ pub fn failure(command: &str, message: &str, hint: &str, result: Value) -> Resul
 
 pub fn error_report(command: Option<&str>, error: &anyhow::Error) -> Value {
     let message = format!("{error:#}");
-    let (kind, hint) = if error
+    let (kind, hint) = if error.is::<clap::Error>() {
+        (
+            "usage",
+            "运行 nekoc run --help 查看用法；复现包使用记录中的帧数、种子、事件和云配置，请移除 --ticks/--frames、--seed、--event 及所有 --cloud-* 参数。",
+        )
+    } else if error.is::<nekoc::player_export::PackagerLaunchError>() {
+        (
+            "node_unavailable",
+            "安装 Node.js 22 或更新版本，确认 node --version 可用，并在源码目录运行 npm ci --ignore-scripts。",
+        )
+    } else if error
         .downcast_ref::<nekoc::ts_frontend::NodeLaunchError>()
         .is_some()
     {
@@ -81,6 +91,16 @@ pub fn error_report(command: Option<&str>, error: &anyhow::Error) -> Value {
         (
             "already_packed",
             "先运行 nekoc unpack <作品> --out <原始作品>，再对解压作品重新 pack。",
+        )
+    } else if command == Some("export-player") {
+        (
+            "command_failed",
+            "使用尚不存在的 --out 目录或 ZIP 路径；确认作品可运行、Node.js 22+ 和 npm 依赖已安装，--wasm-dir 指向已构建的 Web 绑定目录。",
+        )
+    } else if command == Some("run") {
+        (
+            "command_failed",
+            "检查作品及 --input-script；复现包必须匹配作品指纹、NekoC 版本、协议和状态摘要，必要时用同版本重新录制；旧输入脚本使用 nekoc-input-v1。",
         )
     } else {
         (
@@ -226,5 +246,25 @@ mod tests {
             error_report(Some("validate"), &error)["error"]["kind"],
             "command_failed"
         );
+    }
+
+    #[test]
+    fn player_packager_launch_and_replay_conflict_use_typed_sources() {
+        let error = anyhow::Error::new(io::Error::from(io::ErrorKind::NotFound))
+            .context(nekoc::player_export::PackagerLaunchError)
+            .context("with node ENOENT EACCES EPERM");
+        let report = error_report(Some("export-player"), &error);
+        assert_eq!(report["error"]["kind"], "node_unavailable");
+        assert!(
+            report["error"]["hint"]
+                .as_str()
+                .unwrap()
+                .contains("Node.js 22")
+        );
+        let error = anyhow::Error::new(clap::Error::raw(
+            clap::error::ErrorKind::ArgumentConflict,
+            "repro package conflicts with --seed",
+        ));
+        assert_eq!(error_report(Some("run"), &error)["error"]["kind"], "usage");
     }
 }
