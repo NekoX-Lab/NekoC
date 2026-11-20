@@ -55,7 +55,11 @@ const api=async(path,data)=>{
 function log(message,error=false){const node=document.createElement('p');node.textContent=`${error?'!':'›'} ${message}`;if(error)node.className='error';$('#logs .muted')?.remove();$('#logs').append(node);while($('#logs').children.length>100)$('#logs').firstChild.remove();$('#logs').scrollTop=$('#logs').scrollHeight;}
 function notify(message){const el=$('#toast');el.textContent=message;el.classList.add('show');clearTimeout(notify.timer);notify.timer=setTimeout(()=>el.classList.remove('show'),3000);}
 function markDirty(){dirty=true;dirtyState='unsaved';$('#dirty').textContent=t(dirtyState);setCompile('changed');}
-function transaction(fn){if(started){notify(t('stopBeforeEdit'));return;}const before=JSON.stringify(project);fn();if(JSON.stringify(project)!==before){undo.push(before);if(undo.length>80)undo.shift();redo=[];markDirty();}renderEditor();}
+function transaction(fn,{render=true}={}){if(started){notify(t('stopBeforeEdit'));return;}const before=JSON.stringify(project);fn();if(JSON.stringify(project)!==before){undo.push(before);if(undo.length>80)undo.shift();redo=[];markDirty();}if(render)renderEditor();else{
+  // Keep the actual controls alive while change/blur moves native keyboard focus.
+  $('#undo').disabled=!undo.length||started;$('#redo').disabled=!redo.length||started;
+  for(const details of document.querySelectorAll('details[data-expression]')){const value=find(details.dataset.expression);if(value)details.firstElementChild.textContent=expressionText(value);}
+}}
 function find(id,value=entity()?.nekoBlockJsonList){if(!value||typeof value!=='object')return null;if(value.id===id&&value.type)return value;for(const v of Object.values(value)){const b=find(id,v);if(b)return b;}return null;}
 function entity(){return project.actors?.actorsDict?.[owner]||project.scenes?.scenesDict?.[owner];}
 function kitten4(value=project){return Object.hasOwn(value,'_nekocKitten4');}
@@ -82,7 +86,7 @@ function renderEntities(){
 }
 function editInput(value,onChange,type='text'){
   const input=make('input');input.value=value;input.type=type;input.disabled=started;
-  input.onclick=e=>e.stopPropagation();input.onchange=()=>transaction(()=>onChange(type==='number'?Number(input.value):input.value));return input;
+  input.onclick=e=>e.stopPropagation();input.onchange=()=>transaction(()=>onChange(type==='number'?Number(input.value):input.value),{render:false});return input;
 }
 function expressionText(b,depth=0){
   if(depth>12)return '…';if(b.type==='math_number')return String(b.fields?.NUM??0);
@@ -92,7 +96,7 @@ function expressionText(b,depth=0){
   if(args.num)return `${op}(${expressionText(args.num,depth+1)})`;
   return blockLabel(b.type);
 }
-function blockNode(block,depth=0){
+function blockNode(block,depth=0,expanded=new Set()){
   if(depth>128)return make('div','',t('tooDeep'));
   const cat=category(block.type),[bg,border,ink]=colors[cat];
   const node=make('div',`block ${block.type.startsWith('on_')?'hat':''} ${selected===block.id?'selected':''}`);node.dataset.block=block.id;
@@ -110,24 +114,25 @@ function blockNode(block,depth=0){
       const f=value.type==='text'?'TEXT':'NUM',label=make('label','',fieldLabel(key)),input=editInput(value.fields?.[f]??'',v=>value.fields[f]=v,value.type==='text'?'text':'number');
       if(value.type==='text')input.className='text-value';label.append(input);fields.append(label);
     }else{const label=make('div','expression-field',fieldLabel(key)),details=make('details','expression'),summary=make('summary','',expressionText(value));
-      summary.onclick=e=>e.stopPropagation();details.append(summary);
-      details.ontoggle=()=>{if(details.open&&details.children.length===1)details.append(blockNode(value,depth+1));};
+      summary.onclick=e=>e.stopPropagation();details.dataset.expression=value.id;details.append(summary);
+      details.ontoggle=()=>{if(details.open&&details.children.length===1)details.append(blockNode(value,depth+1,expanded));};
+      details.open=expanded.has(value.id);details.ontoggle();
       label.append(details);fields.append(label);}
   }
   if(fields.children.length)node.append(fields);
   const branches=block.statements||(['repeat_n_times','repeat_forever','warp'].includes(block.type)?{DO:null}:{});
   for(const [key,value]of Object.entries(branches)){
     const branch=make('div','branch');branch.append(make('div','branch-label',key==='DO'?t('branch'):key));
-    if(value)renderChain(branch,value,depth+1);
+    if(value)renderChain(branch,value,depth+1,expanded);
     else branch.append(make('span','branch-label',t('branchHint')));
     node.append(branch);
   }
   if(block.statements&&!Object.keys(block.statements).length){const empty=make('div','branch',t('branchHint'));empty.style.fontSize='10px';node.append(empty);}
   return node;
 }
-function renderChain(parent,block,depth){let n=0;while(block&&n++<5000){parent.append(blockNode(block,depth));block=block.next;}}
+function renderChain(parent,block,depth,expanded){let n=0;while(block&&n++<5000){parent.append(blockNode(block,depth,expanded));block=block.next;}}
 function syncBlockSelection(){for(const node of document.querySelectorAll('[data-block]')){const active=node.dataset.block===selected;node.classList.toggle('selected',active);node.querySelector(':scope > .block-label').setAttribute('aria-pressed',String(active));}}
-function renderBlocks(){const root=$('#blocks');root.replaceChildren();for(const block of entity()?.nekoBlockJsonList||[]){const stack=make('div','stack');renderChain(stack,block,0);root.append(stack);}if(!root.children.length)root.append(make('p','context-note',t('emptyBlocks')));}
+function renderBlocks(){const root=$('#blocks'),expanded=new Set([...root.querySelectorAll('details[data-expression][open]')].map(details=>details.dataset.expression));root.replaceChildren();for(const block of entity()?.nekoBlockJsonList||[]){const stack=make('div','stack');renderChain(stack,block,0,expanded);root.append(stack);}if(!root.children.length)root.append(make('p','context-note',t('emptyBlocks')));}
 function renderProperties(){
   const root=$('#properties');root.replaceChildren();const a=entity();if(!a)return;
   const grid=make('div','property-grid');

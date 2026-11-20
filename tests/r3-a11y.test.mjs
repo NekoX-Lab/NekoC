@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import {runInNewContext} from 'node:vm';
 import {messages,normalizeLanguage,translate} from '../web/i18n.js';
 import {PlayerFeedback} from '../web/player-feedback.js';
 
@@ -58,4 +59,26 @@ test('r3-a11y: report Tab wraps both ways, but other keys keep native behavior',
   assert.equal(root.activeElement,root.querySelector('#report-close'));assert.equal(prevented,2);
   keydown({...event,key:'Escape'});assert.equal(prevented,2);
   root.activeElement=root.querySelector('#report-download');keydown(event);assert.equal(prevented,2);
+});
+
+test('r3-a11y: field commits update history and summaries without replacing controls',async()=>{
+  const source=await readFile(new URL('../web/app.js',import.meta.url),'utf8');
+  const undoButton={},redoButton={},summary={},project={value:1};
+  const context={project,started:false,undo:[],redo:['old redo'],dirtyCount:0,renders:0,notices:0,
+    make:()=>({}),markDirty(){context.dirtyCount++;},renderEditor(){context.renders++;},notify(){context.notices++;},t:key=>key,
+    $:selector=>selector==='#undo'?undoButton:redoButton,
+    document:{querySelectorAll:()=>[{dataset:{expression:'expr'},firstElementChild:summary}]},
+    find:()=>project,expressionText:value=>String(value.value),
+  };
+  const transaction=source.slice(source.indexOf('function transaction('),source.indexOf('function find('));
+  const editInput=source.slice(source.indexOf('function editInput('),source.indexOf('function expressionText('));
+  const api=runInNewContext(`${transaction}\n${editInput}\n({transaction,editInput})`,context);
+  const input=api.editInput(1,value=>project.value=value,'number');
+  input.value='45';input.onchange();
+  assert.equal(project.value,45);assert.equal(context.dirtyCount,1);assert.equal(context.renders,0);
+  assert.equal(context.undo[0],'{"value":1}');assert.equal(context.redo.length,0);
+  assert.equal(undoButton.disabled,false);assert.equal(redoButton.disabled,true);assert.equal(summary.textContent,'45');
+  input.onchange();assert.equal(context.undo.length,1,'unchanged values do not add history');
+  context.started=true;input.value='99';input.onchange();assert.equal(project.value,45);assert.equal(context.notices,1);
+  context.started=false;api.transaction(()=>{project.value=46;});assert.equal(context.renders,1,'structural transactions still rebuild the editor');
 });

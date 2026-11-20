@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {spawn} from 'node:child_process';
 import {createServer} from 'node:net';
 import {once} from 'node:events';
+import {readFile} from 'node:fs/promises';
 import {setTimeout as delay} from 'node:timers/promises';
 import {loadPlaywright} from '../tools/probe-kitten4.mjs';
 
@@ -35,6 +36,7 @@ test('r3-a11y: Studio and player keyboard, locale and contrast',{
       try{if((await fetch(`${origin}/api/project`)).ok)break;}catch{}
       await delay(50);
     }
+    assert.equal(await(await fetch(`${origin}/app.js`)).text(),await readFile('web/app.js','utf8'),'backend must serve the editor source being tested');
     browser=await loadPlaywright().chromium.launch({headless:true,channel:process.env.NEKOC_BROWSER_CHANNEL||'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
     const context=await browser.newContext({viewport:{width:1600,height:1000}}),page=await context.newPage(),errors=[];
     page.on('pageerror',error=>errors.push(error.message));page.on('dialog',dialog=>dialog.accept());
@@ -55,8 +57,7 @@ test('r3-a11y: Studio and player keyboard, locale and contrast',{
       const move=page.locator('#palette').getByRole('button',{name:'Move steps',exact:true});await move.focus();await page.keyboard.press('Enter');
       const field=page.locator('#blocks').getByRole('spinbutton',{name:'Steps',exact:true}).last();
       await field.fill('42');await page.keyboard.press('Enter');assert.equal(await focused(field),true);
-      await page.keyboard.press('Tab');assert.equal(await focused(field),false);
-      await field.fill('43');await page.keyboard.press('Tab');assert.equal(await focused(field),false);
+      await field.fill('43');await page.keyboard.press('Enter');assert.equal(await focused(field),true);
       await page.locator('#palette').getByRole('button',{name:'Repeat',exact:true}).focus();await page.keyboard.press('Enter');
       const blockTab=page.getByRole('tab',{name:'Blocks',exact:true});await blockTab.focus();await page.keyboard.press('ArrowRight');
       const source=page.getByRole('tab',{name:'Project source',exact:true});assert.equal(await focused(source),true);assert.equal(await source.getAttribute('aria-selected'),'true');
@@ -77,6 +78,71 @@ test('r3-a11y: Studio and player keyboard, locale and contrast',{
       await page.locator('#stage').focus();await page.keyboard.press('Tab');
       assert.equal(await focused(page.locator('#run')),true);
       await page.locator('#stage').focus();assert.notEqual(await page.locator('#stage').evaluate(el=>getComputedStyle(el).outlineStyle),'none');
+    });
+    await t.test('Studio: field changes preserve native Tab and Shift+Tab targets',async()=>{
+      await page.goto(`${origin}/?lang=en`,{waitUntil:'domcontentloaded'});await studioReady();
+      await page.locator('#palette').getByRole('button',{name:'Go to position',exact:true}).click();
+      const x=page.locator('#blocks').getByRole('spinbutton',{name:'X',exact:true}).last();
+      const y=page.locator('#blocks').getByRole('spinbutton',{name:'Y',exact:true}).last();
+      const original=await x.elementHandle();
+      await x.fill('45');await page.keyboard.press('Tab');assert.equal(await focused(y),true,'block X → Y');
+      assert.equal(await original.evaluate(el=>el.isConnected),true,'commit must not replace the editing controls');
+      await y.fill('46');await page.keyboard.press('Shift+Tab');assert.equal(await focused(x),true,'block Y → X');
+      await page.keyboard.press('Enter');assert.equal(await focused(x),true);
+      assert.equal(await page.locator('#undo').isEnabled(),true);
+      const properties=page.locator('#properties input');
+      await properties.nth(0).fill('47');await page.keyboard.press('Tab');assert.equal(await focused(properties.nth(1)),true,'property X → Y');
+      await properties.nth(1).fill('48');await page.keyboard.press('Tab');assert.equal(await focused(properties.nth(2)),true,'property Y → Size');
+      await properties.nth(2).fill('95');await page.keyboard.press('Shift+Tab');assert.equal(await focused(properties.nth(1)),true,'property Size → Y');
+      await properties.nth(1).fill('49');await page.keyboard.press('Shift+Tab');assert.equal(await focused(properties.nth(0)),true,'property Y → X');
+      await page.locator('#undo').click();assert.equal(await properties.nth(1).inputValue(),'48');
+      await page.locator('#redo').click();assert.equal(await properties.nth(1).inputValue(),'49');
+      assert.equal(await properties.nth(2).inputValue(),'95');
+      await page.locator('#json-tab').click();
+      const saved=JSON.parse(await page.locator('#json-source').inputValue());
+      const entities=[...Object.values(saved.actors.actorsDict),...Object.values(saved.scenes.scenesDict)];
+      const edited=entities.find(value=>value.nekoBlockJsonList?.some(block=>block.type==='self_move_to'));
+      assert.ok(edited);assert.equal(edited.position.x,47);assert.equal(edited.position.y,49);assert.equal(edited.scale,95);
+      const move=edited.nekoBlockJsonList.find(block=>block.type==='self_move_to');
+      assert.equal(move.inputs.x.fields.NUM,45);assert.equal(move.inputs.y.fields.NUM,46);
+    });
+    await t.test('Studio: two expression levels retain commits, focus and expansion across rerenders',async()=>{
+      await page.goto(`${origin}/?lang=en`,{waitUntil:'domcontentloaded'});await studioReady();
+      const value=await page.evaluate(()=>window.nekoImportReport.project),actor=Object.keys(value.actors.actorsDict)[0];
+      const number=(id,n)=>({id,type:'math_number',fields:{NUM:n}});
+      value.actors.actorsDict[actor].nekoBlockJsonList=[{id:'r3-a11y-hat',type:'on_running_group_activated',next:{id:'r3-a11y-move',type:'self_go_forward',inputs:{steps:{id:'r3-a11y-outer',type:'math_arithmetic',fields:{type:'add'},inputs:{A:{id:'r3-a11y-inner',type:'math_arithmetic',fields:{type:'add'},inputs:{A:number('r3-a11y-a',1),B:number('r3-a11y-b',2)}},B:number('r3-a11y-c',3)}}}}}];
+      await page.locator('#json-tab').click();await page.locator('#json-source').fill(JSON.stringify(value));await page.locator('#apply-json').click();
+      await page.waitForFunction(()=>!document.querySelector('#apply-json').disabled);
+      await page.locator('#blocks-tab').click();await page.locator(`[data-owner="${actor}"]`).click();
+      const outer=page.locator('details[data-expression="r3-a11y-outer"]'),inner=page.locator('details[data-expression="r3-a11y-inner"]');
+      await outer.locator(':scope > summary').click();await inner.locator(':scope > summary').click();
+      const a=page.locator('[data-block="r3-a11y-inner"] > .fields > label input[type=number]').nth(0);
+      const b=page.locator('[data-block="r3-a11y-inner"] > .fields > label input[type=number]').nth(1);
+      const c=page.locator('[data-block="r3-a11y-outer"] > .fields > label input[type=number]');
+      const open=async()=>{assert.equal(await outer.getAttribute('open'),'');assert.equal(await inner.getAttribute('open'),'');};
+      const original=await a.elementHandle();
+      await a.fill('7');await page.keyboard.press('Enter');assert.equal(await focused(a),true);await open();
+      assert.equal(await original.evaluate(el=>el.isConnected),true);
+      assert.equal(await outer.locator(':scope > summary').textContent(),'((7 + 2) + 3)');
+      await a.fill('8');await page.keyboard.press('Tab');assert.equal(await focused(b),true,'nested A → B');await open();
+      await b.fill('9');await page.keyboard.press('Shift+Tab');assert.equal(await focused(a),true,'nested B → A');
+      await b.focus();await page.keyboard.press('Tab');assert.equal(await focused(c),true,'inner B → outer B');
+      await c.fill('10');await page.keyboard.press('Shift+Tab');assert.equal(await focused(b),true,'outer B → inner B');
+      // Undo/redo rebuild the editor: both levels must exist synchronously before focus restoration.
+      await page.locator('#undo').click();await open();assert.equal(await c.inputValue(),'3');
+      await page.locator('#redo').click();await open();assert.equal(await c.inputValue(),'10');
+      for(const language of ['zh-CN','en']){await page.locator('#language').selectOption(language);await open();assert.equal(await a.inputValue(),'8');assert.equal(await b.inputValue(),'9');}
+      // Keep a nested field focused during a locale rebuild, rather than focusing the selector first.
+      await a.focus();await page.locator('#language').evaluate(el=>{el.value='zh-CN';el.dispatchEvent(new Event('change',{bubbles:true}));});
+      await open();assert.equal(await focused(a),true);
+      await a.fill('11');await page.keyboard.press('Enter');assert.equal(await focused(a),true);await open();
+      await inner.locator(':scope > summary').click();await page.locator('#language').selectOption('en');
+      assert.equal(await outer.getAttribute('open'),'');assert.equal(await inner.getAttribute('open'),null,'collapsed state is preserved too');
+      await inner.locator(':scope > summary').click();assert.equal(await a.inputValue(),'11');
+      await page.locator('#json-tab').click();
+      const saved=JSON.parse(await page.locator('#json-source').inputValue()).actors.actorsDict[actor].nekoBlockJsonList[0].next.inputs.steps;
+      assert.equal(saved.inputs.A.inputs.A.fields.NUM,11);assert.equal(saved.inputs.A.inputs.B.fields.NUM,9);assert.equal(saved.inputs.B.fields.NUM,10);
+      await page.locator('#language').selectOption('en');
     });
     await t.test('player: persisted language, keyboard playback, settings, report focus and fullscreen labels',async()=>{
       await page.goto(`${origin}/play`,{waitUntil:'domcontentloaded'});await playerReady();
