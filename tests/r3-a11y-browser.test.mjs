@@ -36,7 +36,10 @@ test('r3-a11y: Studio and player keyboard, locale and contrast',{
       try{if((await fetch(`${origin}/api/project`)).ok)break;}catch{}
       await delay(50);
     }
-    assert.equal(await(await fetch(`${origin}/app.js`)).text(),await readFile('web/app.js','utf8'),'backend must serve the editor source being tested');
+    for(const [route,file]of [['app.js','app.js'],['play.js','play.js'],['play.css','play.css'],['play','play.html']]){
+      const served=await(await fetch(`${origin}/${route}`)).text(),local=await readFile(`web/${file}`,'utf8');
+      assert.equal(served.replaceAll('\r\n','\n'),local.replaceAll('\r\n','\n'),`backend must serve current ${file}`);
+    }
     browser=await loadPlaywright().chromium.launch({headless:true,channel:process.env.NEKOC_BROWSER_CHANNEL||'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
     const context=await browser.newContext({viewport:{width:1600,height:1000}}),page=await context.newPage(),errors=[];
     page.on('pageerror',error=>errors.push(error.message));page.on('dialog',dialog=>dialog.accept());
@@ -199,7 +202,8 @@ test('r3-a11y: Studio and player keyboard, locale and contrast',{
       }
       await phone.setViewportSize({width:390,height:844});
       assert.equal(await phone.locator('#runtime-mode').textContent(),'Runtime mode: local VM');
-      const virtual=phone.getByRole('button',{name:'Show virtual controls',exact:true});
+      const virtual=phone.locator('#virtual-toggle');
+      assert.equal(await phone.getByRole('button',{name:'Show virtual controls',exact:true}).count(),1);
       await virtual.focus();await phone.keyboard.press('Enter');
       assert.equal(await virtual.getAttribute('aria-expanded'),'true');
       assert.equal(await virtual.textContent(),'Hide virtual controls');

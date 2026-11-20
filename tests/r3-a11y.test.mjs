@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFile} from 'node:fs/promises';
+import {cp,mkdir,mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {spawnSync} from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {runInNewContext} from 'node:vm';
 import {messages,normalizeLanguage,translate} from '../web/i18n.js';
 import {PlayerFeedback} from '../web/player-feedback.js';
@@ -42,6 +46,26 @@ test('r3-a11y: merged mobile player keeps unique IDs and off-stage accessible er
   assert.match(html,/<span id="notice-text" tabindex="0"[^>]*data-i18n-aria-label="noticeDetails"/);
   assert.match(html,/id="coverage"[^>]*aria-controls="coverage-dialog"/);
   for(const code of [38,37,40,39,32,13,90,88])assert.match(html,new RegExp(`data-key="${code}"[^>]*data-i18n-aria-label="[^"]+"[^>]*aria-pressed="false"`));
+});
+
+test('r3-a11y: extension build ships bilingual, recorder and touch dependencies together',async t=>{
+  const root=fileURLToPath(new URL('../',import.meta.url)),fixture=await mkdtemp(path.join(os.tmpdir(),'nekoc-r3-a11y-extension-'));
+  t.after(()=>rm(fixture,{recursive:true,force:true}));
+  for(const folder of ['web','extension'])await cp(path.join(root,folder),path.join(fixture,folder),{recursive:true});
+  await mkdir(path.join(fixture,'tools'));
+  await cp(path.join(root,'tools/build-extension.mjs'),path.join(fixture,'tools/build-extension.mjs'));
+  const wasm=path.join(fixture,'packages/nekoc/dist/web');await mkdir(wasm,{recursive:true});
+  // Test copying and HTML rewriting only, not execution or VM compatibility.
+  for(const file of ['nekoc_wasm.js','nekoc_wasm_bg.wasm'])await writeFile(path.join(wasm,file),'packaging fixture');
+  const output=path.join(fixture,'output');
+  const result=spawnSync(process.execPath,['tools/build-extension.mjs',output],{cwd:fixture,encoding:'utf8'});
+  assert.ifError(result.error);assert.equal(result.status,0,result.stdout+result.stderr);
+  for(const file of ['i18n.js','repro.js','input.js','play.js','play.css','player-feedback.js']){
+    assert.equal(await readFile(path.join(output,file),'utf8'),await readFile(path.join(root,'web',file),'utf8'),`extension dependency: ${file}`);
+  }
+  const html=await readFile(path.join(output,'play.html'),'utf8');
+  assert.ok(!html.includes('src="/'));assert.ok(!html.includes('href="/'));
+  assert.match(html,/<script type="module" src="\.\/play\.js"/);
 });
 
 test('r3-a11y: report Tab wraps both ways, but other keys keep native behavior',()=>{
