@@ -52,7 +52,7 @@ This avoids treating the host API itself as a semantic failure. It is only a
 small synchronous oracle and does not claim equivalence for general async
 behavior.
 
-The baseline currently contains 222 matches, 21 compile errors, and 2 known
+The baseline currently contains 224 matches, 20 compile errors, and 1 known
 differences among the 245 original probes. A later frontend change may turn a
 compile error into a match; update only the relevant baseline entry and its
 evidence after confirming both Node and VM results.

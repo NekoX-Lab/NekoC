@@ -42,8 +42,9 @@ object coercion/logging/JSON, `delete`, and value-producing property updates are
 compile errors. Log scalar properties instead. Object programs use custom
 procedures rather than argument-substituting inlining; recursive object mutation
 or allocation and recursive locals must be rewritten as loops. The heap has no
-GC until restart. Methods, prototypes, accessors, spread and destructuring remain
-unsupported. See [object lowering and evidence](ts-share-objects.md) and
+GC until restart. Methods, prototypes, accessors and spread remain unsupported.
+Shallow object variable bindings support literal property names and renaming.
+See [object lowering and evidence](ts-share-objects.md) and
 [the support audit](ts-support-audit.md) for target-specific limitations,
 timer cancellation, numeric globals and array factories.
 
@@ -370,9 +371,13 @@ Top-level array destructuring runs at its source position in the implicit
 startup script: the RHS is evaluated once, and root `onStart` handlers wait for
 initialization. Rest produces a new shallow list; reference elements still alias
 their originals. Existing function/event-local destructuring is unchanged.
-Object destructuring, nested patterns and default elements are not supported;
-read properties/elements explicitly instead. Sparse/missing elements do not gain
-JavaScript `undefined` semantics through destructuring.
+Shallow object variable declarations (`const {x, y: name} = source`) save the
+source once, then read properties in order. Standalone array assignments such as
+`[a, b] = [b, a]` support variable targets and a dense array-literal RHS, including
+evaluation of unused elements. Object rest/computed keys, nested/default patterns
+and other assignment targets are rejected; see [boundaries](ts-r2-destructuring.md).
+Sparse/missing elements do not gain JavaScript `undefined` semantics through
+destructuring.
 
 ### Import/Export (Project Files)
 

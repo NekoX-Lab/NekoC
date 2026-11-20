@@ -76,7 +76,7 @@ test("tsctrl: nullish coalescing proves primitive variable assignments without t
   const v = execute('let out=1; onStart(()=>{let a=0; a=0; out=a ?? 7;});');
   assert.equal(v["kn-var-out"], 0);
   assert.throws(() => compileFile("virtual/nullable.ts", { readFile: () =>
-    'let a=0; onStart(()=>{a=[1][9]; console.log(a ?? 7);});' }), /nullable values/);
+    'let a=0; onStart(()=>{a=[1][9]; console.log(a ?? 7);});' }), /Array index is statically out of bounds/);
 });
 
 test("tsctrl: generated expression helpers have editor-compatible parameter identities", () => {

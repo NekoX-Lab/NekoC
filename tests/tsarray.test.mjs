@@ -67,6 +67,7 @@ const cases = [
 // Defaults reading formals still require constant expansion. tsfeat unique
 // naming now keeps callee locals separate from caller strings.
 const rejected = new Map([
+  ["out-of-bounds", /Array index is statically out of bounds/],
   ["default parameter uses earlier formal", /Default parameter y requires a literal or constant numeric expression/],
 ]);
 
@@ -81,8 +82,8 @@ for (const [name, source] of cases) test(`tsarray: compiles ${name}`, () => {
   if (["caller string with callee local", "caller string nested callee local"].includes(name)) assertJsLogs(source);
 });
 
-test("tsarray: array reads use share-player list blocks", () => {
-  const generated = blocks(compile(cases[3][1]));
+test("tsarray: in-bounds array reads use share-player list blocks", () => {
+  const generated = blocks(compile("onStart(() => { const a = [1]; console.log(a[0]); });"));
   assert.ok(generated.some(block => block.type === "list_item"));
   assert.ok(!generated.some(block => block.type.startsWith("_object_")));
 });
@@ -174,8 +175,8 @@ test("tsarray: task cases execute with JS results", () => {
     assert.equal(result.status, 0, result.stderr);
     return result.stdout;
   };
-  // Out-of-range reads keep the Kitten N list_item empty value (NaN), not JS
-  // undefined: known difference core-162 in tests/ts-js-semantics/known-diff.md.
+  // The statically out-of-range direct read is rejected and skipped below.
+  // Dynamic at() still retains the documented KN empty-list value.
   const expected = [["5,1"], ["1,10,9"], ["321", "321"], ["NaN"], ["3"], ["1,2,3"], ["0"], ["4"], ["5,6"], ["3"], ["true", "false"], ["6"], ["9", "0"], ["1", "5"], ["3", "NaN"], ["8"], ["7"], ["2", "4", "3"], ["3"], ["1,2"], ["23"], ["23"], ["23"], ["item:1,item:2"], ["1,1"], ["4,5"], ["6"], ["6"], ["1,2,3"], ["2,3"], ["23"]];
   expected.push(["1", "12"], ["p1", "3"], ["p1", "5"], ["3"], ["3"], ["1,2,3"], ["6"], ["item:1,item:2"]);
   expected.push(["a1"], ["3"], ["a"], ["a1", "1", "a"], ["abc1", "3", "a"], ["1"], ["1"], ["b!"], ["ab!"]);

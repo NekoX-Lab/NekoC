@@ -200,8 +200,9 @@ The ES2020 declarations include the implemented
 ## TypeScript arrays
 
 - `a[i]` reads the zero-based element with the share-player `list_item` block.
-  A missing entry yields Kitten N's empty value (`NaN`), not JavaScript
-  `undefined` (known difference core-162).
+  Statically invalid numeric indices and out-of-range reads on stable dense
+  literal arrays are compile errors (core-162). Dynamic missing entries and
+  `at()` still yield Kitten N's empty value (`NaN`), not JavaScript `undefined`.
 - `a[i] = value`, `+=`, `-=`, `*=`, `/=`, `%=`, `**=` are supported for existing
   elements. Compound assignments evaluate the target, index and old value once.
   User writes require a dense literal initializer (including direct aliases) and
@@ -226,9 +227,10 @@ The ES2020 declarations include the implemented
   reference identity). Top-level array bindings are registered globally, then
   initialized at their source position in the implicit startup script, before
   explicit root `onStart` handlers. Omitted bindings (`[head, , third]`) and other
-  declarations in the same statement are supported. Nested/default patterns and
-  object destructuring are rejected; sparse/missing-element semantics and normal
-  array out-of-bounds access are unchanged.
+  declarations in the same statement are supported. Nested/default patterns
+  remain rejected. Shallow object variable bindings and standalone array-literal
+  destructuring assignments are also supported; see [destructuring boundaries](ts-r2-destructuring.md).
+  Sparse/missing elements do not gain JavaScript `undefined` semantics.
 - `a.at(index)` supports negative indices and truncates fractional indices.
   The ES2020 declaration set includes this frontend-supported method.
 - Array `slice(start?, end?)` evaluates its receiver once, then each explicit

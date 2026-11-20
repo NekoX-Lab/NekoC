@@ -15,6 +15,7 @@ import * as controlFlow from "./control-flow.mjs";
 import { compileTarget, checkTargetBlock } from "./compile-target.mjs";
 import { lowerTsValues } from "./tsfeat-values.mjs";
 import { lowerTsSequences } from "./tsfeat-sequences.mjs";
+import { lowerTsDestructuring } from "./ts-r2-destructure.mjs";
 import { lowerTsFeatures } from "./tsfeat-lowering.mjs";
 import { lowerTsMethods } from "./tsfeat-methods.mjs";
 import { lowerTsClasses } from "./tsfeat-classes.mjs";
@@ -106,7 +107,7 @@ function lowerFrontendFeatures(sourceFile) {
       ts.forEachChild(node, validateRawSyntax);
     };
     validateRawSyntax(sourceFile);
-    const classes = lowerTsClasses(lowerTsNullable(lowerTsCollections(sourceFile)));
+    const classes = lowerTsClasses(lowerTsNullable(lowerTsCollections(lowerTsDestructuring(sourceFile))));
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
       .map(node => node.name.text));
@@ -5970,9 +5971,25 @@ class WorkspaceCompiler {
       this.connectInput(id, this.compilePlusOne(expression.argumentExpression, id), "end_index", "value");
       return id;
     }
+    // Reject statically invalid user reads instead of silently substituting KN's
+    // empty-list value for JS undefined. Generated helpers own their bounds;
+    // dynamic reads retain the documented list semantics until typed undefined
+    // can be represented without confusing an ordinary string/number value.
+    if (expression.pos >= 0 && expression.getSourceFile?.() === this.sourceFile
+      && this.isArrayExpression(target)) {
+      const indexNode = stripParens(expression.argumentExpression);
+      const builtinNonfinite = ts.isIdentifier(indexNode) && ["NaN", "Infinity"].includes(indexNode.text)
+        && !this.globalVariables.has(indexNode.text) && !this.functionParams?.has(indexNode.text)
+        && !this.lookupExpressionBinding(indexNode.text);
+      const index = builtinNonfinite ? Number(indexNode.text) : constantNumber(indexNode);
+      const literal = this.arrayLiteralFor(target);
+      const dense = literal && !literal.elements.some(element => ts.isOmittedExpression(element) || ts.isSpreadElement(element));
+      if (index !== null && (!Number.isInteger(index) || index < 0
+        || dense && index >= literal.elements.length && !this.arrayLengthChanged(target))) {
+        this.unsupported(expression, "Array index is statically out of bounds or not a nonnegative integer; JS undefined reads are not supported here, so use a valid index or an explicit bounds check with a concrete fallback");
+      }
+    }
     // list_item works in the share player; private _object_get does not.
-    // Out-of-range reads therefore follow KN list semantics, not JS undefined
-    // (tests/ts-js-semantics/known-diff.md).
     const id = this.addBlock({ type: "list_item", parent_id: parentId, fields: { item: "any" }, is_output: true });
     this.connectInput(id, this.compileExpression(target, id), "list", "value");
     this.connectInput(id, this.compilePlusOne(expression.argumentExpression, id), "list_index", "value");

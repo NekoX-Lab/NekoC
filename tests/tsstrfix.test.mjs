@@ -102,7 +102,8 @@ test("tsstrfix review: unprovable UTF-16 selections compile through a runtime gu
   }
   compile('function p(s: string) { return s.charAt(0); } console.log(p("abc"));');
   compile('let s = "😀abc"; console.log(s.includes("a"), s.split(",", 1).join("|"));');
-  assert.throws(() => compile('let s = "abc"; [s] = ["😀"]; console.log(s.charAt(0));'), /Assignment|assignment/);
+  assert.ok(blocks(compile('let s = "abc"; [s] = ["😀"]; console.log(s.charAt(0));'))
+    .some(block => block.type === "text_split"), "supported destructuring still needs the non-BMP runtime guard");
 });
 
 test("tsstrfix re-review: loop and destructuring writes select runtime guards instead of unsafe BMP fast paths", () => {
@@ -169,8 +170,10 @@ test("tsstrfix re-review: shared write facts also invalidate bounded producers a
     assert.throws(() => compile(source), /count.*alternative/i);
     // Unbound implicit self also needs invalidation in no-types mode.
     const checked = checkFile("strings.ts", { types: false, host: { readFile: () => body } });
-    assert.ok(checked.diagnostics.some(d => d.line === 2 && /count.*alternative/i.test(d.message)), JSON.stringify(checked));
-    assert.throws(() => compile(body), /count.*alternative/i);
+    const expected = write.startsWith("[self]") ? /declared mutable variable/ : /count.*alternative/i;
+    const line = write.startsWith("[self]") ? 1 : 2;
+    assert.ok(checked.diagnostics.some(d => d.line === line && expected.test(d.message)), JSON.stringify(checked));
+    assert.throws(() => compile(body), expected);
   }
 });
 

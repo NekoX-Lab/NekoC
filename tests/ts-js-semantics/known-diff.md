@@ -11,7 +11,6 @@ conversion. `VM` is the expected VM value/error from the baseline run.
 
 | case | Node | VM | evidence / likely boundary |
 | --- | --- | --- | --- |
-| core-162 | undefined | NaN | out-of-range array read returns the Kitten N `list_item` empty value; there is no undefined value to return instead |
 | extra-036 | 1000 | recursion-depth error | VM reporter recursion has a bounded depth of 200 |
 
 All other differences recorded at main `4e64c70` were fixed by the
@@ -32,3 +31,10 @@ known difference.
 
 The baseline values above are frozen evidence for regression detection, not a
 claim that these behaviors are desirable or permanently unsupported.
+
+The r2-tsfeat change promotes shallow object bindings (`core-179`) and
+array-literal destructuring assignment (`core-006`) to matches. The statically
+out-of-range read (`core-162`) now produces an explicit compile diagnostic rather
+than silently returning `NaN`. Dynamic out-of-range reads remain a limitation;
+the reporter recursion limit is unchanged. Official-player equivalence for the
+new lowering remains **未验证**.
