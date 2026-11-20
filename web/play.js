@@ -2,7 +2,7 @@ import {StageRenderer,decodeFrame,sensesColor} from './renderer.js';
 import {PlayerConnection} from './player.js';
 import {playerExtensions} from './extensions.js';
 import {ProjectAudio} from './audio.js';
-import {StageInput} from './input.js';
+import {StageInput,VirtualControls} from './input.js';
 import {StageOverlay} from './overlay.js';
 import {PlayerFeedback} from './player-feedback.js';
 import {httpBackend,wasmBackend} from './backend.js';
@@ -63,6 +63,7 @@ async function closeRuntime(){
 }
 function fitStage(){
   if(!renderer||!project)return;
+  $('#viewport').style.setProperty('--stage-aspect',`${renderer.width} / ${renderer.height}`);
   const area=$('#viewport'),scale=Math.max(0,Math.min(area.clientWidth/renderer.width,area.clientHeight/renderer.height));
   $('#stage-box').style.width=`${Math.max(1,renderer.width*scale)}px`;
   $('#stage-box').style.height=`${Math.max(1,renderer.height*scale)}px`;
@@ -267,17 +268,28 @@ for(const [id,key]of [['frame-limit','limit'],['budget','budget'],['resolution',
   };
 }
 $('#fullscreen').onclick=async()=>{
-  try{if(document.fullscreenElement)await document.exitFullscreen();else await shell.requestFullscreen();if(running)focusStage();}
-  catch{notice('当前浏览器无法进入全屏');}
+  clearKeys();
+  try{
+    if(shell.classList.contains('fullscreen-fallback'))shell.classList.remove('fullscreen-fallback');
+    else if(document.fullscreenElement)await document.exitFullscreen();
+    else await shell.requestFullscreen();
+  }catch{shell.classList.add('fullscreen-fallback');notice('当前浏览器无法进入全屏，已切换为窗口内全屏；可点退出或按 Esc。');}
+  syncFullscreen();if(running)focusStage();
 };
-document.addEventListener('fullscreenchange',()=>{
-  const active=!!document.fullscreenElement;$('#fullscreen').setAttribute('aria-pressed',String(active));$('#fullscreen').setAttribute('aria-label',active?'退出全屏':'全屏游玩');
+function syncFullscreen(){
+  const fallback=shell.classList.contains('fullscreen-fallback'),active=!!document.fullscreenElement||fallback;
+  document.body.classList.toggle('fullscreen-fallback-active',fallback);
+  $('#fullscreen').setAttribute('aria-pressed',String(active));$('#fullscreen').setAttribute('aria-label',active?'退出全屏':'全屏游玩');
   $('#fullscreen').title=active?'退出全屏':'全屏游玩';$('#fullscreen span').textContent=active?'退出全屏':'全屏';fitStage();
+}
+document.addEventListener('fullscreenchange',()=>{clearKeys();syncFullscreen();});
+window.addEventListener('keydown',event=>{
+  if(event.key==='Escape'&&shell.classList.contains('fullscreen-fallback')){shell.classList.remove('fullscreen-fallback');clearKeys();syncFullscreen();}
 });
 window.addEventListener('pointerdown',()=>audio.unlock(),{capture:true});
 window.addEventListener('keydown',()=>audio.unlock(),{capture:true});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&running)pause('已暂停 · 页面切到后台');});
-window.addEventListener('pagehide',()=>{connection?.close();audio.stop();});
+window.addEventListener('pagehide',()=>{clearKeys();connection?.close();audio.stop();});
 window.addEventListener('orientationchange',()=>{clearKeys();requestAnimationFrame(fitStage);});
 window.addEventListener('dragover',event=>{if(event.dataTransfer.types.includes('Files')){event.preventDefault();shell.classList.add('file-drag');}});
 window.addEventListener('dragleave',event=>{if(!event.relatedTarget)shell.classList.remove('file-drag');});
@@ -292,6 +304,7 @@ new ResizeObserver(()=>{
 try{
   renderer=new StageRenderer(canvas);renderer.resolutionScale=settings.resolution;
   input=new StageInput(canvas,renderer,()=>running&&!busy,notice);
+  new VirtualControls(input,$('#virtual-controls'),$('#virtual-toggle'),visible=>shell.classList.toggle('virtual-controls-visible',visible));
   overlay=new StageOverlay($('#stage-box'),renderer,event=>{if(recorder){recorder.warnings.add('omitted_inputs');notice('录制模式仅接收舞台键鼠输入；问答、云服务和外部输入未录制。');return false;}const accepted=input.push(event);if(accepted)queueMicrotask(()=>{if(running)focusStage();});return accepted;});
   renderer.onError=message=>{if(!busy)pause('渲染提示');feedback.resourceError(message);};
   feedback.mode(bundled||wasm?'wasm':extension?null:'rust');

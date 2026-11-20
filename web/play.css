@@ -75,6 +75,13 @@ h1{font-size:17px;font-weight:650;margin-top:4px;white-space:nowrap;overflow:hid
 .keyboard-hint{font-size:12px;color:var(--muted)}
 #record[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
 #record-help{font-size:11px;line-height:1.55;color:var(--muted)}
+#virtual-controls{display:flex;align-items:center;justify-content:space-between;gap:8px;touch-action:none;user-select:none;-webkit-user-select:none}
+#virtual-controls button{padding:0;min-width:44px;min-height:44px;touch-action:none;-webkit-touch-callout:none}
+#virtual-controls button[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.direction-pad{display:grid;grid-template-columns:repeat(3,44px);grid-template-rows:repeat(3,44px);gap:4px}
+.direction-pad [data-key="38"]{grid-area:1/2}.direction-pad [data-key="37"]{grid-area:2/1}
+.direction-pad [data-key="40"]{grid-area:3/2}.direction-pad [data-key="39"]{grid-area:2/3}
+.action-pad{display:grid;grid-template-columns:repeat(2,minmax(44px,1fr));gap:6px}
 
 /* Timings */
 .timings-tile{grid-area:timings;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px}
@@ -94,7 +101,16 @@ h1{font-size:17px;font-weight:650;margin-top:4px;white-space:nowrap;overflow:hid
 .setting small{font-size:11px;line-height:1.55;color:var(--muted)}
 
 /* Fullscreen: stage dominates, the side column stays usable. */
-#player-shell:fullscreen{grid-template-columns:minmax(0,1fr) 280px;background:var(--canvas)}
+#player-shell:is(:fullscreen,.fullscreen-fallback){grid-template-columns:minmax(0,1fr) 280px;background:var(--canvas)}
+#player-shell:is(:fullscreen,.fullscreen-fallback) #fullscreen span{display:none}
+#player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback){grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"stage controls" "notice notice"}
+#player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) .brand-tile,
+#player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) .fps-tile,
+#player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) .timings-tile,
+#player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) .settings-tile{display:none}
+#player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) .controls-tile{overflow:auto}
+body.fullscreen-fallback-active{overflow:hidden}
+#player-shell.fullscreen-fallback{position:fixed;inset:0;z-index:20}
 
 @media(max-width:900px){
   #player-shell{height:auto;min-height:100dvh;grid-template-columns:1fr 1fr;grid-template-rows:auto;
@@ -107,7 +123,7 @@ h1{font-size:17px;font-weight:650;margin-top:4px;white-space:nowrap;overflow:hid
   #player-shell{--gap:8px;grid-template-columns:1fr;grid-template-areas:"brand" "stage" "controls" "notice" "fps" "timings" "settings"}
   .tile{padding:14px;border-radius:16px}
   .brand-tile{grid-template-columns:auto 1fr}.brand-tile .primary{grid-column:1/-1;width:100%}
-  #viewport{height:auto;aspect-ratio:16/11}
+  #viewport{height:auto;aspect-ratio:var(--stage-aspect,16/11);max-height:62dvh}
   .fps-tile strong{font-size:40px}
   .timings-tile{grid-template-columns:1fr 1fr}
   .keyboard-hint{display:none}
@@ -115,17 +131,32 @@ h1{font-size:17px;font-weight:650;margin-top:4px;white-space:nowrap;overflow:hid
 }
 /* Keep controls reachable on short phone landscapes, including in fullscreen. */
 @media(max-height:560px) and (orientation:landscape){
-  #player-shell,#player-shell:fullscreen{height:100dvh;min-height:0;grid-template-columns:minmax(0,1fr) 220px;grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"stage brand" "stage controls" "notice notice";overflow:auto}
-  #viewport{height:100%;aspect-ratio:auto}
+  #player-shell,#player-shell:is(:fullscreen,.fullscreen-fallback){height:100dvh;min-height:0;grid-template-columns:minmax(0,1fr) 220px;grid-template-rows:auto minmax(0,1fr) auto;grid-template-areas:"stage brand" "stage controls" "notice notice";overflow:auto}
+  #viewport{height:100%;max-height:none;aspect-ratio:auto}
   .brand-tile{padding:10px;grid-template-columns:1fr}.mark{display:none}.brand-tile .primary{grid-column:auto}
   .fps-tile,.timings-tile,.settings-tile{display:none}
   .controls-tile{padding:10px;overflow:auto}.play-controls{grid-template-columns:1fr 1fr}
+  #player-shell.virtual-controls-visible{grid-template-columns:minmax(0,1fr) 280px;grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"stage controls" "notice notice"}
+  .virtual-controls-visible .brand-tile{display:none}
+  .virtual-controls-visible .controls-tile{gap:8px}
+  .virtual-controls-visible .play-controls{grid-template-columns:1fr 1fr}
+  .virtual-controls-visible #toggle{grid-column:auto}
+  .virtual-controls-visible .keyboard-hint{display:none}
 }
-#player-shell:fullscreen{height:100dvh;min-height:0}
+#player-shell:is(:fullscreen,.fullscreen-fallback){height:100dvh;min-height:0}
+@media(min-width:901px) and (max-width:1200px) and (orientation:landscape){
+  #player-shell.virtual-controls-visible{height:100dvh;min-height:0;grid-template-columns:minmax(0,1fr) 280px;grid-template-rows:minmax(0,1fr) auto;grid-template-areas:"stage controls" "notice notice"}
+  .virtual-controls-visible .brand-tile,.virtual-controls-visible .fps-tile,.virtual-controls-visible .timings-tile,.virtual-controls-visible .settings-tile{display:none}
+  .virtual-controls-visible .controls-tile{overflow:auto}
+}
 @media(max-width:900px) and (orientation:portrait){
-  #player-shell:fullscreen{grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) auto auto;grid-template-areas:"brand" "stage" "controls" "notice";overflow:auto}
-  #player-shell:fullscreen #viewport{height:100%;aspect-ratio:auto}
-  #player-shell:fullscreen .fps-tile,#player-shell:fullscreen .timings-tile,#player-shell:fullscreen .settings-tile{display:none}
+  #player-shell:is(:fullscreen,.fullscreen-fallback){grid-template-columns:1fr;grid-template-rows:auto minmax(0,1fr) auto auto;grid-template-areas:"brand" "stage" "controls" "notice";overflow:auto}
+  #player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback){grid-template-rows:minmax(0,1fr) auto auto;grid-template-areas:"stage" "controls" "notice"}
+  #player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) .brand-tile{display:none}
+  #player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) .keyboard-hint{display:none}
+  #player-shell:is(:fullscreen,.fullscreen-fallback) #viewport{height:100%;max-height:none;aspect-ratio:auto}
+  #player-shell:is(:fullscreen,.fullscreen-fallback) .fps-tile,#player-shell:is(:fullscreen,.fullscreen-fallback) .timings-tile,#player-shell:is(:fullscreen,.fullscreen-fallback) .settings-tile{display:none}
+  #player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) .controls-tile{gap:8px}
 }
 @supports(padding:max(0px)){
   #player-shell{padding:max(var(--gap),env(safe-area-inset-top)) max(var(--gap),env(safe-area-inset-right)) max(var(--gap),env(safe-area-inset-bottom)) max(var(--gap),env(safe-area-inset-left))}
@@ -134,7 +165,7 @@ h1{font-size:17px;font-weight:650;margin-top:4px;white-space:nowrap;overflow:hid
 body.app{overflow:hidden}
 body.app #player-shell{display:grid;height:100dvh;min-height:0;padding:0;gap:0;grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) auto auto;grid-template-areas:"stage" "controls" "notice"}
 body.app .brand-tile,body.app .fps-tile,body.app .timings-tile,body.app #welcome,body.app #drop-hint{display:none}
-body.app #viewport{width:auto;height:auto;aspect-ratio:auto;border-radius:0}
+body.app #viewport{width:auto;height:auto;max-height:none;aspect-ratio:auto;border-radius:0}
 body.app .controls-tile{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:6px 10px;border-radius:0}
 body.app .play-controls{display:flex;flex-wrap:wrap;gap:6px}
 body.app .play-controls button{padding:6px 10px}
