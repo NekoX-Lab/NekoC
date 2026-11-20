@@ -1,0 +1,280 @@
+{
+  "projectName": "NekoC r3-knsched wait-negative",
+  "version": "0.27.4",
+  "toolType": "KN",
+  "stageSize": {
+    "width": 900,
+    "height": 562
+  },
+  "scenes": {
+    "currentSceneId": "nekoc-scene-main",
+    "sortList": [
+      "nekoc-scene-main"
+    ],
+    "scenesDict": {
+      "nekoc-scene-main": {
+        "id": "nekoc-scene-main",
+        "name": "Background",
+        "screenName": "Main",
+        "styles": [
+          "nekoc-background"
+        ],
+        "currentStyleId": "nekoc-background",
+        "actorIds": [
+          "nekoc-default-actor"
+        ],
+        "visible": true,
+        "editable": true,
+        "workspaceScrollXy": {
+          "x": 100,
+          "y": 50
+        },
+        "nekoBlockJsonList": [],
+        "comments": {}
+      }
+    }
+  },
+  "actors": {
+    "actorsDict": {
+      "nekoc-default-actor": {
+        "id": "nekoc-default-actor",
+        "name": "Sprite",
+        "styles": [
+          "nekoc-costume"
+        ],
+        "currentStyleId": "nekoc-costume",
+        "position": {
+          "x": 0,
+          "y": 0
+        },
+        "scale": 100,
+        "rotation": 0,
+        "visible": true,
+        "locked": false,
+        "editable": true,
+        "deletable": true,
+        "workspaceScrollXy": {
+          "x": 100,
+          "y": 50
+        },
+        "nekoBlockJsonList": [
+          {
+            "id": "r3sched-33",
+            "type": "on_running_group_activated",
+            "fields": {},
+            "inputs": {},
+            "statements": {},
+            "next": {
+              "id": "r3sched-26",
+              "type": "variables_set",
+              "fields": {
+                "variable": "trace"
+              },
+              "inputs": {
+                "value": {
+                  "id": "r3sched-25",
+                  "type": "text_join",
+                  "fields": {},
+                  "inputs": {
+                    "ADD0": {
+                      "id": "r3sched-23",
+                      "type": "variables_get",
+                      "fields": {
+                        "variable": "trace"
+                      },
+                      "inputs": {},
+                      "statements": {}
+                    },
+                    "ADD1": {
+                      "id": "r3sched-24",
+                      "type": "text",
+                      "fields": {
+                        "TEXT": "A"
+                      },
+                      "inputs": {},
+                      "statements": {}
+                    }
+                  },
+                  "statements": {},
+                  "mutation": "<mutation items=\"2\"></mutation>"
+                }
+              },
+              "statements": {},
+              "next": {
+                "id": "r3sched-28",
+                "type": "wait",
+                "fields": {},
+                "inputs": {
+                  "time": {
+                    "id": "r3sched-27",
+                    "type": "math_number",
+                    "fields": {
+                      "NUM": "-1"
+                    },
+                    "inputs": {},
+                    "statements": {}
+                  }
+                },
+                "statements": {},
+                "next": {
+                  "id": "r3sched-32",
+                  "type": "variables_set",
+                  "fields": {
+                    "variable": "trace"
+                  },
+                  "inputs": {
+                    "value": {
+                      "id": "r3sched-31",
+                      "type": "text_join",
+                      "fields": {},
+                      "inputs": {
+                        "ADD0": {
+                          "id": "r3sched-29",
+                          "type": "variables_get",
+                          "fields": {
+                            "variable": "trace"
+                          },
+                          "inputs": {},
+                          "statements": {}
+                        },
+                        "ADD1": {
+                          "id": "r3sched-30",
+                          "type": "text",
+                          "fields": {
+                            "TEXT": "a"
+                          },
+                          "inputs": {},
+                          "statements": {}
+                        }
+                      },
+                      "statements": {},
+                      "mutation": "<mutation items=\"2\"></mutation>"
+                    }
+                  },
+                  "statements": {}
+                }
+              }
+            }
+          },
+          {
+            "id": "r3sched-38",
+            "type": "on_running_group_activated",
+            "fields": {},
+            "inputs": {},
+            "statements": {},
+            "next": {
+              "id": "r3sched-37",
+              "type": "variables_set",
+              "fields": {
+                "variable": "trace"
+              },
+              "inputs": {
+                "value": {
+                  "id": "r3sched-36",
+                  "type": "text_join",
+                  "fields": {},
+                  "inputs": {
+                    "ADD0": {
+                      "id": "r3sched-34",
+                      "type": "variables_get",
+                      "fields": {
+                        "variable": "trace"
+                      },
+                      "inputs": {},
+                      "statements": {}
+                    },
+                    "ADD1": {
+                      "id": "r3sched-35",
+                      "type": "text",
+                      "fields": {
+                        "TEXT": "B"
+                      },
+                      "inputs": {},
+                      "statements": {}
+                    }
+                  },
+                  "statements": {},
+                  "mutation": "<mutation items=\"2\"></mutation>"
+                }
+              },
+              "statements": {}
+            }
+          }
+        ],
+        "comments": {}
+      }
+    }
+  },
+  "styles": {
+    "stylesDict": {
+      "nekoc-background": {
+        "id": "nekoc-background",
+        "name": "Background",
+        "url": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='562'%3E%3Crect width='900' height='562' fill='white'/%3E%3C/svg%3E"
+      },
+      "nekoc-costume": {
+        "id": "nekoc-costume",
+        "name": "Sprite",
+        "url": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='18' fill='rgb(96,143,238)'/%3E%3C/svg%3E",
+        "centerPoint": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    }
+  },
+  "variables": {
+    "variablesDict": {
+      "trace": {
+        "id": "trace",
+        "name": "trace",
+        "value": "",
+        "type": "any",
+        "isGlobal": true,
+        "currentEntityId": "nekoc-default-actor",
+        "visible": false,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      },
+      "ready": {
+        "id": "ready",
+        "name": "ready",
+        "value": 0,
+        "type": "any",
+        "isGlobal": true,
+        "currentEntityId": "nekoc-default-actor",
+        "visible": false,
+        "position": {
+          "x": 0,
+          "y": 0
+        }
+      }
+    }
+  },
+  "broadcasts": {
+    "broadcastsDict": {
+      "nekoc-scene-main": []
+    }
+  },
+  "procedures": {
+    "proceduresDict": {}
+  },
+  "audios": {
+    "audiosDict": {},
+    "sortList": [],
+    "currentAudioId": ""
+  },
+  "hidden_toolbox": {
+    "toolbox": [],
+    "blocks": [],
+    "forcibleShowBlocks": [],
+    "isCombine": false
+  },
+  "courseMaterials": {
+    "courseMaterialsDict": {},
+    "sortList": []
+  },
+  "previewUrl": ""
+}

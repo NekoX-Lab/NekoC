@@ -88,15 +88,20 @@ fn position(engine: &Engine, project: &Value) -> (f64, f64) {
 
 fn movement(engine: &mut Engine, project: &Value) {
     assert_eq!(position(engine, project), (-180.0, 0.0));
-    hold(engine, "39", 120); // Right: stopped on the near side of the wall.
+    // Official KN wait expiry, release and the loop boundary are separate
+    // updates: at 60 Hz this wait(0.02) loop moves once per four updates.
+    // 120 updates cover only 30 four-pixel moves, not a wall collision.
+    hold(engine, "39", 120);
+    assert_eq!(position(engine, project), (-60.0, 0.0));
+    hold(engine, "39", 120); // Keep holding: stop on the near side of the wall.
     assert_eq!(position(engine, project), (-48.0, 0.0));
-    hold(engine, "38", 180); // Up: slide along the wall, stop at stage bounds.
+    hold(engine, "38", 360); // Up: slide along the wall, stop at stage bounds.
     assert_eq!(position(engine, project), (-48.0, 212.0));
-    hold(engine, "39", 360); // Cross above the wall to the right boundary.
+    hold(engine, "39", 600); // Cross above the wall to the right boundary.
     assert_eq!(position(engine, project), (384.0, 212.0));
-    hold(engine, "40", 360);
+    hold(engine, "40", 600);
     assert_eq!(position(engine, project), (384.0, -212.0));
-    hold(engine, "37", 600);
+    hold(engine, "37", 1000);
     assert_eq!(position(engine, project), (-384.0, -212.0));
     hold(engine, "82", 6); // R resets both axes.
     assert_eq!(position(engine, project), (-180.0, 0.0));

@@ -442,6 +442,8 @@ mod tests {
             .unwrap();
             let project = crate::kitten4::to_neko(&source).unwrap();
             let mut preview = NativePreview::new(&project).unwrap();
+            // Frame-state oracle, not a wall-clock performance assertion.
+            preview.engine.use_virtual_clock();
             preview.engine.start();
             for expected in evidence["cases"][name]["frames"].as_array().unwrap() {
                 let snapshot = preview.tick(&[]).unwrap();
