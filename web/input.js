@@ -52,6 +52,11 @@ export class StageInput {
     });
     canvas.addEventListener('pointerup',event=>{
       if(this.pointer?.id!==event.pointerId)return;
+      // A captured stage gesture may finish over a K4 choice. Clear the
+      // admitted down using its reserved slot, without stage up/click/swipe,
+      // before offering the answer to the same bounded input queue.
+      const select=renderer.kitten4&&event.isPrimary&&event.button===0&&renderer.choiceAt?.(event.clientX,event.clientY);
+      if(select){this.position(event);this.releasePointer();select();event.preventDefault();event.stopPropagation();return;}
       this.position(event);const target=renderer.hitTest(this.mouse.x,this.mouse.y),p=this.pointer,down=p.target,start=p.start;this.pointer=null;
       const elapsed=performance.now()-start.time;
       // Both runtimes first use Hammer 2's CSS-pixel distance and overall

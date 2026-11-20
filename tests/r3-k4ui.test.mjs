@@ -19,20 +19,30 @@ class Element {
   setAttribute(name, value) { this[name] = value; }
   contains(node) { return this === node || this.children.some(child => child.contains(node)); }
   querySelector(tag) { return this.children.find(child => child.tag === tag) || this.children.map(child => child.querySelector(tag)).find(Boolean); }
-  addEventListener(type, fn) { this.handlers.set(type, [...(this.handlers.get(type) || []), fn]); }
+  addEventListener(type, fn, capture = false) { this.handlers.set(type, [...(this.handlers.get(type) || []), { fn, capture }]); }
   emit(type, detail = {}) {
-    const event = { type, button: 0, detail: 0, stopPropagation() { this.stopped = true; }, ...detail };
-    for (let target = this; target; target = event.stopped ? null : target.parent) {
+    const event = { type, target: this, button: 0, isPrimary: true, clientX: 0, clientY: 0, detail: 0,
+      preventDefault() {}, stopPropagation() { this.stopped = true; },
+      stopImmediatePropagation() { this.stopped = this.immediate = true; }, ...detail };
+    const path = []; for (let node = this; node; node = node.parent) path.push(node);
+    for (const target of [...path].reverse()) {
+      for (const { fn, capture } of target.handlers.get(type) || []) if (capture && !event.immediate) fn(event);
+      if (event.stopped) return;
+    }
+    for (const target of path) {
       target[`on${type}`]?.(event);
-      for (const fn of target.handlers.get(type) || []) fn(event);
+      for (const { fn, capture } of target.handlers.get(type) || []) if (!capture && !event.immediate) fn(event);
+      if (event.stopped) return;
     }
   }
 }
 
 function fixture(t, { width = 620, height = 900, kitten4 = true, visible = false } = {}) {
   const previous = Object.getOwnPropertyDescriptor(globalThis, 'document');
+  let hit = null;
   Object.defineProperty(globalThis, 'document', { configurable: true, value: {
     head: new Element('head'), createElement: tag => new Element(tag), getElementById: () => null,
+    elementFromPoint: () => hit,
   } });
   t.after(() => { if (previous) Object.defineProperty(globalThis, 'document', previous); else delete globalThis.document; });
   const box = new Element('div'), answers = [];
@@ -42,7 +52,7 @@ function fixture(t, { width = 620, height = 900, kitten4 = true, visible = false
   // This unit harness has no layout, connection state or focus navigation.
   overlay.focusControl = () => {};
   const ask = { id: 1, sprite: 'actor', question: 'NekoC question', choices: ['first', '', 'last'] };
-  return { overlay, box, answers, ask, accept(value) { accepting = value; },
+  return { overlay, box, answers, ask, accept(value) { accepting = value; }, hit(value) { hit = value; },
     buttons() { return overlay.ask.children.find(child => child.className === 'choices').children; } };
 }
 
@@ -69,7 +79,7 @@ test('r3-k4ui choice text keeps empty/whitespace and truncates UTF-16 display on
   f.overlay.showAsk(f.ask);
   const buttons = f.buttons();
   assert.deepEqual(buttons.map(button => button.textContent), ['', '  spaced  ', '123456789012345678\ud83d…', '1234567890123456789…']);
-  buttons[3].emit('mouseup');
+  f.hit(buttons[3]); buttons[3].emit('pointerup');
   buttons[3].emit('click', { detail: 1 });
   buttons[3].emit('touchend');
   assert.deepEqual(f.answers, [{ kind: 'answer', id: 1, text: long, choice: 4 }]);
@@ -95,6 +105,7 @@ test('r3-k4ui release answers once, rejects stale controls, and retries backpres
   stale.emit('mouseup');
   assert.deepEqual(f.answers, []);
   const button = f.buttons()[1], leaks = [];
+  f.hit(button);
   for (const type of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'touchstart', 'touchend', 'keydown', 'keyup', 'click']) {
     f.box.addEventListener(type, () => leaks.push(type));
   }
@@ -104,14 +115,34 @@ test('r3-k4ui release answers once, rejects stale controls, and retries backpres
   assert.deepEqual(f.answers, []);
   assert.deepEqual(leaks, []);
   f.accept(true);
-  button.emit('mouseup', { button: 2 });
+  button.emit('pointerup', { button: 2 });
   assert.deepEqual(f.answers, [], 'right button is not a selection');
+  button.emit('pointerup');
   button.emit('touchend');
   button.emit('mouseup');
   assert.deepEqual(f.answers, [{ kind: 'answer', id: 2, text: '', choice: 2 }]);
   f.overlay.reset();
   stale.emit('click');
   assert.equal(f.answers.length, 1);
+});
+
+test('r3-k4ui release uses coordinates, ignores cancellation and cannot revive stale panels', t => {
+  const f = fixture(t); f.overlay.showAsk(f.ask);
+  const first = f.buttons()[0], third = f.buttons()[2];
+  f.hit(third); first.emit('pointercancel'); first.emit('touchend');
+  assert.deepEqual(f.answers, []);
+  first.emit('pointerup', { isPrimary: false });
+  assert.deepEqual(f.answers, []);
+  f.hit(f.box); first.emit('pointerup');
+  assert.ok(f.overlay.ask); assert.deepEqual(f.answers, []);
+  f.overlay.showAsk({ ...f.ask, id: 2 });
+  const current = f.buttons()[2]; f.hit(current);
+  first.emit('pointerup');
+  assert.deepEqual(f.answers, [], 'old panel cannot hit a new question');
+  f.buttons()[0].emit('pointerup');
+  current.emit('pointerup');
+  assert.deepEqual(f.answers, [{ kind: 'answer', id: 2, text: 'last', choice: 3 }]);
+  assert.equal(f.overlay.renderer.choiceAt(0,0), undefined);
 });
 
 test('r3-k4ui KN choices retain labels and click activation', t => {
@@ -202,5 +233,39 @@ test('r3-k4ui real browser choices match official geometry, text, hover and rele
     assert.equal(entry.interaction.local.color, 'rgb(255, 255, 255)');
     assert.equal(entry.interaction.official.fill, 'white');
     assert.deepEqual(entry.interaction.local.leaks, []);
+    assert.equal(entry.interaction.local.captured, false);
+    assert.deepEqual(entry.interaction.local.queued.filter(event => event.kind === 'pointer').map(event => event.state), ['mouse_down', '']);
+  }
+});
+
+test('r3-k4ui trusted production canvas and touch gestures match official release hits', {
+  skip: !process.env.NEKOC_R3_K4UI_INTEGRATION, timeout: 600000,
+}, async () => {
+  const { recordChoiceGestures } = await import('../tools/compat/r3-k4ui-probe.mjs');
+  const evidence = await recordChoiceGestures();
+  for (const entry of evidence.official) {
+    assert.deepEqual(entry.errors, []);
+    assert.ok(entry.assets.some(asset => asset.sha256 === '0f7933d51266add6cbad0682b9531036dc1c8daf8c522cde4243744376ce4160'));
+    assert.ok(entry.externalRequests.every(request => request.action === 'blocked'));
+    const local = evidence.local.find(sample => sample.name === entry.name);
+    if (entry.name === 'touch-cross-outside') {
+      // Official touch falls back to the start target outside all options.
+      // Deliberately reject an off-choice release instead of a silent answer.
+      assert.deepEqual(entry.selected, [0]); assert.deepEqual(local.answers, []);
+    } else assert.deepEqual(local.answers.map(answer => answer.choice), entry.selected.map(index => index + 1), entry.name);
+  }
+  for (const entry of evidence.local) {
+    const noAnswer = ['touch-cross-outside', 'touch-cancel', 'rejected-touch', 'stale-touch', 'reset-touch'].includes(entry.name);
+    assert.deepEqual(entry.answers, noAnswer ? [] : [{ kind: 'answer', id: 1, text: 'three', choice: 3 }], entry.name);
+    assert.equal(entry.pointer, null, entry.name); assert.equal(entry.captures, false, entry.name);
+    assert.equal(entry.open, noAnswer && entry.name !== 'reset-touch', entry.name);
+    assert.ok(entry.queued.length <= 256);
+    assert.equal(entry.queued.some(event => event.kind === 'swipe' || event.state === 'mouse_up' || event.state === 'mouse_click'), false, entry.name);
+    if (['canvas', 'scaled-canvas', 'touch-canvas'].includes(entry.name)) {
+      assert.equal(entry.capturedBeforeRelease, true);
+      assert.deepEqual(entry.queued.filter(event => event.kind === 'pointer').map(event => event.state), ['mouse_down', '']);
+    }
+    if (entry.nextStage) assert.deepEqual(entry.nextStage.map(event => event.state), ['mouse_down', 'mouse_up', 'mouse_click']);
+    if (entry.retry) assert.deepEqual(entry.retry, { answers: [{ kind: 'answer', id: 1, text: 'three', choice: 3 }], open: false });
   }
 });

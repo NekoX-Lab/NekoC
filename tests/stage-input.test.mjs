@@ -12,7 +12,7 @@ class FakeElement {
     this.listeners.get(type).push(listener);
   }
   emit(type, init = {}) {
-    const event = { defaultPrevented:false, preventDefault() { this.defaultPrevented=true; }, ...init };
+    const event = { defaultPrevented:false, preventDefault() { this.defaultPrevented=true; }, stopPropagation() { this.stopped=true; }, ...init };
     for (const listener of this.listeners.get(type) ?? []) listener(event);
     return event;
   }
@@ -56,6 +56,37 @@ function fixture(t, options = {}) {
 
 const pointerEvent = (state, target='', x=0, y=0) => ({kind:'pointer', state, target, x, y});
 const keyEvent = (key, down) => ({kind:'key', key:String(key), down});
+
+for (const saturated of [false, true]) {
+  test(`K4 captured release over a choice clears its drag and capture before answer, saturated=${saturated}`, t => {
+    const f = fixture(t); f.target('actor');
+    f.renderer.sprites = [{ id:'actor', x:0, y:0, draggable:true }];
+    f.pointer('pointerdown'); f.pointer('pointermove',20,10);
+    if (saturated) while(f.input.push({kind:'audio_done',id:1})) {}
+    let calls=0;
+    f.renderer.choiceAt=()=>()=>{
+      calls++; assert.equal(f.input.pointer,null);
+      assert.equal(f.canvas.hasPointerCapture(1),false);
+      assert.equal(f.input.push({kind:'answer',id:1,text:'third',choice:3}),true);
+    };
+    f.time(100); const up=f.pointer('pointerup',100,-100);
+    assert.equal(up.stopped,true); assert.equal(up.defaultPrevented,true);
+    assert.equal(calls,1); assert.ok(f.input.events.length<=256);
+    const events=f.input.take().events;
+    assert.deepEqual(events.filter(e=>e.kind==='pointer').map(e=>e.state),['mouse_down','']);
+    assert.deepEqual(events.filter(e=>e.kind==='drag'),[{kind:'drag',target:'actor',x:20,y:10}]);
+    assert.equal(events.some(e=>e.kind==='swipe'),false);
+    assert.deepEqual(events.slice(-2),[pointerEvent('','actor',100,-100),{kind:'answer',id:1,text:'third',choice:3}]);
+    f.pointer('pointerup'); assert.equal(calls,1);
+  });
+}
+
+test('KN never invokes the K4 choice handoff', t => {
+  const f=fixture(t,{kitten4:false});
+  f.renderer.choiceAt=()=>{throw new Error('KN must not resolve K4 choices');};
+  f.pointer('pointerdown'); f.time(50); f.pointer('pointerup');
+  assert.deepEqual(f.input.take().events.map(e=>e.state),['mouse_down','mouse_up','mouse_click']);
+});
 // CSS/stage round-trips may differ by a few floating-point ULPs.
 function assertNear(actual, expected) {
   const rounded=JSON.parse(JSON.stringify(actual, (_key,value) =>
