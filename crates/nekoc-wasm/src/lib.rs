@@ -11,11 +11,23 @@ fn to_text(value: &impl serde::Serialize) -> Result<String, JsValue> {
     String::from_utf8(json::to_vec(value).map_err(error)?).map_err(error)
 }
 
+// Serialize the owned import trees by reference. json! would first materialize
+// a second Value tree (including every block and embedded asset), only to encode
+// and discard it immediately across the WASM boundary.
+#[derive(serde::Serialize)]
+struct ImportResponse<'a> {
+    project: &'a json::Json,
+    report: &'a json::Json,
+}
+
 /// `{project, report}` for a Kitten N `.bcmkn` or Kitten 4 `.bcm` text.
 #[wasm_bindgen(js_name = importProject)]
 pub fn import_project(text: &str) -> Result<String, JsValue> {
     let (project, report) = player::import(json::from_str(text).map_err(error)?).map_err(error)?;
-    to_text(&serde_json::json!({ "project": project, "report": report }))
+    to_text(&ImportResponse {
+        project: &project,
+        report: &report,
+    })
 }
 
 /// Assembles the frontend's workspace report into a `.bcmkn` project. Without
@@ -82,6 +94,51 @@ impl Player {
         match self.0.handle(text).map_err(error)? {
             player::Reply::Text(text) => Ok(JsValue::from_str(&text)),
             player::Reply::Binary(bytes) => Ok(js_sys::Uint8Array::from(bytes.as_slice()).into()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn import_response_serializes_borrowed_trees_without_changing_the_wire_shape() {
+        let project = json::Json::new(json!({
+            "projectName": "中文 / 🐈",
+            "unknown": {"nullable": null, "list": [false, -0.0, 1.25, ""]},
+            "styles": {"url": "data:image/svg+xml;base64,PHN2Zy8+"},
+        }));
+        let report = json::Json::new(json!({"ok": true, "diagnostics": []}));
+        let expected = serde_json::json!({"project": project, "report": report});
+        let bytes = json::to_vec(&ImportResponse {
+            project: &project,
+            report: &report,
+        })
+        .unwrap();
+        assert_eq!(bytes, json::to_vec(&expected).unwrap());
+        let decoded = json::from_slice(&bytes).unwrap();
+        assert!(json::equal(&decoded["project"], &project));
+        assert!(json::equal(&decoded["report"], &report));
+    }
+
+    #[test]
+    fn import_response_retains_kn_and_k4_reports_and_provenance() {
+        for source in [
+            include_str!("../../../samples/three_body.bcmkn"),
+            include_str!("../../../samples/kitten4-demo.bcm"),
+        ] {
+            let (project, report) = player::import(json::from_str(source).unwrap()).unwrap();
+            let bytes = json::to_vec(&ImportResponse {
+                project: &project,
+                report: &report,
+            })
+            .unwrap();
+            let decoded = json::from_slice(&bytes).unwrap();
+            assert!(json::equal(&decoded["project"], &project));
+            assert!(json::equal(&decoded["report"], &report));
+            assert_eq!(decoded["report"]["fast_runtime_ready"], true);
         }
     }
 }
