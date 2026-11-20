@@ -8103,6 +8103,26 @@ impl Engine {
             self.eval_value_one::<false>(i, actor)
         }
     }
+    fn concat_text(&mut self, a: &Cell, b: &Cell) -> Cell {
+        match Cell::try_concat(a, b) {
+            Ok(value) => value,
+            Err(error) => {
+                self.value_error.get_or_insert_with(|| error.to_string());
+                Cell::Undefined
+            }
+        }
+    }
+    fn append_join_text(&mut self, text: &mut String, value: &Cell) {
+        let value = match value {
+            Cell::Text(value) => value.clone(),
+            _ => value.text().into(),
+        };
+        if let Err(error) = value::check_text_growth(text.len(), value.len()) {
+            self.value_error.get_or_insert_with(|| error.to_string());
+        } else {
+            value.append_to(text);
+        }
+    }
     fn eval_deep_value(&mut self, root: usize, actor: usize) -> Cell {
         // Each frame retains already evaluated operands until its parent runs.
         // A scoped queue (not a global memo) preserves duplicate evaluations,
@@ -8298,7 +8318,7 @@ impl Engine {
                 ) {
                     #[cfg(feature = "interp-profile")]
                     let _profile = interp_profile::span("add_text", &());
-                    Cell::concat(&a, &b)
+                    self.concat_text(&a, &b)
                 } else {
                     #[cfg(feature = "interp-profile")]
                     let _profile = interp_profile::span("add_scalar", &());
@@ -8485,7 +8505,7 @@ impl Engine {
                         {
                             return a;
                         }
-                        return Cell::concat(&a, &b);
+                        return self.concat_text(&a, &b);
                     }
                     let stopped = self.program.semantics == RuntimeSemantics::KnCurrent
                         && matches!(a, Cell::Undefined);
@@ -8498,7 +8518,7 @@ impl Engine {
                     if self.program.semantics != RuntimeSemantics::KnCurrent
                         || !matches!(b, Cell::Undefined)
                     {
-                        b.append_text(&mut text);
+                        self.append_join_text(&mut text, &b);
                     }
                     return Cell::Text(text.into());
                 }
@@ -8513,10 +8533,7 @@ impl Engine {
                         stopped = true;
                     }
                     if !stopped {
-                        value.append_text_with_js_nonfinite(
-                            &mut text,
-                            self.program.semantics == RuntimeSemantics::KnCurrent,
-                        );
+                        self.append_join_text(&mut text, &value);
                     }
                 }
                 Cell::Text(text.into())
@@ -9052,7 +9069,7 @@ impl Engine {
                         .unwrap_or(Cell::Number(self.tasks[index].locals[i])),
                 };
                 if self.value_error.is_none()
-                    && let Some(result) = k4decimal::change(&previous, &value, decrease)
+                    && let Some(result) = k4decimal::change(&previous, &value, decrease)?
                 {
                     self.assign(target, result);
                 }
@@ -9062,7 +9079,7 @@ impl Engine {
                 if self.value_error.is_none() {
                     let previous = self.read_actor_variable(actor, slot);
                     if self.value_error.is_none()
-                        && let Some(result) = k4decimal::change(&previous, &value, decrease)
+                        && let Some(result) = k4decimal::change(&previous, &value, decrease)?
                     {
                         self.write_actor_variable(actor, slot, result);
                     }

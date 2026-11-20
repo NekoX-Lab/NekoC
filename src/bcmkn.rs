@@ -19,6 +19,7 @@ pub fn is_kn_tool_type(tool: &str) -> bool {
 fn import_inner(value: crate::json::Json) -> Result<(crate::json::Json, Value)> {
     let _timing = crate::import_perf::span("diagnostics_coverage");
     ensure!(value.is_object(), ".bcmkn 顶层必须是 JSON 对象");
+    check_containers(&value)?;
     ensure!(
         value["toolType"].as_str().is_none_or(is_kn_tool_type),
         "不是 Kitten N 项目（toolType 应为 KN）"
@@ -135,6 +136,41 @@ fn import_inner(value: crate::json::Json) -> Result<(crate::json::Json, Value)> 
         "script_diagnostics":diagnostics,"preserves_unknown_fields":true});
     Ok((value, report))
 }
+
+/// Check only containers that import/assembly mutate. Unknown extension data
+/// remains opaque; absent optional dictionaries retain their existing defaults.
+pub(crate) fn check_containers(value: &Value) -> Result<()> {
+    ensure!(value.is_object(), "project root must be a JSON object");
+    for (section, dict, owners) in [
+        ("scenes", "scenesDict", true),
+        ("actors", "actorsDict", true),
+        ("procedures", "proceduresDict", true),
+        ("variables", "variablesDict", false),
+        ("styles", "stylesDict", false),
+        ("broadcasts", "broadcastsDict", false),
+    ] {
+        let Some(container) = value.get(section) else {
+            continue;
+        };
+        ensure!(container.is_object(), "/{section} must be an object");
+        let Some(entries) = container.get(dict) else {
+            continue;
+        };
+        let entries = entries
+            .as_object()
+            .ok_or_else(|| anyhow::anyhow!("/{section}/{dict} must be an object"))?;
+        if owners {
+            for (id, owner) in entries {
+                ensure!(
+                    owner.is_object(),
+                    "/{section}/{dict}/{id} must be an object"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
 fn collect(block: &Value, types: &mut BTreeMap<String, usize>) {
     let mut pending = vec![block];
     while let Some(block) = pending.pop() {
