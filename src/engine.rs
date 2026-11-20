@@ -24,6 +24,7 @@ mod jit;
 mod jit;
 mod jit_observation;
 mod k4_clock;
+mod k4_collision;
 mod k4_drawing;
 mod k4_effects;
 mod k4_lifecycle;
@@ -6865,6 +6866,9 @@ impl Engine {
     }
     /// Sampled pixel overlap inside the intersection of both bounds.
     fn overlap(&self, a: usize, b: usize) -> bool {
+        if self.program.semantics == RuntimeSemantics::Kitten4 {
+            return self.k4_overlap(a, b);
+        }
         // Geometry is immutable during sampling. A missing costume never contains
         // a point, even when its fallback bounds intersect the other sprite.
         let (Some(a), Some(b)) = (self.geometry(a), self.geometry(b)) else {
@@ -7177,6 +7181,10 @@ impl Engine {
     }
     /// Scratch-style bounce: reflect away from the nearest touched edge, move inside.
     fn bounce(&mut self, actor: usize) {
+        if self.program.semantics == RuntimeSemantics::Kitten4 {
+            self.k4_bounce(actor);
+            return;
+        }
         let a = &self.sprites[actor];
         if ![a.x, a.y, a.direction, a.scale, a.size_x, a.size_y]
             .iter()
