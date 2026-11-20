@@ -8103,6 +8103,20 @@ impl Engine {
             self.eval_value_one::<false>(i, actor)
         }
     }
+    fn concat_text(&mut self, a: &Cell, b: &Cell) -> Cell {
+        match Cell::try_concat(a, b) {
+            Ok(value) => value,
+            Err(error) => {
+                self.value_error.get_or_insert_with(|| error.to_string());
+                Cell::Undefined
+            }
+        }
+    }
+    fn append_join_text(&mut self, text: &mut String, value: &Cell) {
+        if let Err(error) = value.append_bounded_text(text) {
+            self.value_error.get_or_insert_with(|| error.to_string());
+        }
+    }
     fn eval_deep_value(&mut self, root: usize, actor: usize) -> Cell {
         // Each frame retains already evaluated operands until its parent runs.
         // A scoped queue (not a global memo) preserves duplicate evaluations,
@@ -8298,7 +8312,7 @@ impl Engine {
                 ) {
                     #[cfg(feature = "interp-profile")]
                     let _profile = interp_profile::span("add_text", &());
-                    Cell::concat(&a, &b)
+                    self.concat_text(&a, &b)
                 } else {
                     #[cfg(feature = "interp-profile")]
                     let _profile = interp_profile::span("add_scalar", &());
@@ -8483,13 +8497,16 @@ impl Engine {
                         if self.program.semantics == RuntimeSemantics::KnCurrent
                             && matches!(b, Cell::Undefined)
                         {
-                            return a;
+                            return self.concat_text(&a, &Cell::Null);
                         }
-                        return Cell::concat(&a, &b);
+                        return self.concat_text(&a, &b);
                     }
                     let stopped = self.program.semantics == RuntimeSemantics::KnCurrent
                         && matches!(a, Cell::Undefined);
-                    let mut text = if stopped { String::new() } else { a.text() };
+                    let mut text = String::new();
+                    if !stopped {
+                        self.append_join_text(&mut text, &a);
+                    }
                     let b =
                         self.eval_value(self.program.value_args[parts.start as usize + 1], actor);
                     if stopped {
@@ -8498,7 +8515,7 @@ impl Engine {
                     if self.program.semantics != RuntimeSemantics::KnCurrent
                         || !matches!(b, Cell::Undefined)
                     {
-                        b.append_text(&mut text);
+                        self.append_join_text(&mut text, &b);
                     }
                     return Cell::Text(text.into());
                 }
@@ -8513,10 +8530,7 @@ impl Engine {
                         stopped = true;
                     }
                     if !stopped {
-                        value.append_text_with_js_nonfinite(
-                            &mut text,
-                            self.program.semantics == RuntimeSemantics::KnCurrent,
-                        );
+                        self.append_join_text(&mut text, &value);
                     }
                 }
                 Cell::Text(text.into())
@@ -8735,11 +8749,18 @@ impl Engine {
         let mut value = String::new();
         for i in 0..self.program.texts[text].len() {
             match self.program.texts[text][i] {
-                TextPart::Literal(index) => value.push_str(&self.program.strings[index]),
-                TextPart::Value(i) => self.eval_value(i, actor).append_text_with_js_nonfinite(
-                    &mut value,
-                    self.program.semantics == RuntimeSemantics::KnCurrent,
-                ),
+                TextPart::Literal(index) => {
+                    let literal = &self.program.strings[index];
+                    if let Err(error) = value::check_text_growth(value.len(), literal.len()) {
+                        self.value_error.get_or_insert_with(|| error.to_string());
+                    } else {
+                        value.push_str(literal);
+                    }
+                }
+                TextPart::Value(i) => {
+                    let part = self.eval_value(i, actor);
+                    self.append_join_text(&mut value, &part);
+                }
             }
         }
         value
@@ -8975,6 +8996,16 @@ impl Engine {
     /// (or finishes) for this tick.
     #[inline(always)]
     fn exec(&mut self, index: usize, pc: usize, op: Op, actor: usize) -> Result<bool> {
+        // All early returns (including cold ops and waiting/broadcast yields)
+        // must pass the same reporter-error boundary as ordinary instructions.
+        let result = self.exec_inner(index, pc, op, actor);
+        if let Some(error) = self.value_error.take() {
+            bail!(error_location::at_block(&error, &self.program.sources[pc]));
+        }
+        result
+    }
+    #[inline(always)]
+    fn exec_inner(&mut self, index: usize, pc: usize, op: Op, actor: usize) -> Result<bool> {
         #[cfg(feature = "interp-profile")]
         let _profile = interp_profile::span("op", &op);
         if self.program.semantics == RuntimeSemantics::Kitten4
@@ -9052,7 +9083,7 @@ impl Engine {
                         .unwrap_or(Cell::Number(self.tasks[index].locals[i])),
                 };
                 if self.value_error.is_none()
-                    && let Some(result) = k4decimal::change(&previous, &value, decrease)
+                    && let Some(result) = k4decimal::change(&previous, &value, decrease)?
                 {
                     self.assign(target, result);
                 }
@@ -9062,7 +9093,7 @@ impl Engine {
                 if self.value_error.is_none() {
                     let previous = self.read_actor_variable(actor, slot);
                     if self.value_error.is_none()
-                        && let Some(result) = k4decimal::change(&previous, &value, decrease)
+                        && let Some(result) = k4decimal::change(&previous, &value, decrease)?
                     {
                         self.write_actor_variable(actor, slot, result);
                     }
@@ -10241,10 +10272,6 @@ impl Engine {
                 self.finish_task(index);
                 return Ok(false);
             }
-        }
-        if self.value_error.is_some() {
-            let error = self.value_error.take().unwrap_or_default();
-            bail!(error_location::at_block(&error, &self.program.sources[pc]));
         }
         // Nonfinite arithmetic is not a VM error. Input guards above implement
         // the official setters; finite arithmetic can still overflow naturally.

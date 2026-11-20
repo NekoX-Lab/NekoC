@@ -41,15 +41,15 @@ pub(super) fn change(
     previous: &super::Cell,
     value: &super::Cell,
     decrease: bool,
-) -> Option<super::Cell> {
+) -> anyhow::Result<Option<super::Cell>> {
     use super::Cell;
     if matches!(
         previous,
         Cell::List(_) | Cell::Costume(_) | Cell::Midi(_) | Cell::Null
     ) {
-        return None;
+        return Ok(None);
     }
-    Some(
+    Ok(Some(
         if !decrease
             && (matches!(previous, Cell::Text(_))
                 || matches!(
@@ -57,7 +57,7 @@ pub(super) fn change(
                     Cell::Text(_) | Cell::List(_) | Cell::Costume(_) | Cell::Midi(_)
                 ))
         {
-            Cell::concat(previous, value)
+            Cell::try_concat(previous, value)?
         } else {
             Cell::Number(if decrease {
                 cells(super::Binary::K4Sub, previous, value)
@@ -67,7 +67,7 @@ pub(super) fn change(
                 previous.number() + value.number()
             })
         },
-    )
+    ))
 }
 
 fn operation(op: super::Binary) -> Operation {

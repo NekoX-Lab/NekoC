@@ -7,6 +7,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 #[cfg(not(target_arch = "wasm32"))]
 use std::path::PathBuf;
+mod graph;
 
 struct CompiledProcedure {
     id: String,
@@ -159,6 +160,15 @@ pub fn assemble_workspace_bcmkn(
     name: &str,
     template: crate::json::Json,
 ) -> Result<crate::json::Json> {
+    crate::json::expanded(|| assemble_workspace_inner(workspace_report, name, template))
+}
+
+fn assemble_workspace_inner(
+    workspace_report: &Value,
+    name: &str,
+    template: crate::json::Json,
+) -> Result<crate::json::Json> {
+    crate::bcmkn::check_containers(&template)?;
     let workspace_data = workspace_report
         .get("workspaceData")
         .context("compiled TypeScript report is missing workspaceData")?;
@@ -364,13 +374,16 @@ pub fn workspace_data_to_neko_blocks(workspace_data: &Value) -> Result<Vec<Value
         .get("blocks")
         .and_then(Value::as_object)
         .context("workspaceData.blocks must be an object")?;
+    // Validate the complete graph before expanding it: a small shared DAG can
+    // otherwise allocate an exponentially large tree, and cycles never finish.
+    graph::check(workspace_data)?;
+    let empty_connections = Map::new();
     let connections = workspace_data
         .get("connections")
         .and_then(Value::as_object)
-        .cloned()
-        .unwrap_or_default();
+        .unwrap_or(&empty_connections);
 
-    let child_ids = collect_child_ids(&connections);
+    let child_ids = collect_child_ids(connections);
     let mut roots = blocks
         .iter()
         .filter(|(id, block)| {
@@ -386,92 +399,8 @@ pub fn workspace_data_to_neko_blocks(workspace_data: &Value) -> Result<Vec<Value
 
     roots
         .iter()
-        .map(|id| build_nested_block(id, blocks, &connections, None))
+        .map(|id| graph::nest(id, blocks, connections))
         .collect()
-}
-
-fn build_nested_block(
-    id: &str,
-    blocks: &Map<String, Value>,
-    connections: &Map<String, Value>,
-    expected_parent: Option<&str>,
-) -> Result<Value> {
-    let block = blocks
-        .get(id)
-        .with_context(|| format!("connection references missing block {id}"))?;
-    let mut nested = block.as_object().cloned().unwrap_or_default();
-    nested.remove("next");
-    nested.remove("inputs");
-    nested.remove("statements");
-    nested.insert(
-        "parent_id".to_owned(),
-        expected_parent.map_or(Value::String(String::new()), |parent_id| {
-            Value::String(parent_id.to_owned())
-        }),
-    );
-    if nested.get("shield").is_none() {
-        nested.insert("shield".to_owned(), Value::Bool(false));
-    }
-
-    let mut input_items = BTreeMap::new();
-    let mut statement_items = BTreeMap::new();
-    let mut next_id = None;
-
-    if let Some(children) = connections.get(id).and_then(Value::as_object) {
-        for (child_id, connection) in children {
-            let Some(connection_type) = connection.get("type").and_then(Value::as_str) else {
-                continue;
-            };
-            if connection_type == "next" {
-                ensure!(
-                    !crate::validate::block_has_no_next_socket(block),
-                    "Kitten N block {} ({id}) has no next socket; cannot connect {child_id}",
-                    block["type"]
-                );
-                next_id = Some(child_id.to_owned());
-                continue;
-            }
-
-            if connection_type == "input" {
-                let input_name = connection
-                    .get("input_name")
-                    .and_then(Value::as_str)
-                    .context("input connection is missing input_name")?
-                    .to_owned();
-                let input_type = connection
-                    .get("input_type")
-                    .and_then(Value::as_str)
-                    .unwrap_or("value");
-                let child = build_nested_block(child_id, blocks, connections, Some(id))?;
-                if input_type == "statement" {
-                    statement_items.insert(input_name, child);
-                } else {
-                    input_items.insert(input_name, child);
-                }
-            }
-        }
-    }
-
-    if !input_items.is_empty() {
-        nested.insert(
-            "inputs".to_owned(),
-            Value::Object(input_items.into_iter().collect()),
-        );
-    }
-    if !statement_items.is_empty() {
-        nested.insert(
-            "statements".to_owned(),
-            Value::Object(statement_items.into_iter().collect()),
-        );
-    }
-    if let Some(next_id) = next_id {
-        nested.insert(
-            "next".to_owned(),
-            build_nested_block(&next_id, blocks, connections, Some(id))?,
-        );
-    }
-
-    Ok(Value::Object(nested))
 }
 
 fn collect_child_ids(connections: &Map<String, Value>) -> BTreeSet<String> {

@@ -32,7 +32,7 @@ test("snapshot is exactly 300 unique names with mutually exclusive conservative 
     assert.ok(statuses.includes(row.status));
     assert.notEqual(row.status, "VM 已实现");
     assert.equal(row.status === "缺失", row.vm.length === 0, row.type);
-    assert.ok(row.compiler.includes("build_nested_block"));
+    assert.ok(row.compiler.includes("graph.rs::nest"));
     assert.ok(row.risk.length > 0);
     assert.ok(officialCategories[row.officialCategory], row.type);
     assert.equal(row.panelEvidence, "docs/kn-panel-evidence.json");

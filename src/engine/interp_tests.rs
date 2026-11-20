@@ -176,7 +176,7 @@ fn hot_and_cold_fallthrough_take_pending_value_error_at_original_source() {
 }
 
 #[test]
-fn cold_direct_helper_return_keeps_pending_value_error_even_when_true() {
+fn cold_direct_helper_return_reports_pending_value_error_even_when_true() {
     for semantics in [RuntimeSemantics::KnCurrent, RuntimeSemantics::Kitten4] {
         let mut e = engine(
             vec![Op::K4Media(k4_media::Command::Language(0)), Op::Halt],
@@ -184,8 +184,11 @@ fn cold_direct_helper_return_keeps_pending_value_error_even_when_true() {
         );
         e.value_error = Some("pending-layout-error".into());
 
-        assert!(exec_at(&mut e, 0).unwrap());
-        assert_eq!(e.value_error.as_deref(), Some("pending-layout-error"));
+        assert_eq!(
+            exec_at(&mut e, 0).unwrap_err().to_string(),
+            "pending-layout-error at block interp-layout-block-0"
+        );
+        assert!(e.value_error.is_none());
         assert_eq!(e.tasks[0].pc, 1);
         assert!(!e.tasks[0].done);
         assert_eq!(e.tasks[0].pending, 0);
@@ -193,7 +196,7 @@ fn cold_direct_helper_return_keeps_pending_value_error_even_when_true() {
 }
 
 #[test]
-fn cold_blocking_early_returns_keep_pending_error_and_request_side_effects() {
+fn cold_blocking_early_returns_report_pending_error_and_keep_request_side_effects() {
     for semantics in [RuntimeSemantics::KnCurrent, RuntimeSemantics::Kitten4] {
         for op in [Op::Ask(0, None), Op::StageDialog(0, usize::MAX)] {
             let mut e = engine(vec![op, Op::Halt], semantics);
@@ -201,8 +204,11 @@ fn cold_blocking_early_returns_keep_pending_error_and_request_side_effects() {
             let task_id = e.tasks[0].id;
             let next_ask = e.next_ask;
 
-            assert!(!exec_at(&mut e, 0).unwrap());
-            assert_eq!(e.value_error.as_deref(), Some("pending-layout-error"));
+            assert_eq!(
+                exec_at(&mut e, 0).unwrap_err().to_string(),
+                "pending-layout-error at block interp-layout-block-0"
+            );
+            assert!(e.value_error.is_none());
             assert_eq!(e.tasks[0].pc, 1);
             assert_eq!(e.tasks[0].pending, 1);
             assert_eq!(e.next_ask, next_ask + 1);

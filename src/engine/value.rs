@@ -1,10 +1,14 @@
 //! Non-numeric values live beside numeric slots, keeping arithmetic unboxed.
-use anyhow::Result;
+use anyhow::{Result, ensure};
 use serde::{Serialize, Serializer};
 use serde_json::Value;
 use std::{cell::RefCell, rc::Rc};
 mod text;
 pub use text::Text;
+
+// A VM resource bound, not a claimed limit of either official player. A tiny
+// concatenation DAG can describe exabytes before anyone asks to flatten it.
+pub(super) const MAX_TEXT_BYTES: usize = 16 * 1024 * 1024;
 
 pub type List = Rc<RefCell<Vec<Cell>>>;
 pub type Object = Rc<RefCell<Vec<(String, Cell)>>>;
@@ -71,18 +75,84 @@ impl Cell {
         };
         Self::Text(Text::concat(&a, &b))
     }
+    pub(super) fn try_concat(a: &Self, b: &Self) -> Result<Self> {
+        let text = |value: &Self| -> Result<Text> {
+            if let Self::Text(text) = value {
+                check_text_growth(0, text.len())?;
+                Ok(text.clone())
+            } else {
+                let mut out = String::new();
+                value.append_bounded_text(&mut out)?;
+                Ok(out.into())
+            }
+        };
+        let (a, b) = (text(a)?, text(b)?);
+        check_text_growth(a.len(), b.len())?;
+        Ok(Self::Text(Text::concat(&a, &b)))
+    }
+    /// Coerce lists directly into a bounded result, checking each leaf and
+    /// separator before allocating its bytes. Match text_guarded's cyclic-list
+    /// and null/undefined-element behavior without an intermediate Vec<String>.
+    pub(super) fn append_bounded_text(&self, out: &mut String) -> Result<()> {
+        self.append_bounded_text_at(out, &mut Vec::new())
+    }
+    fn append_bounded_text_at(&self, out: &mut String, active: &mut Vec<usize>) -> Result<()> {
+        fn append(out: &mut String, text: &str) -> Result<()> {
+            check_text_growth(out.len(), text.len())?;
+            out.push_str(text);
+            Ok(())
+        }
+        match self {
+            Self::Text(text) => {
+                check_text_growth(out.len(), text.len())?;
+                text.append_to(out);
+                Ok(())
+            }
+            Self::List(items) => {
+                let pointer = Rc::as_ptr(items) as usize;
+                if active.contains(&pointer) || active.len() >= 128 {
+                    return Ok(());
+                }
+                active.push(pointer);
+                let result = (|| {
+                    for (i, value) in items.borrow().iter().enumerate() {
+                        if i != 0 {
+                            append(out, ",")?;
+                        }
+                        if !matches!(value, Self::Null | Self::Undefined) {
+                            value.append_bounded_text_at(out, active)?;
+                        }
+                    }
+                    Ok(())
+                })();
+                active.pop();
+                result
+            }
+            // Scalar conversions are small, independent of user string length.
+            _ => append(out, &self.text()),
+        }
+    }
     pub fn from_json(value: &Value) -> Result<Self> {
+        Self::from_json_at(value, 0)
+    }
+    fn from_json_at(value: &Value, depth: usize) -> Result<Self> {
+        // Cells have recursive coercion/clone/drop consumers, unlike the
+        // stack-safe project JSON owner. Reject deep initial data before any
+        // recursive Cell tree is constructed, on native and wasm alike.
+        ensure!(depth <= 128, "VM value nesting exceeds safety limit (128)");
         Ok(match value {
             Value::Null => Self::Null,
             Value::Bool(v) => Self::Bool(*v),
             Value::Number(v) => Self::Number(v.as_f64().unwrap_or(f64::NAN)),
             Value::String(v) => Self::Text(v.as_str().into()),
             Value::Array(v) => Self::List(Rc::new(RefCell::new(
-                v.iter().map(Self::from_json).collect::<Result<_>>()?,
+                v.iter()
+                    .map(|v| Self::from_json_at(v, depth + 1))
+                    .collect::<Result<_>>()?,
             ))),
             Value::Object(v) => Self::Object(Rc::new(RefCell::new(
                 v.iter()
-                    .map(|(k, v)| Ok((k.clone(), Self::from_json(v)?)))
+                    .map(|(k, v)| Ok((k.clone(), Self::from_json_at(v, depth + 1)?)))
                     .collect::<Result<_>>()?,
             ))),
         })
@@ -321,6 +391,14 @@ impl Cell {
         }
         true
     }
+}
+
+pub(super) fn check_text_growth(a: usize, b: usize) -> Result<()> {
+    ensure!(
+        a.checked_add(b).is_some_and(|n| n <= MAX_TEXT_BYTES),
+        "text size exceeds VM safety limit ({MAX_TEXT_BYTES} bytes)"
+    );
+    Ok(())
 }
 
 #[cfg(test)]

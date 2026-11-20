@@ -197,11 +197,14 @@ export function inventory(root, reference, engineSource) {
   }
   const engine = engineSource ?? fs.readFileSync(path.join(root, "src/engine.rs"), "utf8");
   const compiler = fs.readFileSync(path.join(root, "src/bcmkn_compiler.rs"), "utf8");
+  const graph = fs.readFileSync(path.join(root, "src/bcmkn_compiler/graph.rs"), "utf8");
   // Fail closed if the type-agnostic import path changes. It clones *all* fields,
   // including type, without a block whitelist (not TS API emission support).
-  if (!compiler.includes("let mut nested = block.as_object().cloned().unwrap_or_default();") ||
-      !compiler.includes("Ok(Value::Object(nested))")) {
-    throw new Error("Re-audit bcmkn_compiler::build_nested_block before classifying readable types");
+  if (!compiler.includes("graph::check(workspace_data)?;") ||
+      !compiler.includes("graph::nest(id, blocks, connections)") ||
+      !graph.includes("crate::json::Json::new(crate::json::clone_value(&blocks[id]))") ||
+      !graph.includes('for key in ["next", "inputs", "statements", "parent_id"]')) {
+    throw new Error("Re-audit bcmkn_compiler::graph before classifying readable types");
   }
   const evidence = primaryDispatch(engine);
   // Non-dispatch definitions/loop parameters are consumed as compiler metadata.
@@ -239,7 +242,7 @@ export function inventory(root, reference, engineSource) {
       .map(([file]) => path.relative(root, file).replaceAll("\\", "/"));
     return { type, status, risk: risks[type] ?? limitations[type] ?? hardwareLimits.get(type) ?? (vm.length ? "显式路径仅证明会编译；全部字段、选项、错误与官方行为尚未逐项验证" : missingReason(type)),
       occurrences: frequencies.get(type) ?? 0, event: eventTypes.has(type), tests,
-      vm, compiler: "src/bcmkn_compiler.rs::build_nested_block (generic field-preserving import)",
+      vm, compiler: "src/bcmkn_compiler/graph.rs::nest (generic field-preserving import)",
       reference: referenceFunctions, officialCategory: panelCategories.get(type),
       panelEvidence: "docs/kn-panel-evidence.json" };
   });
@@ -290,7 +293,7 @@ export function coverageMarkdown(result) {
     "- 第一轮按[自有作品静态频率](kn-partial-priority.md)修转换、鼠标与克隆属性；后两项改为有执行路径／未完整验证（不是完整认证），见[原生差分及边界](kn-partial.md)。转换深层/循环列表和对象错误见[专项证据](kn-partial-conversion.md)。",
     "- [partial第二轮](kn-partial2.md)按常见输入/空值/列表对象主路径升级8个本地项，115→107；罕见JS边界单列未验证，不再因此保留整项partial。未达到15项：其余47个非硬件服务/设备/宿主项逐项记录降级后跳过，不冒充成功路径；60个硬件项仍保留部分语义。",
     "- 官方 bundle：`https://creation.bcmcdn.com/neko/web/release/static/js/main.8ccf2442.js`；SHA-256 `58123fcf43cf793d19372fc822750f9899a4375404de61c541f06e915c2b8165`。`_execute` byte 2962264 是空函数；`_array_literal` byte 2962446 使用 `Object.values`。空函数不等于输入不求值，执行管线仍需单独验证。",
-    "- 导入层 `src/bcmkn_compiler.rs::build_nested_block` 泛型保留 type/fields，再按连接重建 inputs/statements/next；这只能说明能装配/读取，不能证明 VM 支持。`tests/kn_gap.rs::workspace_compiler_preserves_unknown_types_without_claiming_vm_support` 专门覆盖此区别。",
+    "- 导入层 `src/bcmkn_compiler/graph.rs::nest` 泛型保留 type/fields，再按连接重建 inputs/statements/next；这只能说明能装配/读取，不能证明 VM 支持。`tests/kn_gap.rs::workspace_compiler_preserves_unknown_types_without_claiming_vm_support` 专门覆盖此区别。",
     "- 实现定位只扫描 value_one、expression_one、scripts、chain 的类型分派，排除注释、字段选项、expression_inputs 遍历提示和游离根忽略名单。元数据单独列出。此静态审计不能证明每条 guard 在 KN 模式均可达，也不能替代运行测试。",
     "- 表中缺失项的 `—` 表示四处执行分派及两处元数据均无匹配；当前表达式/指令/根事件分别进入 unsupported 诊断。游离或未执行代码被忽略不算运行支持。",
     "- 该 300 项清单不是官方全集；例如基础阴影/过程类型可能不在此清单，不能据此推断它们缺失。", "",
@@ -303,7 +306,7 @@ export function coverageMarkdown(result) {
     "- 未完成：300 项分别构造原生工程编译/执行、每个 dropdown/socket 与 malformed input、官方编辑器差分、跨平台硬件/AI/网络后端、渲染和音频最终输出的全量验证。原创 KN 夹具的编辑器检查以对应证据文档和带 SHA-256 的记录为准，不能推广到全部积木。", "",
     ...testIds.map(file => `- **${testRef(file)}**：[${file}](../${file})（源码引用，执行状态见上文）`),
     "", "## 全量逐项表（300 行）", "",
-    "所有行的导入层均为上文 `build_nested_block` 泛型路径；只在“VM/编译位置”列有路径时才有进一步实现证据。行号随源码演化变化，可用下述命令重新生成。", "",
+    "所有行的导入层均为上文 `graph.rs::nest` 泛型路径；只在“VM/编译位置”列有路径时才有进一步实现证据。行号随源码演化变化，可用下述命令重新生成。", "",
     "| # | 类型 | VM状态 | 官方面板证据类别 | VM/编译位置 | 测试源码线索 | 限制／未验证 |",
     "| ---: | --- | --- | --- | --- | --- | --- |",
     ...result.rows.map((row, i) => `| ${i + 1} | \`${row.type}\` | ${row.status} | ${officialCategories[row.officialCategory]} | ${row.vm.map(at => `\`${at}\``).join("<br>") || "—"} | ${row.tests.map(testRef).join(", ") || "未定位"} | ${shortRisk[row.status] ?? limitations[row.type] ?? (row.status === statuses[0] ? "有路径；完整语义未验证" : row.risk)} |`),

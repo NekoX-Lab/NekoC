@@ -971,6 +971,8 @@ fn listener_stop_current_unblocks_sender_and_recursive_broadcast_is_bounded() {
         ),
     );
     let mut vm = Engine::new(Program::compile(&p).unwrap());
+    // Task-limit coverage must not depend on shared CI host wall-clock speed.
+    vm.use_virtual_clock();
     vm.start();
     let f = vm.advance(0.0, 20, Duration::from_secs(1)).unwrap();
     assert!(f.budget_yield);
