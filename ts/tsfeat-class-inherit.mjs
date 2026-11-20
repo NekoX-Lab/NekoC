@@ -47,6 +47,7 @@ export function lowerClassInheritance(input, sourceIdentity = input.fileName) {
   const records = [], byNode = new Map(), bySymbol = new Map();
   const origins = new Map(), helpers = [], declarations = new Map();
   const helperBodies = new Map(), fieldInitializers = new Map();
+  const helperDefaults = new Map();
   const addHelper = (name, code, node) => { helpers.push(code); origins.set(name, { file: input, offset: node.getStart(file) }); };
   const typeText = node => node ? print(node) : "number";
   const inferredType = node => checker.typeToTypeNode(checker.getTypeAtLocation(node), undefined, ts.NodeBuilderFlags.NoTruncation);
@@ -784,9 +785,11 @@ export function lowerClassInheritance(input, sourceIdentity = input.fileName) {
     if (ts.isReturnStatement(node) && !node.expression) return f.createReturnStatement(number(0));
     return ts.visitEachChild(node, replaceReturn, context);
   };
-  const parameters = (nodes, r, defaults = true) => nodes.map(p => {
-    if (p.initializer && defaults) { let hasThis = false; walk(p.initializer, n => { hasThis ||= n.kind === ts.SyntaxKind.ThisKeyword; }); if (hasThis) fail(p, "Method defaults reading this are not supported", "read this in the method body or pass an explicit argument"); }
-    return p.name.text + ": " + typeText(p.type ?? inferredType(p.name)) + (defaults && p.initializer ? " = " + expressionText(p.initializer, r.self, r) : "");
+  const parameters = (nodes, r, defaults, offset) => nodes.map((p, i) => {
+    if (p.initializer) { let hasThis = false; walk(p.initializer, n => { hasThis ||= n.kind === ts.SyntaxKind.ThisKeyword; }); if (hasThis) fail(p, "Method defaults reading this are not supported", "read this in the method body or pass an explicit argument"); }
+    const initializer = p.initializer && transformed(p.initializer, r.self, r);
+    if (initializer) defaults.push({ parameter: i + offset, initializer });
+    return p.name.text + ": " + typeText(p.type ?? inferredType(p.name)) + (initializer ? " = " + print(initializer) : "");
   }).join(", " );
   {
     // A no-op transformation context is enough for this syntax-only rewrite.
@@ -808,7 +811,9 @@ export function lowerClassInheritance(input, sourceIdentity = input.fileName) {
         const hasBareReturn = n => !ts.isFunctionLike(n) && (ts.isReturnStatement(n) && !n.expression || !!ts.forEachChild(n, hasBareReturn));
         const bare = hasBareReturn(m.node.body);
         if (!(signature.flags & ts.TypeFlags.Void) && (!returns(m.node.body) || bare)) fail(m.node, "Value-returning methods must return a concrete value on every path", "add an explicit final return");
-        const args = [m.static ? "" : `${r.self}: ${r.name}`, parameters(m.node.parameters, r)].filter(Boolean).join(", " );
+        const defaults = [];
+        const args = [m.static ? "" : `${r.self}: ${r.name}`, parameters(m.node.parameters, r, defaults, Number(!m.static))].filter(Boolean).join(", " );
+        helperDefaults.set(m.helper, defaults);
         addHelper(m.helper, `function ${m.helper}(${args}): ${returnType(m)} { ${concreteBody.statements.map(print).join("\n")} ${signature.flags & ts.TypeFlags.Void ? "return 0;" : ""} }`, m.node);
       }
     }
@@ -822,11 +827,16 @@ export function lowerClassInheritance(input, sourceIdentity = input.fileName) {
     for (const r of records) for (const arity of r.arities) {
       const params = effectiveCtor(r)?.parameters ?? [], names = params.slice(0, arity).map(p => p.name.text);
       const args = names.map((name, i) => `${name}: ${typeText(params[i].type ?? inferredType(params[i].name))}`);
+      const defaults = [];
       let body = "";
       if (!r.ctor && r.parent) body = `${r.parent.construct}_${arity}(${r.self}${names.length ? ", " + names.join(", ") : ""}); ${r.init}(${r.self});`;
       else {
         if (!r.parent) body += `${r.init}(${r.self});`;
-        for (const p of params.slice(arity)) body += `let ${p.name.text}: ${typeText(p.type ?? inferredType(p.name))} = ${expressionText(p.initializer, r.self, r)};`;
+        for (const p of params.slice(arity)) {
+          const initializer = transformed(p.initializer, r.self, r);
+          defaults.push({ statement: Number(!r.parent) + defaults.length, initializer });
+          body += `let ${p.name.text}: ${typeText(p.type ?? inferredType(p.name))} = ${print(initializer)};`;
+        }
         if (!r.parent) for (const field of r.fields.values()) if (field.parameter) body += `${r.self}[${JSON.stringify(field.name)}] = ${field.name};`;
         if (r.ctor) {
           const statements = ts.visitNode(transformed(r.ctor.body, r.self, r), replaceReturn).statements;
@@ -835,6 +845,7 @@ export function lowerClassInheritance(input, sourceIdentity = input.fileName) {
         }
       }
       const name = r.construct + "_" + arity;
+      helperDefaults.set(name, defaults);
       addHelper(name, `function ${name}(${r.self}: ${r.name}${args.length ? ", " + args.join(", ") : ""}): number { ${body} return 0; }`, r.ctor ?? r.node);
     }
     for (const r of records) for (const arity of r.factories) {
@@ -916,6 +927,18 @@ export function lowerClassInheritance(input, sourceIdentity = input.fileName) {
     const output = ts.createSourceFile(input.fileName, text, input.languageVersion, true, input.scriptKind);
     for (const helper of output.statements) {
       const name = helper.name?.text;
+      // Method defaults remain parameter initializers; omitted constructor
+      // defaults become local declarations before the original body. Neither
+      // is covered by the body-statement mapping below.
+      for (const entry of helperDefaults.get(name) ?? []) {
+        if (entry.parameter !== undefined) {
+          mapPrintedClassNodes(helper.parameters[entry.parameter].initializer, entry.initializer, input, origins.get(name));
+        } else {
+          const statement = helper.body.statements[entry.statement];
+          mapPrintedClassNodes(statement, entry.initializer, input, origins.get(name));
+          mapPrintedClassNodes(statement.declarationList.declarations[0].initializer, entry.initializer, input, origins.get(name));
+        }
+      }
       const body = helperBodies.get(name);
       if (body) {
         const start = helper.body.statements.length - Number(body.trailing) - body.statements.length;

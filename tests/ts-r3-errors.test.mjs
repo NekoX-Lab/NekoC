@@ -131,6 +131,71 @@ test("r3: class helpers retain precise original member locations", () => {
   }
 });
 
+test("r3: class default parameters retain precise original initializer locations", () => {
+  for (const constructor of [false, true]) for (const multiline of [false, true])
+    for (const imported of [false, true]) for (const inherited of [false, true]) {
+      const initializer = multiline ? "(\n    missingApi()\n  )" : "missingApi()";
+      const member = constructor ? "constructor" : "bad";
+      const prefix = inherited ? "class Base { base = 0; }\n" : "";
+      const declaration = `${prefix}class A${inherited ? " extends Base" : ""} {\n  x = 1;\n  ${member}(n = ${initializer}) {\n${constructor && inherited ? "    super();\n" : ""}${constructor ? "    this.x = n;" : "    return n;"}\n  }\n}\n`;
+      const invoke = `const a = new A();\nconsole.log(${constructor ? "a.x" : "a.bad()"});`;
+      const library = declaration + `export function helper() {\n${invoke}\n}\n`;
+      const source = imported ? 'import { helper } from "./lib";\nonStart(() => { helper(); });\n'
+        : declaration + `onStart(() => {\n${invoke}\n});\n`;
+      withFiles({ "main.ts": source, ...(imported ? { "lib.ts": library } : {}) }, (file, dir) => {
+        const expectedFile = imported ? path.join(dir, "lib.ts") : file;
+        const original = imported ? library : source;
+        const host = { readFile: name => name === file ? source : name === expectedFile ? original : undefined };
+        for (const memory of [false, true]) {
+          const result = checkFile(file, { types: false, ...(memory ? { host } : {}) });
+          assert.equal(result.ok, false);
+          assert.equal(result.diagnostics.length, 1);
+          const [d] = result.diagnostics;
+          assert.match(d.message, /Unsupported expression call: missingApi/);
+          assertLocated(d, expectedFile, original);
+          assert.equal(d.line, (multiline ? 4 : 3) + Number(inherited));
+          assert.equal(d.column, multiline ? 5 : constructor ? 19 : 11);
+          assert.match(d.snippet, /missingApi\(\)/);
+          assert.throws(() => compileFile(file, memory ? host : undefined), error => {
+            assert.deepEqual(error.diagnostics, result.diagnostics);
+            return true;
+          });
+        }
+        // The failure must originate in the default expression, not a class
+        // construct that would be rejected even with a supported initializer.
+        const validHost = { readFile: name => host.readFile(name)?.replace("missingApi()", "Math.abs(-2)") };
+        assert.ok(compileFile(file, validHost));
+      });
+    }
+});
+
+test("r3: default origins survive parameter offsets and constructor forwarding", () => {
+  const cases = [
+    'class A { static bad(n = (\n    missingApi()\n  )) { return n; } }\nconsole.log(A.bad());',
+    'class A { x = 1; constructor(n = (\n    missingApi()\n  )) { this.x = n; } }\nclass B extends A {}\nconsole.log(new B().x);',
+    'class Base { base = 0; }\nclass A extends Base { x = 1; constructor(seed: number, n = 1, last = (\n    missingApi()\n  )) { super(); this.x = last; } }\nconsole.log(new A(3).x);',
+    'class Base { x = 1; constructor(n = (\n    missingApi()\n  )) { this.x = n; } }\nclass A extends Base { constructor() { super(); } }\nconsole.log(new A().x);',
+    'class Base { base = 0; }\nclass A extends Base { bad(first: number, n = (\n    missingApi()\n  )) { return n; } }\nconsole.log(new A().bad(1));',
+    'class Base { bad(n = 1) { return n; } }\nclass A extends Base { bad(n = (\n    missingApi()\n  )) { return n; } }\nfunction invoke(a: Base) { return a.bad(); }\nconsole.log(invoke(new A()));',
+    'class Base { base = 0; }\nclass A extends Base { bad(n = Math.abs(\n    missingApi()\n  )) { return n; } }\nconsole.log(new A().bad());',
+  ];
+  for (const source of cases) {
+    withFiles({ "main.ts": source }, file => {
+      const result = checkFile(file, { types: false });
+      assert.equal(result.ok, false);
+      assert.equal(result.diagnostics.length, 1);
+      const [d] = result.diagnostics;
+      assert.match(d.message, /missingApi/);
+      assertLocated(d, file, source);
+      // Calculate from the source call, independently of helper positions.
+      const before = source.slice(0, source.indexOf("missingApi")).split("\n");
+      assert.equal(d.line, before.length);
+      assert.equal(d.column, before.at(-1).length + 1);
+      assert.match(d.snippet, /missingApi\(\)/);
+    });
+  }
+});
+
 test("r3: imported type errors retain the dependency's source", () => {
   const imported = '// library\nexport const x: number = "bad";\n';
   withFiles({ "main.ts": 'import { x } from "./lib"; console.log(x);', "lib.ts": imported }, (file, dir) => {
