@@ -541,6 +541,9 @@ pub struct Sprite {
     /// Effect values by native scope: 0 color, 2 brightness, 3 pixelate,
     /// 4 ripple, 5 twist, 6 grayscale, 7 ASCII (1 transparency is `opacity`).
     pub effects: [f64; 8],
+    /// K4 keeps a zero-angle twist enabled until clear; its padding still matters.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub k4_twist_enabled: bool,
     /// Width/height percentages applied on top of `scale`.
     pub size_x: f64,
     pub size_y: f64,
@@ -1368,6 +1371,7 @@ impl Program {
                 visible: kitten4 && scene_value["visible"].as_bool().unwrap_or(true),
                 opacity: 1.0,
                 effects: [0.0; 8],
+                k4_twist_enabled: false,
                 size_x: 100.0,
                 size_y: 100.0,
                 flip_x: false,
@@ -1418,6 +1422,7 @@ impl Program {
                     visible: actor["visible"].as_bool().unwrap_or(true),
                     opacity: 1.0,
                     effects: [0.0; 8],
+                    k4_twist_enabled: false,
                     size_x: 100.0,
                     size_y: 100.0,
                     flip_x: false,
@@ -9920,6 +9925,7 @@ impl Engine {
             Op::ClearEffects => {
                 let a = &mut self.sprites[actor];
                 a.effects = [0.0; 8];
+                a.k4_twist_enabled = false;
                 a.opacity = 1.0;
             }
             Op::RotationType(kind) => self.sprites[actor].rotation_type = kind,

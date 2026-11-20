@@ -1,0 +1,475 @@
+{
+  "schema": "nekoc-r3-k4effects-official-v1",
+  "scope": "Official VM and native filter state only, not NekoC pixels",
+  "file": "src/player/build/player_v2.2d180c468559fbd29528.js.orig",
+  "sha256": "0f7933d51266add6cbad0682b9531036dc1c8daf8c522cde4243744376ce4160",
+  "offsetUnit": "0-based UTF-16 code units after UTF-8 decoding",
+  "locations": {
+    "get_effect_filter(t){": {
+      "offset": 793395,
+      "windowLength": 256,
+      "windowSha256": "5de0edb6eef422a901b0895de88485bbb2f37b80c7fc6f01aef094134cb11dfd"
+    },
+    "set_twist(t){": {
+      "offset": 795853,
+      "windowLength": 256,
+      "windowSha256": "af8747baf59057c7bc5c2ee86f8366f76a614caf281b5ff4204ecbe03e319a3a"
+    },
+    "disable_effects(){": {
+      "offset": 796653,
+      "windowLength": 256,
+      "windowSha256": "dd16fc9995024abe23c4b5e52ba7b6c3d6bd859ee966038d9dc5248ca0268231"
+    }
+  },
+  "fixtureSha256": "6d11eb0ef489ba502a048f58d675bb4797f829632e282c84f495e02278870c6c",
+  "observations": [
+    {
+      "frame": 1,
+      "angle": 0,
+      "enabled": false,
+      "padding": null
+    },
+    {
+      "frame": 2,
+      "angle": 0,
+      "enabled": false,
+      "padding": null
+    },
+    {
+      "frame": 3,
+      "angle": 0,
+      "enabled": false,
+      "padding": null
+    },
+    {
+      "frame": 4,
+      "angle": 0,
+      "enabled": false,
+      "padding": null
+    },
+    {
+      "frame": 5,
+      "angle": 0,
+      "enabled": false,
+      "padding": null
+    },
+    {
+      "frame": 6,
+      "angle": 0,
+      "enabled": false,
+      "padding": null
+    },
+    {
+      "frame": 7,
+      "angle": 0,
+      "enabled": false,
+      "padding": null
+    },
+    {
+      "frame": 8,
+      "angle": 0,
+      "enabled": false,
+      "padding": null
+    },
+    {
+      "frame": 9,
+      "angle": 0,
+      "enabled": false,
+      "padding": null
+    },
+    {
+      "frame": 10,
+      "angle": 0,
+      "enabled": false,
+      "padding": null
+    },
+    {
+      "frame": 11,
+      "angle": 40,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 12,
+      "angle": 40,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 13,
+      "angle": 40,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 14,
+      "angle": 40,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 15,
+      "angle": 40,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 16,
+      "angle": 40,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 17,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 18,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 19,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 20,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 21,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 22,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 23,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 24,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 25,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 26,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 27,
+      "angle": 0,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 28,
+      "angle": 0,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 29,
+      "angle": 0,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 30,
+      "angle": 0,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 31,
+      "angle": 0,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 32,
+      "angle": 0,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 33,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 34,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 35,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 36,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 37,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 38,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 39,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 40,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 41,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 42,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 43,
+      "angle": 40,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 44,
+      "angle": 40,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 45,
+      "angle": 40,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 46,
+      "angle": 40,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 47,
+      "angle": 40,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 48,
+      "angle": 40,
+      "enabled": true,
+      "padding": 20
+    },
+    {
+      "frame": 49,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 50,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 51,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    },
+    {
+      "frame": 52,
+      "angle": 0,
+      "enabled": false,
+      "padding": 20
+    }
+  ],
+  "errors": [],
+  "assets": [
+    {
+      "name": "player_v2__3ffeebbd0c789e8d9422.css",
+      "source": "player_v2__3ffeebbd0c789e8d9422.css",
+      "sha256": "39e8e70b124b604831773893cdc95931cdee3eaea52c6dd69f33f5781d48b45a"
+    },
+    {
+      "name": "runtime.f42f527f119e09010b85.js",
+      "source": "runtime.f42f527f119e09010b85.js",
+      "sha256": "4164d67795238f64d035f473418236038ae475ae36032a967cba16ede263735f"
+    },
+    {
+      "name": "vendors.d00f4bd454a6352e9d71.js",
+      "source": "vendors.d00f4bd454a6352e9d71.js",
+      "sha256": "9f484cedbde10bcb82958aaf6cdeb24e40d5b52c3e825e027564402dd7977867"
+    },
+    {
+      "name": "player_v2.2d180c468559fbd29528.js",
+      "source": "player_v2.2d180c468559fbd29528.js.orig",
+      "sha256": "0f7933d51266add6cbad0682b9531036dc1c8daf8c522cde4243744376ce4160"
+    },
+    {
+      "name": "9.c396696e9dc71e25b012.js",
+      "source": "9.c396696e9dc71e25b012.js",
+      "sha256": "5758343310c47596d56e954aa05fa76a546080c8bf4fefd41cac0042794d6195"
+    },
+    {
+      "name": "14.c95e6f2ddd61fb701d0e.js",
+      "source": "14.c95e6f2ddd61fb701d0e.js",
+      "sha256": "d3ce91c9113463db4c0988210caeb1be2ddc508499d5c53a8e73a13b5f440175"
+    },
+    {
+      "name": "11.477512e6f03fd2f6f3c5.js",
+      "source": "11.477512e6f03fd2f6f3c5.js",
+      "sha256": "e81bfe3462cc3e79a70ba016ddee2a372a31480d3f52964952e1d21f3a490f91"
+    }
+  ],
+  "externalRequests": [
+    {
+      "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+      "method": "GET",
+      "resourceType": "xhr",
+      "action": "blocked"
+    },
+    {
+      "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+      "method": "GET",
+      "resourceType": "script",
+      "action": "blocked"
+    },
+    {
+      "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+      "method": "GET",
+      "resourceType": "xhr",
+      "action": "blocked"
+    },
+    {
+      "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+      "method": "GET",
+      "resourceType": "image",
+      "action": "blocked"
+    },
+    {
+      "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+      "method": "GET",
+      "resourceType": "xhr",
+      "action": "blocked"
+    },
+    {
+      "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+      "method": "GET",
+      "resourceType": "xhr",
+      "action": "blocked"
+    },
+    {
+      "url": "https://collection.codemao.cn/report/kitten",
+      "method": "POST",
+      "resourceType": "ping",
+      "action": "blocked"
+    },
+    {
+      "url": "https://collection.codemao.cn/report/sysinfo",
+      "method": "POST",
+      "resourceType": "ping",
+      "action": "blocked"
+    },
+    {
+      "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+      "method": "GET",
+      "resourceType": "xhr",
+      "action": "blocked"
+    },
+    {
+      "url": "https://pv.sohu.com/cityjson?ie=utf-8",
+      "method": "GET",
+      "resourceType": "script",
+      "action": "blocked"
+    },
+    {
+      "url": "https://kn-cdn.codemao.cn/kitten/variable-1582192414.json",
+      "method": "GET",
+      "resourceType": "xhr",
+      "action": "blocked"
+    },
+    {
+      "url": "https://kn-cdn.codemao.cn/kn/build/asset/icon_confirm_48939.png",
+      "method": "GET",
+      "resourceType": "image",
+      "action": "blocked"
+    },
+    {
+      "url": "https://kn-cdn.codemao.cn/kitten/stage_dialog-1576674019214.json",
+      "method": "GET",
+      "resourceType": "xhr",
+      "action": "blocked"
+    },
+    {
+      "url": "https://kn-cdn.codemao.cn/kitten/audio_img-1579413740328.json",
+      "method": "GET",
+      "resourceType": "xhr",
+      "action": "blocked"
+    },
+    {
+      "url": "https://kn-cdn.codemao.cn/player-icons/mob%EF%BC%8Ficn_keyboard_nor.png",
+      "method": "GET",
+      "resourceType": "image",
+      "action": "blocked"
+    },
+    {
+      "url": "https://kn-cdn.codemao.cn/player-icons/mob_icn_reset.png",
+      "method": "GET",
+      "resourceType": "image",
+      "action": "blocked"
+    }
+  ]
+}

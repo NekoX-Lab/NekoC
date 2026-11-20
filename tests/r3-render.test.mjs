@@ -45,6 +45,27 @@ test('r3-render batches consecutive textures, flushes at capacity and before pen
   assert.deepEqual([...r.textureBatch.data.slice(0,5)],[13,13,30,40,0]);
   assert.ok(Math.abs(r.textureBatch.data[8]-.2)<1e-7);assert.deepEqual(tint,[.2,.4,.6,.8]);
 });
+test('r3-render neutral K4 twist flushes cached stamps before its padded pass',()=>{
+  const {r,events}=mockRenderer();r.kitten4=true;
+  r.stampCache.set('hot',{texture:'stamp',geometry:[0,0,10,10]});
+  assert.equal(r.drawCachedStamp('hot'),true);
+  assert.equal(r.textureBatch.count,1);
+  r.drawK4SpatialTexture=(...args)=>{
+    assert.equal(r.textureBatch.count,0);
+    assert.deepEqual(events,[['draw',1]]);
+    assert.equal(args.at(-1),true);
+    events.push(['spatial']);
+  };
+  r.drawTexture('actor',0,0,10,10,0,[1,1,1,1],Array(8).fill(0),[10,10],null,null,false,true);
+  assert.deepEqual(events,[['draw',1],['spatial']]);
+  assert.equal(r.drawCachedStamp('hot'),true);r.flushTextureBatch();
+  assert.deepEqual(events.at(-1),['draw',1]);
+  // The flag is K4-only: ordinary KN drawing stays eligible for batching.
+  r.kitten4=false;
+  r.drawTexture('actor',0,0,10,10,0,[1,1,1,1],Array(8).fill(0),null,null,null,false,true);
+  assert.equal(r.textureBatch.count,1);
+});
+
 test('r3-render stamp LRU is bounded by entries and bytes and submits before eviction',()=>{
   const {r,events}=mockRenderer();
   const upload=(key,size=10)=>{for(let i=0;i<2;i++)r.uploadStamp(key,{width:size,height:size},0,size,0,size,1,1);};
@@ -182,8 +203,45 @@ test('r3-render pixels match frozen renderer for clones, stamps, eviction, resol
         compare(`${name}/switch`,r=>r.apply({sprites:[],order:[],...spec.targetFrame,scene:ids[1],transition:{kind:name.split('-')[0],direction:'left'}},empty));
         for(let frame=0;frame<65;frame++)compare(`${name}/${frame}`,r=>{r.transitionClock=()=>frame*1000/60;r.dirty=true;r.render();});
       }
+      // Isolate the integration boundary using identical filter logic without
+      // batching/cache, not the historical renderer without the twist fix.
+      class ImmediateRenderer extends current.StageRenderer{
+        drawTexture(...args){
+          const active=this.textureBatchActive;this.textureBatchActive=false;
+          try{return super.drawTexture(...args);}finally{this.textureBatchActive=active;}
+        }
+        drawCachedStamp(){return false;}
+        uploadStamp(_key,...args){return super.uploadStamp(null,...args);}
+      }
+      const immediate=new ImmediateRenderer(document.createElement('canvas'));immediate.resolutionScale=1;
+      const optimized=rs[1],twistChecks=[];
+      await Promise.all([immediate,optimized].map(r=>{r.resolutionScale=1;return r.load({...project,_nekocKitten4:{}});}));
+      const actors=Array.from({length:33},(_,i)=>({id:`twist${i}`,style:'c',x:i%11*23-115.25,y:Math.floor(i/11)*45-50.5,
+        scale:137,direction:i*17,rotation_type:0,visible:true,opacity:.65,effects:[25,0,10,9,0,0,15,7],k4_twist_enabled:true}));
+      const cached={style:'c',x:3.25,y:-5.5,scale:95,direction:37,rotation_type:0,before_line:0};
+      const twistFrame={clear:true,reset:true,sprites:actors,order:actors.map(a=>a.id),image_stamps:Array(12).fill(cached)};
+      const compareTwist=(name,frame)=>{
+        const pixels=[immediate,optimized].map(r=>{r.apply(frame,empty);if(r.gl.getError())throw Error(name+': GL error');return snapshot(r);});
+        if(pixels[0].some((v,i)=>v!==pixels[1][i]))throw Error(name+': batching/cache changed neutral-twist pixels');
+        twistChecks.push(name);return pixels[1];
+      };
+      compareTwist('twist/cold',twistFrame);
+      compareTwist('twist/warm',twistFrame);
+      if(optimized.stats.stampUploads!==0||!optimized.stampCache.size)throw Error('Twist probe missed the warm stamp cache');
+      const delta=enabled=>({sprites:actors.map(a=>({...a,k4_twist_enabled:enabled||undefined}))});
+      const enabled=compareTwist('twist/enabled',delta(true));
+      const disabled=compareTwist('twist/clear-flag',delta(false));
+      if(enabled.every((v,i)=>v===disabled[i]))throw Error('Twist probe did not distinguish padded neutral filter');
+      compareTwist('twist/restore-flag',delta(true));
+      // Mix batched actors on either side of spatial passes and test the
+      // background activation flag without changing the stamp cache policy.
+      compareTwist('twist/background-mixed',{...twistFrame,sprites:[
+        {id:'s',style:'c',visible:true,effects:[25,0,10,9,0,0,15,7],k4_twist_enabled:true},
+        ...actors.map((a,i)=>i%3===0?a:{...a,effects:Array(8).fill(0),k4_twist_enabled:undefined}),
+      ]});
+      immediate.gl.getExtension('WEBGL_lose_context').loseContext();
       for(const r of rs)r.gl.getExtension('WEBGL_lose_context').loseContext();
-      return {comparisons:checks.length,reductions,movingCounts};
+      return {comparisons:checks.length,reductions,movingCounts,twistChecks};
     },await transition10Fixtures());
     assert.ok(result.comparisons>200);
     for(const r of result.reductions){assert.ok(r.current<(r.kitten4?310:r.old/100),JSON.stringify(r));assert.equal(r.stampUploads,r.kitten4?300:0);assert.equal(r.textUploads,0);}
