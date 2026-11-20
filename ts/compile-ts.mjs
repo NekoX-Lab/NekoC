@@ -6640,6 +6640,37 @@ class WorkspaceCompiler {
       }
       return this.addBlock({ type: "math_number", parent_id: parentId, fields: { NUM: String(value) }, is_output: true });
     }
+    const equality = [ts.SyntaxKind.EqualsEqualsToken, ts.SyntaxKind.EqualsEqualsEqualsToken,
+      ts.SyntaxKind.ExclamationEqualsToken, ts.SyntaxKind.ExclamationEqualsEqualsToken].includes(operator);
+    // Only NaN/NaN differs from KN EQ. A known non-NaN operand makes the
+    // native comparison sufficient and avoids growing ordinary loop guards.
+    const knownOrdered = node => {
+      const value = constantNumber(node);
+      return value !== null && !Number.isNaN(value);
+    };
+    if (this.target.name === "kitten-n" && equality && this.expressionType?.(expression.left) === "number"
+        && this.expressionType?.(expression.right) === "number"
+        && !knownOrdered(expression.left) && !knownOrdered(expression.right)) {
+      // Official KN EQ considers NaN equal to NaN. JS numeric equality does
+      // not: ordered comparisons reject NaN while preserving infinities/zeros.
+      // Invocation-local parameters keep both original operands single-evaluated
+      // left to right, even across recursive calls or mutations of a binding.
+      return evaluatedChoice(this, [expression.left, expression.right], parentId, ([a, b], definition) => {
+        const ret = this.addReturnValueBlock(definition);
+        const unequal = operator === ts.SyntaxKind.ExclamationEqualsToken || operator === ts.SyntaxKind.ExclamationEqualsEqualsToken;
+        const result = unequal ? this.addBlock({ type: "logic_negate", parent_id: ret, is_output: true }) : null;
+        const ordered = this.addBlock({ type: "logic_operation", parent_id: result ?? ret, fields: { type: "and" }, is_output: true });
+        for (const [input, OP] of [["A", "LTE"], ["B", "GTE"]]) {
+          const cmp = this.addBlock({ type: "logic_compare", parent_id: ordered, fields: { OP }, is_output: true });
+          this.connectInput(cmp, this.compileExpression(a, cmp), "A", "value");
+          this.connectInput(cmp, this.compileExpression(b, cmp), "B", "value");
+          this.connectInput(ordered, cmp, input, "value");
+        }
+        if (result) this.connectInput(result, ordered, "logic", "value");
+        this.connectInput(ret, result ?? ordered, "VALUE", "value");
+        return ret;
+      });
+    }
     const spec = nativeBinaryExpressionSpec(operator);
     if (!spec) {
       this.unsupported(expression.operatorToken, "Unsupported binary expression operator");

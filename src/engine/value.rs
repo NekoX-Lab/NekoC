@@ -605,6 +605,8 @@ pub(super) enum ValueExpr {
     Boolean(usize),
     Encode64(usize),
     Decode64(usize),
+    /// Official KN String code API, after nullish-to-empty String coercion.
+    KnTextCase(usize, bool),
     ParseFloat(usize),
     ParseInt(usize, usize),
     IsNumber(usize, bool),

@@ -16,6 +16,13 @@ and bit-identical V8 compensated summation remain outside the documented guarant
 
 ## Numeric helpers
 
+For the Kitten N target, statically numeric `==`, `===`, `!=` and `!==` preserve JavaScript NaN
+semantics, unlike the underlying KN equality block (which considers NaN equal
+to NaN). The compiler saves both operands once, left to right, in invocation-local
+parameters and combines ordered comparisons. Infinities and signed zeros retain
+their numeric equality semantics. This does not extend equality guarantees for
+`any`/unknown or mixed non-primitive operands.
+
 `Math.max` / `Math.min` accept one or more numeric arguments, save each once in
 left-to-right order, and propagate numeric NaN in any position. Arguments after
 NaN still run, including side effects. Single arguments, ±Infinity, numeric

@@ -73,6 +73,31 @@ onStart(() => { waitUntil(signaled); console.log("resumed", inf); });
 onStart(() => { console.log("ready", nan, inf, neg); signaled = true; });
 `;
 
+export const equalitySource = `
+let nan = 0/0; let inf = 1/0; let neg = -1/0; let zero = 0;
+console.log(nan === nan, nan !== nan, nan == nan, nan != nan);
+console.log(inf === inf, neg === neg, inf !== neg, zero === -zero);
+let order = 0;
+function take(n: number): number { order = order * 10 + n; return n; }
+console.log(take(1) === take(2), order);
+let value = 1;
+function change(): number { value = 2; return 1; }
+console.log(value === change(), value);
+function recurse(n: number): number {
+  if (n <= 0) return 0/0;
+  let child = recurse(n - 1);
+  if (child !== child) return child;
+  return 1;
+}
+console.log(recurse(4) !== nan);
+let hits = 0;
+for (let i = 0; i < 100; i++) {
+  if (nan !== nan) hits += 1;
+  if (inf === inf) hits += 1;
+}
+console.log(hits);
+`;
+
 export function hostFor(body) {
   const files = new Map([
     [path.resolve("tsnonfiniteinit.ts"), body],
@@ -96,7 +121,7 @@ export function expectedFor(body) {
 }
 
 export function prepare() {
-  return [source, importedSource, barrierSource].map(body => ({
+  return [source, importedSource, barrierSource, equalitySource].map(body => ({
     report: compileFile("tsnonfiniteinit.ts", hostFor(body)), expected: expectedFor(body),
   })).concat({
     report: compileFile("tsnonfiniteinit.ts", hostFor(concurrentSource)),

@@ -1440,11 +1440,14 @@ impl Gen<'_, '_> {
                     let b = self.numeric(b, &mut Vec::new()).unwrap();
                     let a = self.numeric_value(a);
                     let b = self.numeric_value(b);
-                    if self.engine.program.semantics == RuntimeSemantics::Kitten4
-                        && matches!(op, Binary::Eq | Binary::Ne)
+                    if matches!(
+                        self.engine.program.semantics,
+                        RuntimeSemantics::Kitten4 | RuntimeSemantics::KnCurrent
+                    ) && matches!(op, Binary::Eq | Binary::Ne)
                     {
-                        // Official Y+p1 (lodash isEqual): NaN equals NaN in
-                        // value comparisons, unlike numeric arithmetic Eq.
+                        // Official K4 Y+p1 and KN's base-domain equality:
+                        // NaN equals NaN in value comparisons, unlike numeric
+                        // arithmetic Eq. See docs/kn-r3-text.md for KN evidence.
                         let equal = self.b.ins().fcmp(FloatCC::Equal, a, b);
                         let nan_a = self.b.ins().fcmp(FloatCC::Unordered, a, a);
                         let nan_b = self.b.ins().fcmp(FloatCC::Unordered, b, b);

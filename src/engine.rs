@@ -44,6 +44,7 @@ mod kn_local;
 mod kn_objects;
 mod kn_panel;
 mod kn_services;
+mod kn_text;
 mod kn_warp;
 mod legacy_costume;
 pub use kn_panel::{GlobalAnimationRequest, PanelNotice};
@@ -2241,6 +2242,16 @@ impl Compiler {
             "logic_to_boolean" => ValueExpr::Boolean(self.value(input(b, "VALUE")?)?),
             // 参考 HateNeko 0.7.1 的 rt/impl/js.lua::atob/btoa/parseInt/parseFloat。
             "atob" => ValueExpr::Decode64(self.value(input(b, "encoded")?)?),
+            "String.toLowerCase" | "String.toUpperCase"
+                if self.program.semantics == RuntimeSemantics::KnCurrent =>
+            {
+                let value = if let Some(value) = b["inputs"].get("CONSTRUCTOR") {
+                    self.value(value)?
+                } else {
+                    self.push_constant(Cell::Undefined)
+                };
+                ValueExpr::KnTextCase(value, b["type"] == "String.toUpperCase")
+            }
             "btoa" => ValueExpr::Encode64(self.value(input(b, "data")?)?),
             "parseFloat" => ValueExpr::ParseFloat(self.value(input(b, "str")?)?),
             "parseInt" => {
@@ -2563,7 +2574,9 @@ impl Compiler {
                     self.program.strings.push(field(b, "TEXT").into());
                     parts.push(TextPart::Literal(index));
                 }
-                Some("text_join") => {
+                // KN joins stop at undefined independently at each nesting
+                // level. Flattening into text parts loses those boundaries.
+                Some("text_join") if self.program.semantics != RuntimeSemantics::KnCurrent => {
                     let mut inputs = b["inputs"]
                         .as_object()
                         .into_iter()
@@ -2923,6 +2936,8 @@ impl Compiler {
             | "_variable_get"
             | "logic_to_boolean"
             | "atob"
+            | "String.toLowerCase"
+            | "String.toUpperCase"
             | "btoa"
             | "parseInt"
             | "parseFloat"
@@ -8274,6 +8289,7 @@ impl Engine {
             | ValueExpr::IsNumber(i, _)
             | ValueExpr::Encode64(i)
             | ValueExpr::Decode64(i)
+            | ValueExpr::KnTextCase(i, _)
             | ValueExpr::ParseFloat(i)
             | ValueExpr::K4Screen(i, _) => children.push((true, i)),
             ValueExpr::Contains(a, b)
@@ -8408,7 +8424,10 @@ impl Engine {
                 let a = self.eval_value(a, actor);
                 let b = self.eval_value(b, actor);
                 let valid = |v: &Cell| {
-                    !matches!(v, Cell::Null) && !matches!(v, Cell::Number(n) if n.is_nan())
+                    !matches!(v, Cell::Null)
+                        && !(self.program.semantics == RuntimeSemantics::KnCurrent
+                            && matches!(v, Cell::Undefined))
+                        && !matches!(v, Cell::Number(n) if n.is_nan())
                 };
                 Cell::Bool(valid(&a) && valid(&b) && a.text().contains(&b.text()))
             }
@@ -8538,14 +8557,14 @@ impl Engine {
                         let b = self
                             .eval_value(self.program.value_args[parts.start as usize + 1], actor);
                         if self.program.semantics == RuntimeSemantics::KnCurrent
-                            && matches!(b, Cell::Undefined)
+                            && matches!(b, Cell::Null | Cell::Undefined)
                         {
                             return self.concat_text(&a, &Cell::Null);
                         }
                         return self.concat_text(&a, &b);
                     }
                     let stopped = self.program.semantics == RuntimeSemantics::KnCurrent
-                        && matches!(a, Cell::Undefined);
+                        && matches!(a, Cell::Null | Cell::Undefined);
                     let mut text = String::new();
                     if !stopped {
                         self.append_join_text(&mut text, &a);
@@ -8556,7 +8575,7 @@ impl Engine {
                         return Cell::Text("".into());
                     }
                     if self.program.semantics != RuntimeSemantics::KnCurrent
-                        || !matches!(b, Cell::Undefined)
+                        || !matches!(b, Cell::Null | Cell::Undefined)
                     {
                         self.append_join_text(&mut text, &b);
                     }
@@ -8568,7 +8587,7 @@ impl Engine {
                     let part = self.program.value_args[k as usize];
                     let value = self.eval_value(part, actor);
                     if self.program.semantics == RuntimeSemantics::KnCurrent
-                        && matches!(value, Cell::Undefined)
+                        && matches!(value, Cell::Null | Cell::Undefined)
                     {
                         stopped = true;
                     }
@@ -8697,6 +8716,14 @@ impl Engine {
                 let a = self.eval_value(a, actor);
                 let b = self.eval_value(b, actor);
                 let equal = || {
+                    // Official KN crc_libs.a21338b6.js:819970 delegates EQ
+                    // to its equality helper: numeric NaN equals numeric NaN.
+                    // Keep list search's strict Cell::equals unchanged.
+                    if self.program.semantics == RuntimeSemantics::KnCurrent
+                        && matches!((&a, &b), (Cell::Number(a), Cell::Number(b)) if a.is_nan() && b.is_nan())
+                    {
+                        return true;
+                    }
                     if self.program.semantics == RuntimeSemantics::Kitten4
                         || matches!((&a, &b), (Cell::Object(_), Cell::Object(_)))
                     {
@@ -8737,6 +8764,7 @@ impl Engine {
             | ValueExpr::Ranking(..)
             | ValueExpr::Encode64(..)
             | ValueExpr::Decode64(..)
+            | ValueExpr::KnTextCase(..)
             | ValueExpr::ParseFloat(..)
             | ValueExpr::ParseInt(..)
             | ValueExpr::K4Screen(..)

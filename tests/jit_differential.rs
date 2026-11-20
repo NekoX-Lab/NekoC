@@ -700,7 +700,8 @@ fn hot_private_nan_and_list_equality_respects_runtime_semantics() {
                 json!({"type":"logic_compare","fields":{"OP":"EQ"},"inputs":{"A":get("left"),"B":get("right")}}),
             ),
             // Branch uses ExprOp::Truth/native truth_tree, unlike assigning a
-            // comparison Cell. K4 treats NaN as equal to itself in both paths.
+            // comparison Cell. Both runtimes treat numeric NaN as equal to
+            // itself (KN official evidence: docs/kn-r3-text-playback.json).
             json!({"type":"controls_if","inputs":{"IF0":{"type":"logic_compare","fields":{"OP":"EQ"},"inputs":{"A":get("private"),"B":get("private")}}},"statements":{"DO0":{
                 "type":"change_variables","fields":{"variable":"out"},"inputs":{"value":num(1.0)}
             }}}),
@@ -714,15 +715,15 @@ fn hot_private_nan_and_list_equality_respects_runtime_semantics() {
                 json!({"id":id,"isGlobal":true,"value":[[1,2],true,"12"]});
         }
         let vm = compare_hot(&p, None);
-        for id in ["compared", "typed_compared"] {
-            assert_eq!(
-                vm.variable_text(id),
-                if k4 { "true" } else { "false" },
-                "k4={k4}, {id}"
-            );
-        }
-        assert_eq!(vm.variable_text("out"), if k4 { "900" } else { "0" });
-        assert_eq!(vm.variable_text("after"), if k4 { "0" } else { "900" });
+        assert_eq!(vm.variable_text("compared"), "true", "k4={k4}, NaN");
+        // Distinct lists still use identity in KN and structural equality in K4.
+        assert_eq!(
+            vm.variable_text("typed_compared"),
+            if k4 { "true" } else { "false" },
+            "k4={k4}, lists"
+        );
+        assert_eq!(vm.variable_text("out"), "900", "k4={k4}, EQ branch");
+        assert_eq!(vm.variable_text("after"), "0", "k4={k4}, NEQ branch");
     }
 }
 
