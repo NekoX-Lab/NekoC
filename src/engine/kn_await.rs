@@ -106,6 +106,20 @@ impl Compiler {
             .into_iter()
             .flat_map(|m| m.keys().cloned())
             .collect();
+        if matches!(
+            kind,
+            "bcm_translator_text_return_boolean_block" | "bcm_translator_text_return_value_block"
+        ) {
+            // These dynamic placeholders use Object.keys, not ADD suffix order.
+            // Keep the same order when a child suspends for a device Promise.
+            keys.sort_by_key(|key| {
+                key.parse::<u32>()
+                    .ok()
+                    .filter(|&i| i != u32::MAX && i.to_string() == *key)
+                    .map_or((1, 0), |i| (0, i))
+            });
+            return Ok(keys);
+        }
         let order: &[&str] = match kind {
             "math_arithmetic" | "logic_compare" | "logic_operation" => &["A", "B"],
             "logic_ternary" => &["condition", "ifTrue", "ifFalse"],

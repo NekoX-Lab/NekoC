@@ -15,6 +15,8 @@ pub(super) enum Command {
 
 #[derive(Clone, Copy, Debug)]
 pub(super) enum Reporter {
+    /// Legacy conversion placeholder: evaluate dynamic inputs, then false/NaN.
+    ConversionPlaceholder(usize, bool),
     Translate(usize, usize),
     Ranking(Option<usize>),
     Classifier(Option<usize>, bool),
@@ -23,6 +25,7 @@ pub(super) enum Reporter {
 impl Reporter {
     pub(super) fn children(self) -> Vec<usize> {
         match self {
+            Self::ConversionPlaceholder(inputs, _) => vec![inputs],
             Self::Translate(a, b) => vec![a, b],
             Self::Ranking(i) => i.into_iter().collect(),
             Self::Classifier(i, _) => i.into_iter().collect(),
@@ -139,6 +142,24 @@ impl Compiler {
 
     pub(super) fn kn_panel_reporter(&mut self, b: &Value) -> Result<Reporter> {
         Ok(match b["type"].as_str().unwrap_or("") {
+            "bcm_translator_text_return_boolean_block"
+            | "bcm_translator_text_return_value_block" => {
+                ensure!(
+                    b["disabled"] != true,
+                    "KN conversion placeholder: disabled_param at {}",
+                    b["id"]
+                );
+                // Official compile_params evaluates dynamic sockets in object
+                // order even though these handlers ignore their arguments.
+                // Evidence: docs/kn-r3-translator-evidence.md.
+                let inputs = self.array_literal(b)?;
+                let index = self.program.values.len();
+                self.program.values.push(inputs);
+                Reporter::ConversionPlaceholder(
+                    index,
+                    b["type"] == "bcm_translator_text_return_boolean_block",
+                )
+            }
             "translate_result" => Reporter::Translate(
                 self.kn_panel_arg(b, "text")?,
                 self.kn_panel_arg(b, "language")?,
@@ -169,6 +190,14 @@ impl Compiler {
 impl Engine {
     pub(super) fn eval_kn_panel(&mut self, reporter: Reporter, actor: usize) -> Cell {
         match reporter {
+            Reporter::ConversionPlaceholder(inputs, boolean) => {
+                self.eval_value(inputs, actor);
+                if boolean {
+                    Cell::Bool(false)
+                } else {
+                    Cell::Number(f64::NAN)
+                }
+            }
             Reporter::Translate(text, language) => {
                 let text = self.eval_value(text, actor);
                 let _ = self.eval_value(language, actor);
