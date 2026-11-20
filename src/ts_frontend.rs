@@ -199,6 +199,16 @@ pub fn test_ts(input: impl AsRef<Path>) -> Result<()> {
     Ok(())
 }
 
+/// Capture the test runner's streams for the CLI's JSON output mode.
+pub fn test_ts_output(input: impl AsRef<Path>) -> Result<std::process::Output> {
+    let script = frontend_script("test-ts.mjs")?;
+    Command::new("node")
+        .arg(&script)
+        .arg(input.as_ref())
+        .output()
+        .with_context(|| node_error(&script))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

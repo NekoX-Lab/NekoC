@@ -17,6 +17,14 @@ pub struct Args {
 }
 
 pub fn run(args: Args) -> Result<()> {
+    run_with_report(args, |report| {
+        println!("{}", serde_json::to_string(report)?);
+        Ok(())
+    })
+}
+
+/// Let CLI callers collect results without mixing progress text into JSON.
+pub fn run_with_report(args: Args, mut emit: impl FnMut(&Value) -> Result<()>) -> Result<()> {
     let mut reports = vec![];
     for file in args.files {
         let (result, timings) = nekoc::import_perf::measure(|| -> Result<Value> {
@@ -101,7 +109,7 @@ pub fn run(args: Args) -> Result<()> {
         });
         let mut report = result?;
         report["timings_ms"] = json!(timings);
-        println!("{}", serde_json::to_string(&report)?);
+        emit(&report)?;
         reports.push(report);
     }
     if let Some(out) = args.out {
