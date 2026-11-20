@@ -5,7 +5,8 @@ use super::Engine;
 impl Engine {
     /// Both official brushes test stored coordinates for JS truthiness. With
     /// either coordinate zero a repeated pen-down draws another dot; away from
-    /// the axes it is idempotent. A down brush's stored origin is its position.
+    /// the axes it is idempotent. KN also registers another change callback
+    /// whenever this returns true. A down brush's stored origin is its position.
     pub(super) fn canvas_pen_down_draws(&self, actor: usize) -> bool {
         let a = &self.sprites[actor];
         !a.pen || a.x == 0.0 || a.y == 0.0 || a.x.is_nan() || a.y.is_nan()

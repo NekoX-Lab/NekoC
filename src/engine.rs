@@ -595,6 +595,9 @@ pub struct Sprite {
     stage: bool,
     #[serde(skip)]
     pen: bool,
+    /// KN axis re-downs register additional change callbacks on the same brush.
+    #[serde(skip)]
+    pen_listeners: usize,
     #[serde(skip)]
     color: [f32; 4],
     #[serde(skip)]
@@ -1395,6 +1398,7 @@ impl Program {
                 scene: scene_index,
                 stage: true,
                 pen: false,
+                pen_listeners: 0,
                 fill_color: None,
                 fill_path: None,
                 color: [0.0, 0.0, 0.0, 1.0],
@@ -1458,6 +1462,7 @@ impl Program {
                     scene: scene_index,
                     stage: false,
                     pen: false,
+                    pen_listeners: 0,
                     fill_color: None,
                     fill_path: None,
                     color: [0.0, 0.0, 0.0, 1.0],
@@ -7851,6 +7856,7 @@ impl Engine {
             sprite.y = if y.is_nan() { 0.0 } else { y };
         }
         sprite.pen = false;
+        sprite.pen_listeners = 0;
         sprite.fill_path = None;
         if split.is_some() {
             // Official clone-state.bcm: a fresh brush, not a copy of the source.
@@ -8864,26 +8870,39 @@ impl Engine {
                 self.value_error = Some("pen path exceeds 65536 points".into());
             }
         }
+        let repeats = if self.program.semantics == RuntimeSemantics::Kitten4 {
+            1
+        } else {
+            self.sprites[actor].pen_listeners
+        };
+        self.pen_line(actor, old, repeats);
+    }
+    fn pen_line(&mut self, actor: usize, old: (f64, f64), repeats: usize) {
         let a = &self.sprites[actor];
         if a.pen
             && [old.0, old.1, a.x, a.y, a.size]
                 .iter()
                 .all(|v| v.is_finite() && v.abs() <= 1e9)
         {
-            self.lines.extend_from_slice(&[
-                old.0 as f32,
-                old.1 as f32,
-                a.x as f32,
-                a.y as f32,
-                a.size as f32,
-                a.color[0],
-                a.color[1],
-                a.color[2],
-                a.color[3],
-            ]);
-            if self.program.uses_color {
-                let (to, size, color) = ((a.x, a.y), a.size, a.color);
-                self.raster_canvas_line(old, to, size, color);
+            let (to, size, color) = ((a.x, a.y), a.size, a.color);
+            for callback in 0..repeats {
+                // Each official callback updates the shared origin. Later
+                // callbacks therefore draw a zero-length dot at the endpoint.
+                let from = if callback == 0 { old } else { to };
+                self.lines.extend_from_slice(&[
+                    from.0 as f32,
+                    from.1 as f32,
+                    to.0 as f32,
+                    to.1 as f32,
+                    size as f32,
+                    color[0],
+                    color[1],
+                    color[2],
+                    color[3],
+                ]);
+                if self.program.uses_color {
+                    self.raster_canvas_line(from, to, size, color);
+                }
             }
         }
     }
@@ -9434,8 +9453,19 @@ impl Engine {
             Op::Pen(down) => {
                 let draws = down && self.canvas_pen_down_draws(actor);
                 self.sprites[actor].pen = down;
+                if !down {
+                    self.sprites[actor].pen_listeners = 0;
+                } else if draws && self.program.semantics != RuntimeSemantics::Kitten4 {
+                    self.sprites[actor].pen_listeners += 1;
+                }
                 if draws {
-                    self.line(actor, old);
+                    // Registering another callback still draws only one
+                    // immediate point; multiplicity applies to later changes.
+                    if self.program.semantics == RuntimeSemantics::Kitten4 {
+                        self.line(actor, old);
+                    } else {
+                        self.pen_line(actor, old, 1);
+                    }
                 }
             }
             Op::FillColor(color) => {

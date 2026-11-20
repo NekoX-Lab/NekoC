@@ -18,6 +18,20 @@ test('r3-knpen official evidence covers real brush deltas and all authored cases
   assert.deepEqual(sample('alpha-endpoints', -120, 30), [32,64,96,224]);
   assert.equal(sample('repeated-down-zero', 0, 0)[3], 192);
   assert.equal(sample('repeated-down-nonzero', -120, 30)[3], 128);
+  for(const name of ['double-origin-move','double-x-axis-move','double-y-axis-move','double-two-moves','double-clear-move'])
+    assert.equal(sample(name,100,60)[3],192,name);
+  assert.equal(sample('triple-origin-move',100,60)[3],224);
+  assert.equal(sample('double-nonzero-move',100,60)[3],128);
+  assert.equal(sample('double-up-move',100,60)[3],0);
+  assert.equal(sample('double-up-redown-move',100,60)[3],128);
+  const life=evidence.lifecycle;
+  assert.deepEqual([life.triple.listeners,life.up.listeners,life.redown.listeners,life.clear.listeners],[3,0,1,1]);
+  assert.deepEqual(life.clear,life.redown);
+  assert.deepEqual(life.cloneFresh,{origin:[null,null],listeners:0});
+  assert.equal(life.sourceAfterClone.listeners,2);
+  assert.equal(life.cloneMovedUp,0);
+  assert.ok(life.restartQueued && life.restartProcessed && life.actorRecreated);
+  assert.deepEqual(life.restarted,{origin:[null,null],listeners:0});
   for(const name of ['alpha-endpoints','alpha-corner','colours-crossing','clear-while-down']){
     const d=evidence.visual.find(c=>c.name===name).differences;
     assert.ok(d.after.absoluteAlphaError<d.before.absoluteAlphaError, name);

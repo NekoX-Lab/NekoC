@@ -121,7 +121,16 @@ test('r3-render K4 image raster keys include subpixels and actual resolution',()
 test('r3-render pixels match frozen renderer for clones, stamps, eviction, resolution and transitions',{
   skip:!process.env.NEKOC_R3_RENDER_BROWSER,timeout:240000,
 },async()=>{
-  const sources={'/baseline.js':baseline,'/renderer.js':await readFile('web/renderer.js','utf8'),'/pen-k4.js':await readFile('web/pen-k4.js','utf8')};
+  const currentSource=await readFile('web/renderer.js','utf8');
+  // KN intentionally gained origin-disk compositing after round 11. Compare
+  // batching/cache changes with that same KN shader on both sides, not with
+  // the obsolete capsule. K4 never uses this shader and stays byte-exact to
+  // its original source. Keep the unmodified historical hash assertion above.
+  const knShader=/const PEN_FRAGMENT = `[\s\S]*?`;/g;
+  const currentKn=currentSource.match(knShader),baselineKn=baseline.match(knShader);
+  assert.equal(currentKn?.length,1);assert.equal(baselineKn?.length,1);
+  const comparisonBaseline=baseline.replace(knShader,()=>currentKn[0]);
+  const sources={'/baseline.js':comparisonBaseline,'/renderer.js':currentSource,'/pen-k4.js':await readFile('web/pen-k4.js','utf8')};
   const server=createServer((req,res)=>{res.setHeader('Content-Type',sources[req.url]?'application/javascript':'text/html');res.end(sources[req.url]??'<!doctype html>');});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));let browser;
   try{

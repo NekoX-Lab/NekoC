@@ -38,6 +38,7 @@ impl Sprite {
             scene: self.scene,
             stage: self.stage,
             pen: self.pen,
+            pen_listeners: 0,
             color: self.color,
             hsv: self.hsv,
             size: self.size,
@@ -68,6 +69,7 @@ mod tests {
         assert!(frame.styles.is_empty());
         assert!(frame.variables.is_empty());
         assert!(frame.fill_path.is_none());
+        assert_eq!(frame.pen_listeners, 0);
         assert!(matches!(frame.camp, RoleCamp::Unset));
         assert_eq!(frame.flip_x, source.flip_x);
         assert_eq!(frame.flip_y, source.flip_y);
@@ -141,6 +143,7 @@ mod tests {
         source.variables.insert(23, Cell::List(list.clone()));
         source.scene = 3;
         source.pen = true;
+        source.pen_listeners = 3;
         source.color = [0.1, 0.2, 0.3, 0.4];
         source.hsv = [120.0, 0.25, 0.75];
         source.size = 9.0;
@@ -156,6 +159,7 @@ mod tests {
         assert_eq!(ordinary.styles, source.styles);
         assert!(matches!(&ordinary.camp, RoleCamp::Custom(id) if id == "custom-camp"));
         assert_eq!(ordinary.fill_path, source.fill_path);
+        assert_eq!(ordinary.pen_listeners, source.pen_listeners);
         assert!(
             matches!(ordinary.variables.get(&23), Some(Cell::List(value)) if Rc::ptr_eq(value, &list))
         );

@@ -84,7 +84,7 @@ try {
         call('self_set_pen_color', { color: '#000000' }); call('self_set_pen_color_property', { scope: 'alpha', val: 0 });
         call('self_set_pen_size', { size: 1 }); lines = [];
         for (const [name, args] of c.commands) { call(name, args); if (name === 'clear_drawing') lines = []; }
-        const samples = [[-120,30],[-70,30],[-20,30],[-11,30],[-120,0],[0,30],[0,0],[-20,65]].map(([x,y]) =>
+        const samples = [[-120,30],[-70,30],[-20,30],[-11,30],[-120,0],[0,30],[0,0],[-20,65],[50,60],[100,60]].map(([x,y]) =>
           ({ x, y, rgba: [...ctx.getImageData(ctx.canvas.width / 2 + x, ctx.canvas.height / 2 - y, 1, 1).data] }));
         results.push({ name: c.name, lines, samples, png: ctx.canvas.toDataURL() });
       }
@@ -145,6 +145,34 @@ try {
   }, { cases: report.cases, frames, stageSize: report.inspect.stageSize });
   for (const c of report.cases) { await fs.writeFile(`${out}/${prefix}-${c.name}-official.png`, Buffer.from(c.png.split(',')[1], 'base64')); delete c.png; }
   for (const c of report.visual) { await fs.writeFile(`${out}/${prefix}-${c.name}-comparison.png`, Buffer.from(c.png.split(',')[1], 'base64')); delete c.png; }
+  report.lifecycle = await page.evaluate(() => {
+    const id = Object.keys(window.__penBcm.getBcm().actors.actorsDict)[0];
+    const actor = window.__penStage.getStageTarget(id), brush = actor.get_brush();
+    const state = a => { const b = a.get_brush(); return {
+      origin: [b.origin_x ?? null, b.origin_y ?? null],
+      listeners: a.listeners('change').filter(f => f === b.update_pen_on_change).length,
+    }; };
+    brush.set_pen_up(); actor.set_position(0, 0);
+    brush.set_pen_down(); brush.set_pen_down(); brush.set_pen_down();
+    const triple = state(actor); brush.set_pen_up(); const up = state(actor);
+    actor.set_position(-120, -30); brush.set_pen_down();
+    const redown = state(actor); brush.clear(); const clear = state(actor);
+    brush.set_pen_up(); actor.set_position(0, 0); brush.set_pen_down(); brush.set_pen_down();
+    const clone = actor.clone('r3-knpen-lifecycle-clone');
+    const cloneFresh = state(clone), sourceAfterClone = state(actor);
+    const cb = clone.get_brush(), original = cb.draw_line; let cloneDraws = 0;
+    cb.draw_line = function(x, y) { cloneDraws++; return original.call(this, x, y); };
+    clone.set_position(50, -60); const cloneMovedUp = cloneDraws;
+    cb.draw_line = original; clone.destroy();
+    // restart() merely sets a flag. Process update() before observing the new
+    // stage actor; a synchronous stop/start observation is not restart proof.
+    const manager = window.__penRuntime.get_instance().getHeart().runtimeManager.run_mgr;
+    manager.restart(); const restartQueued = manager.just_restart; manager.update();
+    const restartedActor = window.__penStage.getStageTarget(id);
+    return { triple, up, redown, clear, cloneFresh, sourceAfterClone, cloneMovedUp,
+      restartQueued, restartProcessed: !manager.just_restart,
+      actorRecreated: restartedActor !== actor, restarted: state(restartedActor) };
+  });
   if (process.argv.includes('--record')) {
     if (report.errors.length || !frames || !player) throw Error('Record requires error-free player observations with real VM deltas');
     const evidence = { ...report, inspect: { stageSize: report.inspect.stageSize, version: report.inspect.version },
