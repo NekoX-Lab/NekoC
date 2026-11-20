@@ -146,6 +146,43 @@ test("r2-tsobject: fresh scalar slots may use explicit union types without creat
     console.log(String(object.value) + 2);`);
 });
 
+for (const [shape, annotation, literal, update, output] of [
+  ["empty array field", "{xs: number[]}", "{xs: []}", "p.xs.push(1);", "p.xs[0]"],
+  ["nested fresh object", "{child: {value: number | string}}", "{child: {value: 1}}", 'p.child.value = "x";', "String(p.child.value) + 2"],
+  ["fresh object array", "{value: number | string}[]", "[{value: 1}]", 'p[0].value = "x";', "String(p[0].value) + 2"],
+  ["parenthesized object", "{value: number | string}", "(({value: 1}))", 'p.value = "x";', "String(p.value) + 2"],
+  ["wrapped empty array", "{xs: number[]}", "({xs: (([])!)})", "p.xs.push(1);", "p.xs[0]"],
+  ["satisfies object", "{value: number | string}", "({value: 1} satisfies {value: number | string})", 'p.value = "x";', "String(p.value) + 2"],
+]) {
+  for (const context of ["declaration", "argument", "assignment", "return"]) {
+    test(`r2-tsobject review: ${shape} stays fresh in ${context}`, () => {
+      const use = `${update} console.log(${output});`;
+      const source = context === "declaration" ? `const p: ${annotation} = ${literal}; ${use}`
+        : context === "argument" ? `function use(p: ${annotation}) { ${use} } use(${literal});`
+        : context === "return" ? `function make(): ${annotation} { return ${literal}; } const p = make(); ${use}`
+        : `let p: ${annotation} = ${literal}; p = ${literal}; ${use}`;
+      assertJsLogs(source);
+    });
+  }
+}
+
+for (const [name, setup, annotation, value] of [
+  ["empty array alias", "const xs = [];", "{xs: number[]}", "{xs}"],
+  ["array alias", "const xs = [1];", "{xs: (number | string)[]}", "{xs}"],
+  ["nested object alias", "const child = {value: 1};", "{child: {value: number | string}}", "{child: (child)}"],
+  ["array element alias", "const child = {value: 1};", "{value: number | string}[]", "[(child)]"],
+  ["mixed fresh and alias", "const child = {value: 1};", "{value: number | string}[]", "[{value: 1}, child]"],
+]) {
+  for (const context of ["declaration", "argument", "return"]) {
+    test(`r2-tsobject review: ${name} is not fresh in ${context}`, () => {
+      const source = context === "declaration" ? `${setup}\nconst p: ${annotation} = ${value};`
+        : context === "argument" ? `function use(p: ${annotation}) {} ${setup}\nuse(${value});`
+        : `${setup}\nfunction make(): ${annotation} { return ${value}; } console.log(make().length);`;
+      assertRejected(source, /shape.*scalar|scalar.*shape/i, 2);
+    });
+  }
+}
+
 for (const [name, source, message] of [
   ["dynamic read", 'const p = {value: 1}; let key = "value";\nconsole.log(p[key]);', /dynamic object keys/i],
   ["dynamic write", 'const p = {value: 1}; let key = "value";\np[key] = 2;', /dynamic object keys/i],
@@ -153,4 +190,47 @@ for (const [name, source, message] of [
   ["object coercion", 'const p = {value: 1};\nconsole.log(String(p));', /coercion/i],
 ]) {
   test(`r2-tsobject: ${name} reports its user source line`, () => assertRejected(source, message, 2));
+}
+
+for (const [name, annotation, literal, output] of [
+  ["empty tuple", "[]", "[]", "p.length"],
+  ["required object", "[{value: number}]", "[{value: 1}]", "p[0].value"],
+  ["zero rest elements", "[{value: number}, ...{value: number}[]]", "[{value: 1}]", "p[0].value"],
+  ["multiple rest elements", "[{value: number}, ...{value: number}[]]", "[{value: 1}, {value: 2}, {value: 3}, {value: 4}]", "p[3].value"],
+  ["optional rest omitted", "[{value: number}?, ...{value: number}[]]", "[]", "p.length"],
+  ["optional rest supplied", "[{value: number}?, ...{value: number}[]]", "[{value: 1}, {value: 2}, {value: 3}]", "p[2].value"],
+  ["rest with required suffix", "[...{value: number}[], {last: number}]", "[{value: 1}, {value: 2}, {last: 3}]", "p.length"],
+  ["zero rest before suffix", "[...{value: number}[], {last: number}]", "[{last: 3}]", "p.length"],
+]) {
+  for (const context of ["declaration", "argument", "assignment", "return"]) {
+    test(`r2-tsobject tuple review: ${name} in ${context}`, () => {
+      const use = `console.log(${output});`;
+      const source = context === "declaration" ? `const p: ${annotation} = ${literal}; ${use}`
+        : context === "argument" ? `function use(p: ${annotation}) { ${use} } use(${literal});`
+        : context === "return" ? `function make(): ${annotation} { return ${literal}; } const p = make(); ${use}`
+        : `let p: ${annotation} = ${literal}; p = ${literal}; ${use}`;
+      assertJsLogs(source);
+    });
+  }
+}
+
+for (const [name, annotation, literal] of [
+  ["missing required object", "[{value: number}]", "[]"],
+  ["missing second object", "[{value: number}, {value: number}]", "[{value: 1}]"],
+  ["missing required before rest", "[{value: number}, ...{value: number}[]]", "[]"],
+  ["missing required suffix", "[...{value: number}[], {last: number}]", "[]"],
+  ["nested missing object", "{xs: [{value: number}]}", "{xs: []}"],
+  ["too many fixed elements", "[{value: number}]", "[{value: 1}, {value: 2}]"],
+  ["narrow alias in rest", "[{value: number | string}, ...{value: number | string}[]]", "[{value: 1}, {value: 2}, existing]"],
+]) {
+  for (const context of ["declaration", "argument", "assignment", "return"]) {
+    test(`r2-tsobject tuple review: rejects ${name} in ${context}`, () => {
+      const setup = "const existing = {value: 1};";
+      const source = context === "declaration" ? `${setup}\nconst p: ${annotation} = ${literal};`
+        : context === "argument" ? `${setup}\nfunction use(p: ${annotation}) {} use(${literal});`
+        : context === "return" ? `${setup}\nfunction make(): ${annotation} { return ${literal}; }`
+        : `${setup}\nfunction use(p: ${annotation}) { p = ${literal}; }`;
+      assertRejected(source, /shape.*scalar|scalar.*shape/i, 2);
+    });
+  }
 }
