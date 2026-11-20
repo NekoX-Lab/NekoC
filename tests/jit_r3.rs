@@ -81,9 +81,24 @@ struct Drawing {
 }
 
 fn compare(p: &Value, budget: usize, profile: bool, error: Option<&str>) -> (Engine, Drawing) {
-    let mut a = Engine::new(Program::compile(p).unwrap());
+    compare_with_raster(p, budget, profile, error, false)
+}
+
+fn compare_with_raster(
+    p: &Value,
+    budget: usize,
+    profile: bool,
+    error: Option<&str>,
+    raster: bool,
+) -> (Engine, Drawing) {
+    let compile = || {
+        let mut program = Program::compile(p).unwrap();
+        program.uses_color |= raster;
+        program
+    };
+    let mut a = Engine::new(compile());
     a.disable_jit();
-    let mut b = Engine::new(Program::compile(p).unwrap());
+    let mut b = Engine::new(compile());
     if profile {
         b.enable_jit_profile();
     }
@@ -341,6 +356,48 @@ fn hot_drawing_procedure_still_rejects_stage_context() {
                 }),
             );
             assert_eq!(vm.variable_text("after"), "900");
+        }
+    }
+}
+
+#[test]
+fn hot_raster_paths_clear_and_invalid_moves_preserve_tier_boundaries() {
+    for k4 in [false, true] {
+        for bad_position in [false, true] {
+            for budget in [17, 997, 1_000_000] {
+                let mut body = triangle();
+                // Unlike the invalid-start probe, fail while an open path is
+                // recording, after its PC and both drawing helpers became hot.
+                if bad_position {
+                    let x = json!({"type":"logic_ternary","inputs":{
+                        "condition":{"type":"logic_compare","fields":{"OP":"GT"},
+                            "inputs":{"A":get("tick"),"B":num(800.0)}},
+                        "ifTrue":num(1e10),"ifFalse":num(1.0)
+                    }});
+                    body.insert(
+                        body.len() - 1,
+                        json!({"type":"self_move_to","inputs":{"x":x,"y":num(0.0)}}),
+                    );
+                }
+                body.extend([json!({"type":"clear_drawing"}), pos(0.0, 0.0)]);
+                let (vm, _) = compare_with_raster(
+                    &project(body, 900, k4),
+                    budget,
+                    true,
+                    bad_position.then_some("invalid pen path position"),
+                    true,
+                );
+                assert_eq!(
+                    vm.variable_text("after"),
+                    if bad_position { "800" } else { "900" }
+                );
+                assert!(
+                    vm.jit_profile()["helper_reasons"]["op/FillColor"]
+                        .as_u64()
+                        .unwrap_or(0)
+                        > 0
+                );
+            }
         }
     }
 }
