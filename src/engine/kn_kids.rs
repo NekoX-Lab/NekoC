@@ -14,7 +14,7 @@ pub(super) enum Direction {
 pub(super) struct Motion {
     start: f64,
     last: f64,
-    duration: f64,
+    lifetime_ms: f64,
     distance: f64,
     origin: f64,
     horizontal: bool,
@@ -59,12 +59,14 @@ impl Engine {
         let motion = Motion {
             start: self.time,
             last: self.time,
-            duration: distance / 200.0,
+            // Preserve both JS operations, including underflow in seconds and
+            // overflow when TaskManager converts the lifetime to milliseconds.
+            lifetime_ms: (distance / 200.0) * 1000.0,
             distance: distance * sign,
             origin,
             horizontal,
         };
-        if motion.duration <= 0.0 {
+        if motion.lifetime_ms <= 0.0 {
             self.apply_kn_kids_motion(actor, &motion, motion.distance, false);
         } else {
             self.tasks[task].anim = Some(Anim::KidsMotion(motion));
@@ -75,6 +77,7 @@ impl Engine {
         // changeTargetPosition adds each task delta to the CURRENT coordinate;
         // its on_end snaps only the selected axis to the captured final value.
         let sprite = &mut self.sprites[actor];
+        let old = (sprite.x, sprite.y);
         let coordinate = if motion.horizontal {
             &mut sprite.x
         } else {
@@ -86,24 +89,43 @@ impl Engine {
             *coordinate + delta
         };
         self.dirty[actor] = true;
+        self.line(actor, old);
     }
 
-    pub(super) fn step_kn_kids_motion(
-        &mut self,
-        task: usize,
-        actor: usize,
-        mut motion: Motion,
-    ) -> bool {
-        let elapsed = (self.time - motion.start).max(0.0);
-        let done = elapsed >= motion.duration;
-        let dt = (self.time - motion.last).max(0.0);
-        self.apply_kn_kids_motion(actor, &motion, dt / motion.duration * motion.distance, done);
-        motion.last = self.time;
-        self.tasks[task].anim = if done {
-            None
-        } else {
-            Some(Anim::KidsMotion(motion))
-        };
-        done
+    /// Official step_code precedes TaskManager.update. Expiry queues disposal:
+    /// removing the animation here releases AnimStep only on the NEXT update.
+    pub(super) fn tick_kn_kids_motion(&mut self) -> Result<()> {
+        for index in 0..self.tasks.len() {
+            if self.tasks[index].done
+                || !matches!(self.tasks[index].anim, Some(Anim::KidsMotion(_)))
+            {
+                continue;
+            }
+            let Some(Anim::KidsMotion(mut motion)) = self.tasks[index].anim.take() else {
+                unreachable!();
+            };
+            let actor = self.tasks[index].actor;
+            if !self.sprites[actor].alive {
+                continue;
+            }
+            let elapsed_ms = (self.time - motion.start).max(0.0) * 1000.0;
+            let dt_ms = (self.time - motion.last).max(0.0) * 1000.0;
+            if elapsed_ms >= motion.lifetime_ms {
+                // TaskManager calls on_end INSTEAD OF on_tick at expiry.
+                self.apply_kn_kids_motion(actor, &motion, 0.0, true);
+            } else {
+                if dt_ms != 0.0 {
+                    let delta = dt_ms / motion.lifetime_ms * motion.distance;
+                    self.apply_kn_kids_motion(actor, &motion, delta, false);
+                }
+                motion.last = self.time;
+                self.tasks[index].anim = Some(Anim::KidsMotion(motion));
+            }
+            if let Some(error) = self.value_error.take() {
+                let pc = self.tasks[index].pc.saturating_sub(1);
+                bail!(error_location::at_block(&error, &self.program.sources[pc]));
+            }
+        }
+        Ok(())
     }
 }

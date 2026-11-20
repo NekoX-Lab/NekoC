@@ -10092,7 +10092,10 @@ impl Engine {
                 self.start_entity_visibility(index, actor, targets, duration, show);
             }
             Op::AnimStep => {
-                if matches!(self.tasks[index].anim, Some(Anim::Shake(_))) {
+                if matches!(
+                    self.tasks[index].anim,
+                    Some(Anim::Shake(_) | Anim::KidsMotion(_))
+                ) {
                     self.tasks[index].pc = pc;
                     return Ok(false);
                 }
@@ -10103,13 +10106,6 @@ impl Engine {
                 let Some(anim) = self.tasks[index].anim.clone() else {
                     return Ok(true);
                 };
-                if let Anim::KidsMotion(motion) = anim {
-                    if !self.step_kn_kids_motion(index, actor, motion) {
-                        self.tasks[index].pc = pc;
-                        return Ok(false);
-                    }
-                    return Ok(true);
-                }
                 let (start, duration) = match anim {
                     Anim::KidsMotion(_) => unreachable!("kids motion stepped above"),
                     Anim::Shake(_) => unreachable!("shake advances at frame end"),
@@ -10547,6 +10543,7 @@ impl Engine {
             }
         }
         self.tick_k4_shake();
+        self.tick_kn_kids_motion()?;
         self.tick_entity_visibility(dt);
         self.synchronize_soft_physics_geometry();
         // Rebase the round-robin cursor when finished tasks are compacted. Wait

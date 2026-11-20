@@ -82,6 +82,8 @@ fn kids_four_directions_use_25_pixel_units_and_block_only_their_script() {
             assert_eq!(vm.variable_value("after").number(), 0.0);
             tick(&mut vm, 0.125);
             assert_eq!(position(&vm, ACTOR), (10.0 + dx, 20.0 + dy));
+            assert_eq!(vm.variable_value("after").number(), 0.0);
+            tick(&mut vm, 0.0);
             assert_eq!(vm.variable_value("after").number(), 1.0);
         }
     }
@@ -159,9 +161,9 @@ fn kids_incremental_motion_preserves_concurrent_changes_until_final_snap() {
     );
     tick(&mut vm, 0.0);
     tick(&mut vm, 0.125);
-    assert_eq!(position(&vm, ACTOR), (100.0, 90.0));
-    tick(&mut vm, 0.125);
     assert_eq!(position(&vm, ACTOR), (125.0, 90.0));
+    tick(&mut vm, 0.125);
+    assert_eq!(position(&vm, ACTOR), (150.0, 90.0));
     tick(&mut vm, 0.25);
     assert_eq!(position(&vm, ACTOR), (110.0, 90.0));
 }
@@ -180,8 +182,11 @@ fn kids_fractional_steps_and_sequential_axes_keep_heading_and_restart_cleanly() 
     tick(&mut vm, 0.0625);
     assert_eq!(position(&vm, ACTOR), (22.5, 20.0));
     assert_eq!(vm.variable_value("after").number(), 0.0);
+    tick(&mut vm, 0.0); // Dispose first blocker, then launch the next axis.
     tick(&mut vm, 0.125);
     assert_eq!(position(&vm, ACTOR), (22.5, 45.0));
+    assert_eq!(vm.variable_value("after").number(), 0.0);
+    tick(&mut vm, 0.0);
     assert_eq!(vm.variable_value("after").number(), 1.0);
     assert_eq!(vm.debug_snapshot()["actors"][ACTOR]["direction"], heading);
     vm.start();
@@ -199,6 +204,138 @@ fn kids_missing_steps_and_unknown_siblings_remain_diagnostic() {
         json!({"type":"kids_future_move","inputs":{"steps":num(1.0)}}),
     ] {
         assert!(Program::compile(&project(vec![start(vec![block])])).is_err());
+    }
+}
+
+#[test]
+fn kids_task_phase_matches_official_concurrent_writer_and_disposal() {
+    for jit in [false, true] {
+        let p = project(vec![
+            start(vec![
+                movement("kids_move_right", num(2.0)),
+                set("after", num(1.0)),
+            ]),
+            start(vec![json!({"type":"repeat_forever","statements":{"DO":
+                json!({"type":"self_set_position_x","inputs":{"value":num(100.0)}})}})]),
+        ]);
+        let mut vm = engine(&p, jit);
+        // Same samples as the review's unchanged official RuntimeManager,
+        // TaskManager and movement helper: scripts, then tasks, next-update dispose.
+        for (dt, x, after) in [
+            (0.0, 100.0, 0.0),
+            (0.125, 125.0, 0.0),
+            (0.125, 60.0, 0.0),
+            (0.001, 100.0, 1.0),
+        ] {
+            tick(&mut vm, dt);
+            assert_eq!(position(&vm, ACTOR), (x, 20.0));
+            assert_eq!(vm.variable_value("after").number(), after);
+        }
+    }
+}
+
+#[test]
+fn kids_pen_records_immediate_incremental_and_final_snap_segments() {
+    for jit in [false, true] {
+        let mut vm = engine(
+            &project(vec![start(vec![
+                json!({"type":"self_pen_down"}),
+                movement("kids_move_right", num(-2.0)),
+            ])]),
+            jit,
+        );
+        let frame = vm.advance(0.0, 100_000, Duration::from_secs(2)).unwrap();
+        assert!(
+            frame
+                .lines
+                .as_chunks::<9>()
+                .0
+                .iter()
+                .any(|l| l[..4] == [10.0, 20.0, -40.0, 20.0])
+        );
+
+        let mut vm = engine(
+            &project(vec![
+                start(vec![
+                    json!({"type":"self_pen_down"}),
+                    movement("kids_move_right", num(2.0)),
+                ]),
+                start(vec![
+                    json!({"type":"wait","inputs":{"time":num(0.1)}}),
+                    json!({"type":"self_set_position_x","inputs":{"value":num(100.0)}}),
+                ]),
+            ]),
+            jit,
+        );
+        tick(&mut vm, 0.0);
+        let mid = vm.advance(0.125, 100_000, Duration::from_secs(2)).unwrap();
+        assert!(
+            mid.lines
+                .as_chunks::<9>()
+                .0
+                .iter()
+                .any(|l| l[..4] == [100.0, 20.0, 125.0, 20.0])
+        );
+        let end = vm.advance(0.125, 100_000, Duration::from_secs(2)).unwrap();
+        // At expiry on_end replaces on_tick: no extra overshoot segment.
+        assert_eq!(end.lines.len(), 9);
+        assert!(
+            end.lines
+                .as_chunks::<9>()
+                .0
+                .iter()
+                .any(|l| l[..4] == [125.0, 20.0, 60.0, 20.0])
+        );
+    }
+}
+
+#[test]
+fn kids_moves_record_fill_contours_even_with_pen_up() {
+    for jit in [false, true] {
+        let p = project(vec![start(vec![
+            json!({"type":"pen_begin_path"}),
+            movement("kids_move_right", num(-2.0)),
+            movement("kids_move_up", num(2.0)),
+            json!({"type":"pen_close_path"}),
+        ])]);
+        let mut vm = engine(&p, jit);
+        tick(&mut vm, 0.0);
+        tick(&mut vm, 0.125);
+        tick(&mut vm, 0.125);
+        let frame = vm.advance(0.0, 100_000, Duration::from_secs(2)).unwrap();
+        assert!(frame.lines.is_empty());
+        assert_eq!(frame.pen_fills.len(), 1);
+        assert_eq!(
+            frame.pen_fills[0].points,
+            vec![[10.0, 20.0], [-40.0, 20.0], [-40.0, 45.0], [-40.0, 70.0]]
+        );
+    }
+}
+
+#[test]
+fn kids_millisecond_lifetime_preserves_overflow_and_seconds_underflow() {
+    for jit in [false, true] {
+        let mut vm = engine(
+            &project(vec![start(vec![
+                movement("kids_move_right", num(2e306)),
+                set("after", num(1.0)),
+            ])]),
+            jit,
+        );
+        tick(&mut vm, 0.0);
+        tick(&mut vm, 0.125);
+        assert_eq!(position(&vm, ACTOR), (10.0, 20.0));
+        assert_eq!(vm.variable_value("after").number(), 0.0);
+        // The smallest distance survives, while distance / 200 underflows to 0.
+        let mut p = project(vec![start(vec![
+            movement("kids_move_right", num(1e-323)),
+            set("after", num(1.0)),
+        ])]);
+        p["actors"]["actorsDict"][ACTOR]["position"] = json!({"x":0,"y":0});
+        let mut vm = engine(&p, jit);
+        tick(&mut vm, 0.0);
+        assert_eq!(position(&vm, ACTOR).0, 1e-323 * 25.0);
+        assert_eq!(vm.variable_value("after").number(), 1.0);
     }
 }
 

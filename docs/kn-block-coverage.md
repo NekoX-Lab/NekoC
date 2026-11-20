@@ -298,7 +298,7 @@
 | 177 | `received_broadcast` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2124`<br>`src/engine.rs:2912` | T10, T50 | 有路径；完整语义未验证 |
 | 178 | `recognize_body_part` | 部分语义 | 可配置面板／默认隐藏 | `src/engine.rs:1994`<br>`src/engine.rs:2815` | T33 | 仅无检测结果时 false；检测后端未实现 |
 | 179 | `recognize_gesture` | 部分语义 | 可配置面板／默认隐藏 | `src/engine.rs:1994`<br>`src/engine.rs:2815` | T33 | 仅无检测结果时 false；检测后端未实现 |
-| 180 | `repeat_forever` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4878` | T10, T16, T23, T42, T47, T50, T59, T61 | 有路径；完整语义未验证 |
+| 180 | `repeat_forever` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4878` | T10, T16, T23, T42, T43, T47, T50, T59, T61 | 有路径；完整语义未验证 |
 | 181 | `repeat_forever_until` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4878` | T10, T46, T47, T50 | 有路径；完整语义未验证 |
 | 182 | `repeat_n_times` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4878` | T1, T6, T9, T10, T12, T13, T16, T17, T18, T21, T22, T23, T24, T25, T26, T27, T29, T30, T32, T33, T36, T45, T46, T47, T50, T58, T59, T60, T61 | 有路径；完整语义未验证 |
 | 183 | `replace_list_item` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4688` | T10, T16, T50, T54, T58, T63 | 有路径；完整语义未验证 |
@@ -335,7 +335,7 @@
 | 214 | `self_move_specify` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4169` | T50 | 有路径；完整语义未验证 |
 | 215 | `self_move_specify_sprite` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4169` | T50 | 有路径；完整语义未验证 |
 | 216 | `self_move_to` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4048` | T10, T11, T16, T17, T41, T43, T50 | 有路径；完整语义未验证 |
-| 217 | `self_pen_down` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4660` | T9, T10, T13, T16, T17, T50 | 有路径；完整语义未验证 |
+| 217 | `self_pen_down` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4660` | T9, T10, T13, T16, T17, T43, T50 | 有路径；完整语义未验证 |
 | 218 | `self_pen_up` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4661` | T10, T13, T17, T50 | 有路径；完整语义未验证 |
 | 219 | `self_point_towards` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4066` | T10, T20, T50 | 有路径；完整语义未验证 |
 | 220 | `self_prev_next_style` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4095` | T10, T50 | 有路径；完整语义未验证 |
@@ -346,7 +346,7 @@
 | 225 | `self_set_pen_color` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4766` | T10, T50 | 有路径；完整语义未验证 |
 | 226 | `self_set_pen_color_property` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4708` | T10, T17, T50 | 有路径；完整语义未验证 |
 | 227 | `self_set_pen_size` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4740`<br>`src/engine.rs:4765` | T10, T41, T50 | 有路径；完整语义未验证 |
-| 228 | `self_set_position_x` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4049` | T9, T10, T14, T16, T50, T62 | 有路径；完整语义未验证 |
+| 228 | `self_set_position_x` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4049` | T9, T10, T14, T16, T43, T50, T62 | 有路径；完整语义未验证 |
 | 229 | `self_set_position_y` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4050` | T10, T50 | 有路径；完整语义未验证 |
 | 230 | `self_set_role_camp` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4318` | T10, T50 | 有路径；完整语义未验证 |
 | 231 | `self_set_rotation_type` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4160` | T10, T50 | 有路径；完整语义未验证 |

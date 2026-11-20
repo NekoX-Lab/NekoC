@@ -79,6 +79,27 @@ SHA-256：`0be9bcf1696995dc1b7cc9f6d86c5abe9bbd0263641db17c5c24c388c0730885`。
 负数立即反向移动。增量式动画保留并发脚本的中间改动，结束时单轴校正。
 所有新增积木回归放在 `tests/kn_r2_blocks.rs`。
 
+### 复审修订：画笔、更新阶段与极值
+
+- 所有 kids 坐标变化都调用现有 `line(actor, old)`，记录笔迹、填充轮廓并
+  更新颜色碰撞栅格；包括负数即时移动、普通 tick 增量和最终位置校正。
+  官方 main 在 5438755 附近的坐标 setter 发出 `change(position)`，
+  5422486 附近画笔监听该事件并调用 `draw_line`。本地回归检查实际
+  `Frame.lines` 和笔抬起时仍记录的 `pen_fills.points`，不是仅比较坐标。
+- 动画改为普通脚本阶段之后统一更新；普通 tick 增量移动，到期本帧只执行 on_end，
+  不额外 on_tick，下一次 update 才通过 AnimStep 继续后继。
+  官方 RuntimeManager 在 4824448 附近先 step_code 后 task_manager.update；4849971 的
+  task_update 到期排队 dispose。复审探针使用未改写的官方方法，原创
+  actor/clock/script 适配器结果为 x=100/125/60/100，after=0/0/0/1
+  （0/125/250/251ms）；本地 JIT 开关两种模式均按该序列回归。
+  原来测试中脚本阶段内先移动、再被并发写覆盖的预期已纠正。
+- 保留 `distance / 200 * 1000` 两次运算的毫秒 lifetime：极大有限步数
+  `2e306` 在毫秒转换时成为 Infinity，后续 125ms tick 位移为 0；
+  极小步数 `1e-323` 的秒时长下溢为 0，按官方即时移动。
+- 本地复审材料与重跑结果位于忽略的 `dist/review-r2-knblocks/` 和
+  `dist/r2-knblocks/revision-official-{phase,extremes}.*`。这是未改写
+  官方方法的局部执行，不宣称完整浏览器原生工程或像素端到端认证。
+
 ## 官方服务失败与代码占位块证据
 
 同一固定主包 `main.0f3db563.js` 的零基源码位置：
@@ -144,9 +165,12 @@ NEKOC_NODE_MODULES=D:/AppData/Local/Temp/opencode/nekoc-kitenn/node_modules node
   `303456318` 在禁用占位块之后仍遇到不支持的 `self_enable_physics`；
   `336191749` 在摄像头之后仍遇到返回块缺 `VALUE`。两者仍明确失败，
   不用通用 no-op 或猜测返回值制造全通过。
-- 少儿移动的完整官方调度相位、暂停/重启、画笔像素和并发任务顺序未验证；
-  本地回归覆盖明确的 0/125/250 ms 时间点及最终状态，不声称逐帧全等。
+- 已核实并修正上述 scripts→task→下一 update dispose 相位及并发写入结果；
+  少儿移动其余完整调度、暂停/重启的官方差分、画笔像素和全部并发顺序仍未验证，
+  不声称完整浏览器逐帧全等。
 - 不实现其余少儿积木；未被语料触发的 API 不以通用 no-op 吞掉。
+- Scene background 的理论分支尚缺真实原生工作区可达性和目标语义证据，
+  本轮不猜测扩展，仍保留为未验证边界。
 - 账号、排名、全局动画、真实 AI/翻译/摄像头、网络权限等既有局限仍保留。
 - 翻译 null/undefined 的官方域函数拒绝 Promise；最小原生命令观察仍继续，
   本 VM 对这类非法输入保留错误诊断，不声称该异常调度路径一致。
