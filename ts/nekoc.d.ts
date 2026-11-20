@@ -101,8 +101,10 @@ type NekoStatementBody = () => void;
  * NaN become 1; remaining fractions are truncated. `delay` stores seconds.
  * Callbacks must be ordinary inline functions, not async/generator functions.
  * Omit undefined delays; non-numeric/unknown delays require Number(value).
- * Native TS loops and timers in the same import graph are rejected: implicit
- * loop yields cannot preserve JS run-to-return/cancellation boundaries.
+ * Native TS loops or Map/Set/unknown forEach and timers in the same import
+ * graph are rejected, even across imports. Proven synchronous array forEach
+ * helpers run atomically; explicit cooperative waits stay suspendable.
+ * Opaque/recursive callbacks are rejected when synchrony cannot be proved.
  */
 interface NekoTimer { readonly active: boolean; readonly delay: number; }
 declare function setTimeout(callback: () => void, ms?: number): NekoTimer;

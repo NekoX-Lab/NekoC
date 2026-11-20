@@ -174,13 +174,18 @@ async function nodeLogs(source) {
   }
 }
 
-function vmLogs(source, label) {
+function vmLogs(source, label, files = {}, checkTypes = false) {
   const root = path.resolve(artifacts ?? "target");
   mkdirSync(root, { recursive: true });
   const dir = mkdtempSync(path.join(root, `r3-tsasync-${label}-`));
   try {
     const input = path.join(dir, "main.ts");
     writeFileSync(input, source);
+    for (const [name, text] of Object.entries(files)) writeFileSync(path.join(dir, name), text);
+    if (checkTypes) for (const types of [false, true]) {
+      const checked = checkFile(input, { types });
+      assert.equal(checked.ok, true, JSON.stringify(checked.diagnostics));
+    }
     const results = [];
     const env = { ...process.env, NEKOC_FRONTEND: path.resolve("ts") };
     const run = args => {
@@ -209,8 +214,9 @@ function vmLogs(source, label) {
 }
 
 const timerLoopDiagnostic = /Timers cannot be combined with native TypeScript loops.*implicitly yield.*alternative:/;
+const timerForEachDiagnostic = /Timers cannot be combined with forEach calls.*implicitly yield.*alternative:/;
 
-function rejectTimerLoopBuild(source, label) {
+function rejectTimerLoopBuild(source, label, diagnostic = timerLoopDiagnostic) {
   const root = path.resolve(artifacts ?? "target");
   mkdirSync(root, { recursive: true });
   const dir = mkdtempSync(path.join(root, `r3-tsasync-${label}-`));
@@ -221,7 +227,7 @@ function rejectTimerLoopBuild(source, label) {
     assert.equal(checked.ok, false);
     assert.equal(checked.report, null);
     assert.equal(checked.diagnostics.filter(diagnostic => diagnostic.source === "types").length, 0, JSON.stringify(checked.diagnostics));
-    assert.match(checked.diagnostics[0].message, timerLoopDiagnostic);
+    assert.match(checked.diagnostics[0].message, diagnostic);
     for (const optimize of [false, true]) {
       const output = path.join(dir, `main-${optimize}.bcmkn`);
       const result = spawnSync(bin, ["build", input, "-o", output, ...(optimize ? ["--optimize"] : [])], {
@@ -230,7 +236,7 @@ function rejectTimerLoopBuild(source, label) {
       assert.equal(result.error, undefined);
       assert.notEqual(result.status, null);
       assert.notEqual(result.status, 0, result.stdout + result.stderr);
-      assert.match(result.stdout + result.stderr, timerLoopDiagnostic);
+      assert.match(result.stdout + result.stderr, diagnostic);
       assert.equal(existsSync(output), false, "rejected source must not emit a work");
     }
   } finally { if (!artifacts) rmSync(dir, { recursive: true, force: true }); }
@@ -297,6 +303,151 @@ test("r3-tsasync timer-loop guard spans imports and preserves original loop coor
       assert.equal(diagnostic.line, locationLine);
     }
   }
+});
+
+for (const [name, source, expected] of [
+  ["array-foreach-cancel", `const h = setTimeout(() => console.log(99), 0);
+    let n = 0; [1,2,3,4,5].forEach(v => { n += v; });
+    clearTimeout(h); console.log(n);`, ["15"]],
+  ["map-foreach-cancel", `const h = setTimeout(() => console.log(99), 0);
+    let n = 0; new Map<number,number>([[1,1],[2,2],[3,3]]).forEach(v => { n += v; });
+    clearTimeout(h); console.log(n);`, ["6"]],
+  ["set-foreach-cancel", `const h = setTimeout(() => console.log(99), 0);
+    let n = 0; new Set<number>([1,2,3]).forEach(v => { n += v; });
+    clearTimeout(h); console.log(n);`, ["6"]],
+  ["foreach-callback", `let n = 0;
+    setTimeout(() => { [1,2,3,4,5].forEach(v => { n += v; }); console.log(n); }, 0);
+    setTimeout(() => console.log(n), 0);`, ["15", "15"]],
+  ["foreach-interval-cancel", `const h = setInterval(() => console.log(99), 0);
+    let n = 0; [1,2,3,4,5].forEach(v => { n += v; });
+    clearInterval(h); console.log(n);`, ["15"]],
+  ["foreach-nested-function", `let n = 0;
+    function inner() { [1,2,3].forEach(v => { n += v; }); }
+    function outer() { inner(); }
+    const h = setTimeout(() => console.log(99), 0); outer(); clearTimeout(h); console.log(n);`, ["6"]],
+]) test(`r3-tsasync preserves synchronous forEach/timer boundaries or rejects them: ${name}`, async () => {
+  assert.deepEqual(await nodeLogs(source), expected);
+  if (name.startsWith("map-") || name.startsWith("set-")) {
+    reject(source, timerForEachDiagnostic);
+    rejectTimerLoopBuild(source, name, timerForEachDiagnostic);
+  } else {
+    assert.ok(compileFile(entry, hostFor(source)).workspaceData);
+    for (const actual of vmLogs(source, name, {}, true)) assert.deepEqual(actual, expected);
+  }
+});
+
+test("r3-tsasync forEach guard covers unused, nested, waiting and imported callbacks", () => {
+  for (const call of [
+    "new Map<number,number>([[1,1]]).forEach(v => { console.log(v); });",
+    "new Set<number>([1]).forEach(v => { console.log(v); });",
+  ]) {
+    reject(`function unused() { ${call} } setTimeout(() => {}, 0);`, timerForEachDiagnostic);
+    reject(`${call} setInterval(() => {}, 1);`, timerForEachDiagnostic, call.slice(0, -1));
+    assert.ok(compileFile(entry, hostFor(call)).workspaceData, "forEach without timers remains supported");
+  }
+  const dependency = path.resolve(path.dirname(entry), "dependency.ts");
+  for (const [main, imported, file, marker] of [
+    ['import { work } from "./dependency"; setTimeout(() => {}, 0); work();',
+      "export function work() {\n  new Set<number>([1,2]).forEach(v => { console.log(v); });\n}", dependency, "new Set"],
+    ['import { schedule } from "./dependency";\nnew Map<number,number>([[1,1]]).forEach(v => { console.log(v); }); schedule();',
+      "export function schedule() { setTimeout(() => {}, 0); }", entry, "new Map"],
+  ]) {
+    const root = path.resolve(artifacts ?? "target");
+    mkdirSync(root, { recursive: true });
+    const dir = mkdtempSync(path.join(root, "r3-tsasync-foreach-import-"));
+    try {
+      const input = path.join(dir, "main.ts");
+      writeFileSync(input, main);
+      writeFileSync(path.join(dir, "dependency.ts"), imported);
+      for (const types of [false, true]) {
+        const result = checkFile(input, { types });
+        const diagnostic = result.diagnostics.find(item => item.source === "compat");
+        assert.equal(result.ok, false);
+        assert.equal(result.report, null);
+        assert.ok(diagnostic, JSON.stringify(result));
+        assert.match(diagnostic.message, timerForEachDiagnostic);
+        assert.equal(path.resolve(diagnostic.file), path.join(dir, path.basename(file)));
+        const source = file === entry ? main : imported;
+        const prefix = source.slice(0, source.indexOf(marker)).split(newline);
+        assert.equal(diagnostic.line, prefix.length);
+        assert.equal(diagnostic.column, prefix.at(-1).length + 1);
+      }
+      for (const optimize of [false, true]) {
+        const output = path.join(dir, `out-${optimize}.bcmkn`);
+        const result = spawnSync(bin, ["build", input, "-o", output, ...(optimize ? ["--optimize"] : [])], {
+          encoding: "utf8", env: { ...process.env, NEKOC_FRONTEND: path.resolve("ts") }, timeout: 120000,
+        });
+        assert.equal(result.error, undefined);
+        assert.notEqual(result.status, null);
+        assert.notEqual(result.status, 0);
+        assert.match(result.stdout + result.stderr, timerForEachDiagnostic);
+        assert.equal(existsSync(output), false);
+      }
+    } finally { if (!artifacts) rmSync(dir, { recursive: true, force: true }); }
+  }
+});
+
+test("r3-tsasync synchronous array forEach helpers are atomic, explicitly waiting callbacks remain cooperative", () => {
+  for (const [body, atomic] of [
+    ["console.log(value);", true], ["wait(0.01); console.log(value);", false],
+    ["pause(); console.log(value);", false],
+  ]) {
+    const source = `function pause() { wait(0.01); } setTimeout(() => {}, 0);
+      [1,2].forEach(value => { ${body} });`;
+    const report = compileFile(entry, hostFor(source));
+    const helper = report.procedures.find(p => /^__forEach\d+ \(implementation\)$/.test(p.name));
+    assert.ok(helper);
+    assert.equal(Object.values(helper.workspaceData.blocks).some(b => b.type === "warp"), atomic);
+  }
+  const source = `let n = 0; const h = setTimeout(() => console.log(99), 0);
+    [1,2].forEach(v => { [3,4].forEach(w => { n += w; }); }); clearTimeout(h); console.log(n);`;
+  for (const actual of vmLogs(source, "nested-foreach", {}, true)) assert.deepEqual(actual, ["14"]);
+  reject('setTimeout(() => {}, 0); [1].forEach(v => { callProc("opaque"); });', timerForEachDiagnostic);
+});
+
+test("r3-tsasync imported synchronous array callbacks preserve run-to-return", () => {
+  const source = 'import { total } from "./dependency"; const h = setTimeout(() => console.log(99), 0); total(); clearTimeout(h);';
+  const files = { "dependency.ts": "export function total() { let result = 0; [1,2,3].forEach(v => { console.log(v); }); }" };
+  for (const actual of vmLogs(source, "imported-foreach", files, true)) assert.deepEqual(actual, ["1", "2", "3"]);
+});
+
+test("r3-tsasync rejects destructured global asynchronous APIs before unused lowering", () => {
+  for (const [source, marker] of [
+    ["function unused() { const {Promise} = globalThis; Promise.resolve(1); } console.log(1);", "Promise"],
+    ["function unused() { const {Promise: P} = (globalThis); P.resolve(1); }", "Promise"],
+    ['function unused() { const {["Promise"]: P} = globalThis; }', '["Promise"]'],
+    ["function unused() { const {queueMicrotask: enqueue} = globalThis; }", "queueMicrotask"],
+    ["function unused({Promise: P} = globalThis) { P.resolve(1); }", "Promise"],
+    ["function unused() { const {Promise: P} = globalThis; var globalThis = 1; }", null],
+  ]) {
+    if (!marker) {
+      assert.ok(compileFile(entry, hostFor(source)).workspaceData);
+      continue;
+    }
+    reject(source, /(?:Promise|queueMicrotask) is not supported.*destructure.*globalThis/, marker);
+    const root = path.resolve(artifacts ?? "target");
+    mkdirSync(root, { recursive: true });
+    const dir = mkdtempSync(path.join(root, "r3-tsasync-destructure-"));
+    try {
+      const input = path.join(dir, "main.ts");
+      writeFileSync(input, source);
+      for (const types of [false, true]) {
+        const result = checkFile(input, { types });
+        assert.equal(result.ok, false);
+        const diagnostic = result.diagnostics.find(item => item.source === "compat");
+        assert.ok(diagnostic, JSON.stringify(result));
+        assert.match(diagnostic.message, /not supported.*destructure.*globalThis/);
+      }
+    } finally { if (!artifacts) rmSync(dir, { recursive: true, force: true }); }
+  }
+  assert.ok(compileFile(entry, hostFor("function unused() { const globalThis = {Promise: 1}; const {Promise} = globalThis; } console.log(1);")).workspaceData);
+});
+
+test("r3-tsasync wrapped timer names produce actionable errors, not internal exceptions", () => {
+  for (const source of [
+    "(setTimeout)(() => {}, 0);", "((setInterval))(() => {}, 0);",
+    "(setTimeout as typeof setTimeout)(() => {}, 0);", "setTimeout!(() => {}, 0);",
+  ]) reject(source, /Timer calls require a direct.*alternative: remove parentheses/);
 });
 
 for (const [name, source] of [

@@ -379,17 +379,27 @@ not native JS timer blocks. Scheduling is frame-quantized; an interval waits
 again after its callback finishes, including cooperative waits. This does not
 promise Node event-loop timing or microtask ordering. Event registration is a
 compile-time declaration, not a general runtime event-listener API.
-Native TypeScript `for`, `for...of`, `for...in`, `while` and `do...while` loops
+Native TypeScript `for`, `for...of`, `for...in`, `while` and `do...while` loops,
+and Map/Set or unknown-receiver `forEach` calls (whose helpers also yield),
 cannot coexist with timers anywhere in the same import graph, including unused
 functions and loops before scheduling. Kitten loops implicitly yield, allowing
 a timer to observe intermediate state or fire before synchronous cancellation.
 Until run-to-return scheduling is implemented, this conservative combination is
-a compile error with the original loop location; use an explicit cooperative
+a compile error with the original loop/call location; use an explicit cooperative
 event state machine instead. No automatic atomic wrapper is added around waits.
+Array `forEach` helpers proven synchronous (including nested/imported callees)
+run atomically when timers are present, so a timer cannot observe a partial
+iteration or fire before synchronous cancellation. Callbacks with explicit
+cooperative waits, including indirect waits, remain suspendable; they do not
+claim JS event-loop equivalence. Opaque/recursive callbacks whose safety cannot
+be proved are rejected with an original-call diagnostic, not silently made atomic.
 
 `async`/`await`, generators (including callbacks), global runtime `Promise` and
 `queueMicrotask` references are rejected before lowering, including unused code
-and imported modules. Type-only Promise annotations and locally shadowed names
+and imported modules. This includes named, aliased and literal-key destructuring
+of these APIs directly from unshadowed `globalThis`. Parenthesized/type-wrapped
+timer names are unsupported and diagnosed; use direct `setTimeout(...)` or
+`setInterval(...)` calls. Type-only Promise annotations and locally shadowed names
 do not by themselves invoke Promise scheduling. Use ordinary synchronous
 functions or explicit event state machines; `wait(seconds)` cooperatively pauses
 the current block task and is not a Promise. See `tests/ts-r3-async.test.mjs` for
