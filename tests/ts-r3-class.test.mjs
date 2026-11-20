@@ -9,6 +9,18 @@ const entry = path.resolve("virtual/r3-class.ts");
 const compile = source => compileFile(entry, { readFile: name => name === entry ? source : undefined });
 
 const supported = [
+  ["branded numeric getters preserve prefix and postfix updates", `
+type N = number & { readonly tag: "n" };
+class C { x = 1 as N; get p(): N { return this.x; } set p(v: number) { this.x = v as N; } }
+const c = new C(); c.p++; console.log(c.p); ++c.p; console.log(c.p);
+c.p--; console.log(c.p); --c.p; console.log(c.p);
+`],
+  ["inherited branded numeric getters support super updates", `
+type N = number & { readonly tag: "n" };
+class A { x = 3 as N; get p(): N { return this.x; } set p(v: number) { this.x = v as N; } }
+class B extends A { bump() { super.p++; } drop() { --super.p; } }
+const b = new B(); b.bump(); console.log(b.p); b.drop(); console.log(b.p);
+`],
   ["inherited constructors and super preserve initialization order", `
 let trace = "";
 function mark(label: string): number { trace += label; return 2; }
@@ -73,6 +85,10 @@ for (const [name, source] of supported) test("r3 class matches JavaScript: " + n
   assertJsLogs(source, { target: ts.ScriptTarget.ES2022 }));
 
 const unsupported = [
+  ["getter cannot hide an inherited method with a callable result", 'class A { p() { return 3; } } class B extends A { get p() { return () => 7; } } console.log(new B().p());', /accessors cannot replace inherited methods/i],
+  ["setter cannot hide an inherited method", 'class A { p() { return 3; } } class B extends A { set p(v: number) {} } const b = new B(); b.p = 7;', /accessors cannot replace inherited methods/i],
+  ["accessor cannot hide a grandparent method", 'class A { p() { return 3; } } class B extends A {} class C extends B { get p() { return () => 7; } } console.log(new C().p());', /accessors cannot replace inherited methods/i],
+  ["branded string getter remains nonnumeric", 'type S = string & { readonly tag: "s" }; class C { x = "1" as S; get p(): S { return this.x; } set p(v: string) { this.x = v as S; } } const c = new C(); c.p++;', /accessor updates.*numeric/i],
   ["string getter increment cannot become concatenation", 'class C { x = "1"; get p() { return this.x; } set p(v: string) { this.x = v; } } const c = new C(); c.p++;', /accessor updates.*numeric/i],
   ["string getter decrement requires numeric conversion", 'class C { x = "3"; get p() { return this.x; } set p(v: string) { this.x = v; } } const c = new C(); --c.p;', /accessor updates.*numeric/i],
   ["boolean getter increment requires numeric conversion", 'class C { x = true; get p() { return this.x; } set p(v: boolean) { this.x = v; } } const c = new C(); ++c.p;', /accessor updates.*numeric/i],
