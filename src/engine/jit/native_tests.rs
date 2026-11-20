@@ -154,7 +154,7 @@ fn append_all_list_refs_preserve_cells_and_check_cycles_without_exec() {
             assert_eq!(values.borrow().len(), 2);
             assert_eq!(
                 e.jit_error.take().unwrap().to_string(),
-                "cyclic list at native-test"
+                "cyclic list [actor Sprite (nekoc-default-actor)] at block native-test"
             );
             assert_eq!(e.jit_profile()["delegated_ops"], 0);
         }
@@ -332,7 +332,7 @@ fn native_invalid_return_and_stack_limit_match_pc_and_fuel() {
     assert_eq!(e.tasks[0].pc, 1);
     assert_eq!(
         e.jit_error.take().unwrap().to_string(),
-        "invalid procedure return"
+        "invalid procedure return [actor Sprite (nekoc-default-actor)] at block native-test"
     );
     e.program.ops[0] = Op::Call(0, 0);
     e.program.call_arguments = vec![vec![]];
@@ -351,7 +351,7 @@ fn native_invalid_return_and_stack_limit_match_pc_and_fuel() {
     assert_eq!(e.tasks[0].pc, 1);
     assert_eq!(
         e.jit_error.take().unwrap().to_string(),
-        "procedure stack limit at native-test"
+        "procedure stack limit [actor Sprite (nekoc-default-actor)] at block native-test"
     );
 }
 
@@ -398,7 +398,7 @@ fn dedicated_helpers_preserve_error_side_effects_and_instruction_precedence() {
     assert_eq!(e.tasks[0].calls.len(), 1);
     assert_eq!(
         e.jit_error.take().unwrap().to_string(),
-        "entity_variable_operation_out_of_scope: missing at block native-test"
+        "entity_variable_operation_out_of_scope: missing [actor Sprite (nekoc-default-actor)] at block native-test"
     );
     // The explicit stack-limit error precedes exec's trailing value-error check.
     e.tasks[0].calls.resize(
@@ -414,7 +414,7 @@ fn dedicated_helpers_preserve_error_side_effects_and_instruction_precedence() {
     assert_eq!(e.tasks[0].pc, 1);
     assert_eq!(
         e.jit_error.take().unwrap().to_string(),
-        "procedure stack limit at native-test"
+        "procedure stack limit [actor Sprite (nekoc-default-actor)] at block native-test"
     );
     assert!(e.value_error.is_none());
 
@@ -431,7 +431,7 @@ fn dedicated_helpers_preserve_error_side_effects_and_instruction_precedence() {
     assert_eq!(e.tasks[0].pc, 1);
     assert_eq!(
         e.jit_error.take().unwrap().to_string(),
-        "entity_variable_operation_out_of_scope: missing at block native-test"
+        "entity_variable_operation_out_of_scope: missing [actor Sprite (nekoc-default-actor)] at block native-test"
     );
     assert_eq!(e.jit_profile()["delegated_ops"], 0);
 }
@@ -547,7 +547,7 @@ fn reentrant_tail_preserves_error_fuel_pc_and_reporter_done_state() {
                     .take()
                     .unwrap()
                     .to_string()
-                    .contains("missing at block native-test")
+                    .contains("missing [actor Sprite (nekoc-default-actor)] at block native-test")
             );
         }
     }

@@ -771,7 +771,7 @@ fn hot_kn_list_writes_check_private_reporter_errors_before_the_next_statement() 
         });
         let vm = compare_hot(
             &p,
-            Some("entity_variable_operation_out_of_scope: private at block hot-list-write"),
+            Some("entity_variable_operation_out_of_scope: private [actor"),
         );
         assert_eq!(vm.variable_text("after"), "0");
         assert_eq!(vm.variable_text("out"), "0");
@@ -1454,7 +1454,7 @@ fn hot_append_rejects_direct_and_nested_cycles_before_mutation() {
                 );
                 p["variables"]["variablesDict"]["items"] =
                     json!({"id":"items","type":"list","value":[],"isGlobal":true});
-                let vm = compare_hot(&p, Some("cyclic list at hot-cycle"));
+                let vm = compare_hot(&p, Some("cyclic list [actor"));
                 assert_eq!(vm.variable_text("tick"), "851");
                 assert_eq!(vm.variable_text("after"), "850");
                 let snapshot = vm.debug_snapshot();
@@ -1929,7 +1929,7 @@ fn hot_reentrant_reporter_errors_done_and_restart_stop_at_the_same_boundary() {
                     assert_native_helper(&b, &format!("native/reentrant-{op}"));
                 } else {
                     let expected_error = if ending == "error" {
-                        Some("cyclic list at reporter-cycle")
+                        Some("cyclic list [actor")
                     } else if site == "AppendTarget" {
                         // stop-all ends the reporter before ReturnValue, so it
                         // produces Null. The outer instruction still resolves

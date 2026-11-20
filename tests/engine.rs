@@ -707,7 +707,8 @@ fn cyclic_lists_report_the_source_block_instead_of_panicking() {
         .advance(0.0, 100, Duration::from_secs(1))
         .unwrap_err()
         .to_string();
-    assert!(error.contains("cyclic list at cycle-source"), "{error}");
+    assert!(error.starts_with("cyclic list [actor "), "{error}");
+    assert!(error.ends_with("at block cycle-source"), "{error}");
     vm.start();
     assert!(vm.list_values(0).is_empty());
 }

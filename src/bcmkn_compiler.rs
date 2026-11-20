@@ -239,6 +239,11 @@ fn assemble_workspace_inner(
     project["projectName"] = Value::String(name.to_owned());
 
     crate::key_buttons::annotate(&mut project, workspace_report.get("keyButtons"));
+    // Scripts are replaced, so never inherit a template's mapping for reused ids.
+    project.as_object_mut().unwrap().remove("sourceMap");
+    if let Some(source_map) = workspace_report.get("sourceMap").filter(|v| v.is_object()) {
+        project["sourceMap"] = source_map.clone();
+    }
     Ok(project)
 }
 

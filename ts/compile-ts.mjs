@@ -28,6 +28,7 @@ import { bitwiseAssignments, bitwisePlan, bitwiseTokens } from "./bitwise.mjs";
 import { enrichDiagnostic, formatDiagnostic } from "./diagnostics.mjs";
 export { formatDiagnostic } from "./diagnostics.mjs";
 import { unsupportedMessage, validateUnsupportedSyntax } from "./js-support.mjs";
+import { runtimeSourceLocation } from "./runtime-source-map.mjs";
 
 /** A compile error. `location` is { file, line, column } (1-based) when known. */
 export class CompileError extends Error {
@@ -4724,6 +4725,14 @@ class WorkspaceCompiler {
 
   compileExpression(expression, parentId) {
     const id = this.compileExpressionUnfolded(expression, parentId);
+    // Prefer the reporter's span to its enclosing statement (multi-line inputs).
+    // An inlined body belongs to its definition, not the outer call expression.
+    const node = blockSourceNodes.get(this.blocks[id]);
+    if (node && expression.pos >= node.pos && expression.end <= node.end
+      && expression.getSourceFile?.() === node.getSourceFile?.()) {
+      const location = runtimeSourceLocation(expression, this.replacementSourceFiles, helperOrigins, path.resolve);
+      if (location) this.sourceMap[id] = location;
+    }
     this.foldPureNumber(id);
     return id;
   }
@@ -7171,17 +7180,16 @@ class WorkspaceCompiler {
     this.blocks[id] = { id, ...block };
     const node = sourceNode || this.currentStatementNode;
     if (node) blockSourceNodes.set(this.blocks[id], node);
-    if (node && this.sourceFile && node.pos >= 0 && node.getSourceFile?.() === this.sourceFile) {
-      const start = node.getStart(this.sourceFile);
-      const { line, character } = this.sourceFile.getLineAndCharacterOfPosition(start);
-      this.sourceMap[id] = { line: line + 1, column: character };
-    }
+    const location = runtimeSourceLocation(node, this.replacementSourceFiles, helperOrigins, path.resolve);
+    if (location) this.sourceMap[id] = location;
     return id;
   }
 
   addBlockWithId(id, block, sourceNode) {
     if (this.target.name === "kitten4") this.targetBlocks.push([block, sourceNode || this.currentStatementNode]);
     this.blocks[id] = { id, ...block };
+    const location = runtimeSourceLocation(sourceNode || this.currentStatementNode, this.replacementSourceFiles, helperOrigins, path.resolve);
+    if (location) this.sourceMap[id] = location;
     return id;
   }
 

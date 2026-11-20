@@ -7,7 +7,6 @@ use super::{
     Binary, Cell, Engine, Expr, ExprOp, ListRef, Op, RuntimeSemantics, Target, Unary, ValueExpr,
     contains_list, list_index, read_list_index,
 };
-use anyhow::anyhow;
 use cranelift_codegen::ir::{
     AbiParam, Block, InstBuilder, MemFlags, Signature, Value,
     condcodes::{FloatCC, IntCC},
@@ -463,7 +462,7 @@ impl Engine {
             // An explicit instruction error (e.g. cyclic append or stack limit)
             // takes precedence over a pending evaluator error, just as in exec.
             if self.jit_error.is_none() {
-                self.jit_error = Some(anyhow::anyhow!(error));
+                self.jit_error = Some(self.located_error(&error, next.saturating_sub(1), actor));
             }
         }
         (used > 0 || self.jit_error.is_some()).then_some(used)
@@ -721,7 +720,7 @@ fn key_list(key: u64) -> ListRef {
     }
 }
 
-unsafe extern "C" fn h_list_item(c: *mut NativeContext, list: u64, at: f64) -> f64 {
+unsafe extern "C" fn h_list_item(c: *mut NativeContext, list: u64, at: f64, pc: u64) -> f64 {
     let _timing = timing::span(
         unsafe { (*c).timing.as_ref() },
         "helper/list-item",
@@ -729,26 +728,30 @@ unsafe extern "C" fn h_list_item(c: *mut NativeContext, list: u64, at: f64) -> f
     );
     let engine = unsafe { &mut *(*c).engine };
     engine.check_list_index(at);
-    engine
+    let value = engine
         .resolve_list(key_list(list))
         .map_or(f64::NAN, |list| {
             let values = list.borrow();
             read_list_index(at, values.len(), engine.program.semantics)
                 .and_then(|i| values.get(i))
                 .map_or(f64::NAN, Cell::number)
-        })
+        });
+    engine.locate_expression_error(pc as usize, unsafe { (*c).actor });
+    value
 }
 
-unsafe extern "C" fn h_list_length(c: *mut NativeContext, list: u64) -> f64 {
+unsafe extern "C" fn h_list_length(c: *mut NativeContext, list: u64, pc: u64) -> f64 {
     let _timing = timing::span(
         unsafe { (*c).timing.as_ref() },
         "helper/list-length",
         list as usize,
     );
     let engine = unsafe { &mut *(*c).engine };
-    engine
+    let value = engine
         .resolve_list(key_list(list))
-        .map_or(f64::NAN, |l| l.borrow().len() as f64)
+        .map_or(f64::NAN, |l| l.borrow().len() as f64);
+    engine.locate_expression_error(pc as usize, unsafe { (*c).actor });
+    value
 }
 
 /// Guards never raise errors: on missing scope or a non-number the original
@@ -805,10 +808,7 @@ unsafe extern "C" fn h_error(c: *mut NativeContext, pc: u64, next: u64) -> u64 {
     let engine = unsafe { &mut *c.engine };
     if let Some(error) = engine.value_error.take() {
         engine.tasks[c.index].pc = next as usize;
-        engine.jit_error = Some(anyhow!(super::error_location::at_block(
-            &error,
-            &engine.program.sources[pc as usize]
-        )));
+        engine.jit_error = Some(engine.located_error(&error, pc as usize, c.actor));
         1
     } else {
         0
@@ -914,10 +914,7 @@ unsafe extern "C" fn h_position(c: *mut NativeContext, pc: u64, x: f64, y: f64) 
     engine.dirty[actor] = true;
     engine.set_position(actor, x, y, old);
     if let Some(error) = engine.value_error.take() {
-        engine.jit_error = Some(anyhow!(super::error_location::at_block(
-            &error,
-            &engine.program.sources[pc]
-        )));
+        engine.jit_error = Some(engine.located_error(&error, pc, actor));
         return u64::MAX - 1;
     }
     if engine.output_limit_reached() {
@@ -982,10 +979,7 @@ unsafe extern "C" fn h_replace_item(
     };
     if contains_list(&cell, &engine.lists[target as usize]) {
         engine.tasks[c.index].pc = pc as usize + 1;
-        engine.jit_error = Some(anyhow!(
-            "cyclic list at {}",
-            engine.program.sources[pc as usize]
-        ));
+        engine.jit_error = Some(engine.located_error("cyclic list", pc as usize, c.actor));
         return 2;
     }
     let mut values = engine.lists[target as usize].borrow_mut();
@@ -1009,18 +1003,27 @@ unsafe extern "C" fn h_append_number(c: *mut NativeContext, list: u64, value: f6
     }
 }
 /// `target = list[at]` without the generic dispatch: bit 0 of `target` selects locals.
-unsafe extern "C" fn h_assign_item(c: *mut NativeContext, target: u64, list: u64, at: f64) {
+unsafe extern "C" fn h_assign_item(
+    c: *mut NativeContext,
+    target: u64,
+    list: u64,
+    at: f64,
+    value: u64,
+) {
     let c = unsafe { &mut *c };
     let _timing = timing::span(c.timing.as_ref(), "helper/assign-item", target as usize);
     let engine = unsafe { &mut *c.engine };
     engine.check_list_index(at);
     assign_item(engine, target, list, Some(at));
+    engine.locate_value_error(value as usize, c.actor);
 }
 /// `target = last item of list`; same target encoding as `h_assign_item`.
-unsafe extern "C" fn h_assign_last_item(c: *mut NativeContext, target: u64, list: u64) {
+unsafe extern "C" fn h_assign_last_item(c: *mut NativeContext, target: u64, list: u64, value: u64) {
     let c = unsafe { &mut *c };
     let _timing = timing::span(c.timing.as_ref(), "helper/assign-item", target as usize);
-    assign_item(unsafe { &mut *c.engine }, target, list, None);
+    let engine = unsafe { &mut *c.engine };
+    assign_item(engine, target, list, None);
+    engine.locate_value_error(value as usize, c.actor);
 }
 /// Shared body of the assign-item helpers, mirroring `ValueExpr::Item` in
 /// `eval_value_one` followed by `Op::SetValue`.
@@ -1249,14 +1252,15 @@ impl Gen<'_, '_> {
                     self.unary(op, a)
                 }
                 ExprOp::ListItem(list, false) => {
+                    let pc = self.b.ins().iconst(types::I64, at as i64);
                     let at = values.pop().unwrap();
                     let list = self.b.ins().iconst(types::I64, list_key(list) as i64);
                     let ctx = self.ctx;
                     self.call(
                         h_list_item as *const () as usize,
-                        &[types::I64, types::I64, types::F64],
+                        &[types::I64, types::I64, types::F64, types::I64],
                         Some(types::F64),
-                        &[ctx, list, at],
+                        &[ctx, list, at, pc],
                     )
                     .unwrap()
                 }
@@ -1272,12 +1276,13 @@ impl Gen<'_, '_> {
             ExprOp::Slot(s) => self.load(self.slots, s),
             ExprOp::Local(s) => self.load(self.locals, s),
             ExprOp::ListLength(list) => {
+                let pc = self.b.ins().iconst(types::I64, pc as i64);
                 let list = self.b.ins().iconst(types::I64, list_key(list) as i64);
                 self.call(
                     h_list_length as *const () as usize,
-                    &[types::I64, types::I64],
+                    &[types::I64, types::I64, types::I64],
                     Some(types::F64),
-                    &[self.ctx, list],
+                    &[self.ctx, list, pc],
                 )
                 .unwrap()
             }
@@ -1944,18 +1949,19 @@ impl Gen<'_, '_> {
             let encoded = self.b.ins().iconst(types::I64, encoded);
             let list = self.b.ins().iconst(types::I64, list_key(list) as i64);
             let ctx = self.ctx;
+            let value = self.b.ins().iconst(types::I64, v as i64);
             match at {
                 Some(at) => self.call(
                     h_assign_item as *const () as usize,
-                    &[types::I64, types::I64, types::I64, types::F64],
+                    &[types::I64, types::I64, types::I64, types::F64, types::I64],
                     None,
-                    &[ctx, encoded, list, at],
+                    &[ctx, encoded, list, at, value],
                 ),
                 None => self.call(
                     h_assign_last_item as *const () as usize,
-                    &[types::I64, types::I64, types::I64],
+                    &[types::I64, types::I64, types::I64, types::I64],
                     None,
-                    &[ctx, encoded, list],
+                    &[ctx, encoded, list, value],
                 ),
             };
             self.check_error(pc, remaining);
@@ -2519,10 +2525,10 @@ mod tests {
             assert_eq!(used, 1, "delegated={delegated}");
             assert_eq!(engine.tasks[0].pc, 1);
             assert_eq!(engine.slots[0], 0.0);
-            assert_eq!(
-                engine.jit_error.take().unwrap().to_string(),
-                "entity_variable_operation_out_of_scope: missing at block failed"
-            );
+            let error = engine.jit_error.take().unwrap().to_string();
+            assert!(error.starts_with("entity_variable_operation_out_of_scope: missing"));
+            assert!(error.contains("[actor "), "{error}");
+            assert!(error.ends_with("at block failed"), "{error}");
             assert_eq!(engine.jit_profile()["native_ops"], 1);
         }
     }

@@ -104,10 +104,7 @@ pub(super) unsafe extern "C" fn h_call(c: *mut NativeContext, pc: u64) -> u64 {
     }
     let task = &mut engine.tasks[c.index];
     if task.calls.len() >= 10_000 {
-        engine.jit_error = Some(anyhow!(
-            "procedure stack limit at {}",
-            engine.program.sources[pc]
-        ));
+        engine.jit_error = Some(engine.located_error("procedure stack limit", pc, c.actor));
         return u64::MAX - 1;
     }
     task.calls.push(super::super::CallFrame {
@@ -136,7 +133,7 @@ pub(super) unsafe extern "C" fn h_return(c: *mut NativeContext, pc: u64) -> u64 
     let parameters = {
         let task = &mut engine.tasks[c.index];
         let Some(call) = task.calls.pop() else {
-            engine.jit_error = Some(anyhow!("invalid procedure return"));
+            engine.jit_error = Some(engine.located_error("invalid procedure return", pc, c.actor));
             return u64::MAX - 1;
         };
         task.pc = call.pc;
@@ -165,7 +162,7 @@ pub(super) unsafe extern "C" fn h_append_cell(c: *mut NativeContext, pc: u64) ->
     let value = engine.eval_value(value, c.actor);
     if let Some(list) = engine.resolve_list(list) {
         if contains_list(&value, &list) {
-            engine.jit_error = Some(anyhow!("cyclic list at {}", engine.program.sources[pc]));
+            engine.jit_error = Some(engine.located_error("cyclic list", pc, c.actor));
             return u64::MAX - 1;
         }
         list.borrow_mut().push(value);
@@ -223,7 +220,7 @@ pub(super) unsafe extern "C" fn h_boundary(c: *mut NativeContext, pc: u64) -> u6
         Op::Next(target, yielding) => {
             let task = &mut engine.tasks[c.index];
             let Some(left) = task.loops.last_mut() else {
-                engine.jit_error = Some(anyhow!("invalid repeat stack"));
+                engine.jit_error = Some(engine.located_error("invalid repeat stack", pc, c.actor));
                 return u64::MAX - 1;
             };
             *left -= 1;
@@ -237,16 +234,14 @@ pub(super) unsafe extern "C" fn h_boundary(c: *mut NativeContext, pc: u64) -> u6
         Op::RangeNext(target, yielding) => {
             let task = &mut engine.tasks[c.index];
             let Some(range) = task.ranges.last_mut() else {
-                engine.jit_error = Some(anyhow!("invalid range stack"));
+                engine.jit_error = Some(engine.located_error("invalid range stack", pc, c.actor));
                 return u64::MAX - 1;
             };
             let next = range.value + range.step;
             let kn = engine.program.semantics == RuntimeSemantics::KnCurrent;
             if next == range.value && !(kn && range.step == 0.0) {
-                engine.jit_error = Some(anyhow!(
-                    "range step makes no progress at {}",
-                    engine.program.sources[pc]
-                ));
+                engine.jit_error =
+                    Some(engine.located_error("range step makes no progress", pc, c.actor));
                 return u64::MAX - 1;
             }
             range.value = next;
