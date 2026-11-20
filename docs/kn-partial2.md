@@ -65,10 +65,10 @@
 | 检测/模型/身体识别 | `move_to_body_part` | 仅无检测结果时不修改位置；检测后端未实现 | kn-offline-round3.md、kn-async-services.md、kn-panel-ai.md |
 | 检测/模型/身体识别 | `recognize_body_part` | 仅无检测结果时 false；检测后端未实现 | kn-offline-round3.md、kn-async-services.md、kn-panel-ai.md |
 | 检测/模型/身体识别 | `recognize_gesture` | 仅无检测结果时 false；检测后端未实现 | kn-offline-round3.md、kn-async-services.md、kn-panel-ai.md |
-| 摄像头 | `open_close_webcam` | 仅从未开启 profile 的 turn_off；turn_on 明确拒绝，摄像设备未实现 | kn-panel-capture.md |
-| 摄像头 | `open_hide_camera` | 仅从未开启 profile 的 turn_off；turn_on 明确拒绝，摄像设备未实现 | kn-panel-capture.md |
-| 摄像头 | `set_camera_alpha` | 仅共享离线 alpha 控制值，严格 Number 与夹取；实际摄像/渲染未实现，异步相位未验证 | kn-panel-capture.md |
-| 摄像头 | `set_webcam_alpha` | 仅共享离线 alpha 控制值，严格 Number 与夹取；实际摄像/渲染未实现，异步相位未验证 | kn-panel-capture.md |
+| 摄像头 | `open_close_webcam` | 仅无摄像头后端时 turn_on 可恢复提示并异步续行；失败后 turn_off 重置 alpha；官方证据见 kn-r3-camera.md，真实采集未实现 | kn-panel-capture.md、kn-r3-camera.md |
+| 摄像头 | `open_hide_camera` | 仅无摄像头后端时 turn_on 可恢复提示并异步续行；失败后 turn_off 重置 alpha；官方证据见 kn-r3-camera.md，真实采集未实现 | kn-panel-capture.md、kn-r3-camera.md |
+| 摄像头 | `set_camera_alpha` | 仅共享离线 alpha 控制值，严格 Number 与夹取；实际摄像/渲染未实现，异步相位未验证 | kn-panel-capture.md、kn-r3-camera.md |
+| 摄像头 | `set_webcam_alpha` | 仅共享离线 alpha 控制值，严格 Number 与夹取；实际摄像/渲染未实现，异步相位未验证 | kn-panel-capture.md、kn-r3-camera.md |
 | 麦克风/语音 | `get_voice_answer` | 仅未开始识别的初始空文本；麦克风、权限与识别后端未实现 | kn-panel-capture.md、kn-remaining-official.md |
 | 麦克风/语音 | `get_voice_volume` | 仅默认权限 pending、拒绝 0、显式停用录音 NaN 与可选浏览器采样；每次读等待下一 update，真实无设备错误与完整平台差异未验证 | kn-panel-capture.md、kn-remaining-official.md |
 | 麦克风/语音 | `voice_recognition` | 仅未登录提前返回与宿主提示；真实权限/识别/登录 UI 未实现 | kn-panel-capture.md、kn-remaining-official.md |
