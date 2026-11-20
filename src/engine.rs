@@ -4966,6 +4966,8 @@ struct Task {
     created: u64,
     wait_started: Option<u64>,
     wait_finished: bool,
+    /// KN logical millisecond start and lifetime; K4 retains absolute wake.
+    kn_wait: Option<(f64, f64)>,
     pc: usize,
     actor: usize,
     loops: Vec<u64>,
@@ -5000,6 +5002,7 @@ impl Task {
             created: 0,
             wait_started: None,
             wait_finished: false,
+            kn_wait: None,
             pc: script.start,
             actor: script.actor,
             loops: vec![],
@@ -5270,6 +5273,8 @@ pub struct Engine {
     kn_warp: kn_warp::Slice,
     cloud: cloud::State,
     scheduler_tick: u64,
+    wait_clock_ms: f64,
+    wait_clock_error: f64,
     k4_frames: u64,
     k4_shake_clock: k4_shake::Clock,
     k4_media: k4_media::State,
@@ -5765,6 +5770,8 @@ impl Engine {
             next_video_generation: 1,
             video_above_pen: false,
             scheduler_tick: 0,
+            wait_clock_ms: 0.0,
+            wait_clock_error: 0.0,
             k4_frames: 0,
             k4_shake_clock: k4_shake::Clock::default(),
             k4_media: k4_media::State::default(),
@@ -5945,6 +5952,8 @@ impl Engine {
         self.stopped = false;
         self.initialize_legacy_physics();
         self.time = 0.0;
+        self.wait_clock_ms = 0.0;
+        self.wait_clock_error = 0.0;
         self.k4_frames = 0;
         self.k4_shake_clock.reset();
         self.k4_media.reset();
@@ -6734,7 +6743,7 @@ impl Engine {
         });
         let saved_returned = task.returned.take();
         let (wake, anim) = (task.wake, task.anim.clone());
-        let wait = (task.wait_started, task.wait_finished);
+        let wait = (task.wait_started, task.wait_finished, task.kn_wait);
         task.pc = self.program.procedure_entries[procedure];
         self.reporter_depth += 1;
         let mut steps = 0usize;
@@ -6772,7 +6781,7 @@ impl Engine {
         }
         task.wake = wake;
         task.anim = anim;
-        (task.wait_started, task.wait_finished) = wait;
+        (task.wait_started, task.wait_finished, task.kn_wait) = wait;
         std::mem::replace(&mut task.returned, saved_returned).unwrap_or(Cell::Null)
     }
     fn monitor_values(&self) -> Vec<Monitor> {
@@ -9605,7 +9614,15 @@ impl Engine {
             Op::Jump(target) => self.tasks[index].pc = target,
             Op::Yield => return Ok(false),
             Op::Wait(e) => {
-                self.tasks[index].wake = self.time + self.eval(e, actor).max(0.0);
+                let seconds = self.eval(e, actor).max(0.0);
+                if self.program.semantics == RuntimeSemantics::KnCurrent {
+                    // KN TaskManager compares elapsed logical milliseconds with
+                    // lifetime, not independently rounded absolute second sums.
+                    self.tasks[index].kn_wait = Some((self.wait_clock_ms, seconds * 1000.0));
+                    self.tasks[index].wake = 0.0;
+                } else {
+                    self.tasks[index].wake = self.time + seconds;
+                }
                 // Both official runtimes start the task at this update's end,
                 // observe expiry at a later update's end, then dispose its lock
                 // on the following entry. Even wait 0 skips one full update.
@@ -10360,6 +10377,7 @@ impl Engine {
             if task.wait_finished {
                 task.wait_started = None;
                 task.wait_finished = false;
+                task.kn_wait = None;
             }
         }
         if self.program.k4_timer.is_some() {
@@ -10373,6 +10391,12 @@ impl Engine {
             self.timer += dt;
         }
         self.time += dt;
+        // Compensated logical milliseconds avoid cumulative second-clock drift.
+        // No deadline epsilon: genuinely positive sub-ms lifetimes stay positive.
+        let delta_ms = dt * 1000.0 - self.wait_clock_error;
+        let next_ms = self.wait_clock_ms + delta_ms;
+        self.wait_clock_error = (next_ms - self.wait_clock_ms) - delta_ms;
+        self.wait_clock_ms = next_ms;
         self.tick_kn_timers();
         self.received.clear();
         self.clone_counts.clear();
@@ -10485,7 +10509,10 @@ impl Engine {
             if task
                 .wait_started
                 .is_some_and(|tick| tick < self.scheduler_tick)
-                && task.wake <= self.time
+                && task.kn_wait.map_or_else(
+                    || task.wake <= self.time,
+                    |(start, lifetime)| lifetime <= self.wait_clock_ms - start,
+                )
             {
                 task.wait_finished = true;
             }

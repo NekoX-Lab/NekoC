@@ -47,6 +47,9 @@ bash E:/nekoc-wt/_cargo.sh test --test kn_r3_sched
 ```
 
 每个更新使用 16 ms 时钟增量，不把 Playwright 的等待时间当作运行帧数。
+这里只固定逻辑时钟与 Date；没有固定 `clock.wall_clock_now()` 的
+`performance.now()`。官方 warp 的 4 ms 墙钟分片仍受机器负载影响，因此
+不保证任意长 warp 作品的逐帧确定性；本次等待探针和计数器语料不依赖该分片。
 8 个更新后停止采样；所有 10 个原创 fixture 已通过官方编辑器检查
 （`ok: true`，无 issues/pageErrors）。Rust 回归对等待、条件等待和重复执行
 逐帧比较，解释器/JIT 都执行 600 次 start，覆盖热身后的执行路径。
@@ -60,6 +63,37 @@ bash E:/nekoc-wt/_cargo.sh test --test kn_r3_sched
 | repeat（3 次） | `AB`, `ABAB`, `ABABAB`, `ABABABab` |
 
 `dt=0`、1 ms、100 ms 的回归还确保零等待的帧边界不依赖写死的 60 Hz。
+
+## 连续正等待的精度回归（审查修订）
+
+短时间反复 start 不能覆盖累计时间误差。原先 `wake = time + seconds`
+与秒时钟逐帧累加采用不同浮点路径，32 ms 循环在第 1005 帧会比官方少一次。
+KN 现单独使用补偿累加的逻辑毫秒时钟，并像官方 `task_update` 一样比较
+`lifetime <= now - start`，不把截止秒数再加到较大的绝对秒时钟上，也不添加
+epsilon 或把微小正 lifetime 截断成零。K4 的原有 wake 判定不变；reporter
+调用保存/恢复 KN 等待状态，start 重置时钟和补偿项。初始化、观察到期、
+下一入口释放三个阶段保持不变。这只改善浮点模型，并不承诺无限时长或
+任意 f64 步长都可无损表示。
+
+`docs/kn-r3-wait-precision.json` 归档 5 个原创探针各 1200 次官方更新的
+完整 `ready` 序列（恒空的 trace 不重复存储）、输入散列、浏览器和 bundle
+信息及编辑器检查结果。每个探针只 start 一次，不按 8 帧重置：
+
+- `long`：400 次 `ready += 1; wait(0.032)`；16 ms/update，官方第 1005 帧为 252。
+- `below` / `above`：32 ms 上下各 1e-9 ms，严格核对边界，不用 epsilon 吞掉差异。
+- `tiny`：1e-12 秒正等待，步长循环为 `[0, 0, 1e-8]` ms，零 dt 不会令其到期。
+- `variable`：32 ms 等待，步长循环为 `[7, 9, 0, 16, 5, 11]` ms。
+
+Rust 对解释器和默认 JIT 配置逐帧比较，并检查再次 start 的初始状态；
+这不是每条路径都实际进入 native 代码的证明。所有新增作品均通过官方
+编辑器 `ok: true`、无 issues/pageErrors，Node 回归绑定生成器与归档字节。
+
+```bash
+node tools/compat/kn-r3-sched.mjs --precision --generate
+NEKOC_NODE_MODULES=D:/AppData/Local/Temp/opencode/nekoc-kitenn/node_modules node tools/compat/kn-r3-sched.mjs --precision
+NEKOC_NODE_MODULES=D:/AppData/Local/Temp/opencode/nekoc-kitenn/node_modules node tools/editor-compat.mjs tests/fixtures/kn-r3-sched/precision/*.bcmkn --channel msedge --out dist/r3-knsched/precision-editor.json
+node tools/compat/kn-r3-sched.mjs --precision --archive
+```
 
 ## 已发现但本次未修复的调度差异
 

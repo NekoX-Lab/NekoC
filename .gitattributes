@@ -20,3 +20,4 @@ samples/web-pen-stress.bcmkn text eol=crlf
 
 # Original KN scheduling probes: their observation hashes are LF bytes.
 tests/fixtures/kn-r3-sched/*.bcmkn text eol=lf
+tests/fixtures/kn-r3-sched/precision/*.bcmkn text eol=lf

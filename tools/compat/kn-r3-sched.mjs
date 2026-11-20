@@ -53,7 +53,20 @@ export async function projects() {
   }));
 }
 
-export async function observe(browser, source, frames = 8) {
+export async function precisionProjects() {
+  const base = (await projects())["wait-positive"];
+  const cases = {};
+  for (const [name, seconds] of Object.entries({ long: 0.032, below: 0.031999999999, above: 0.032000000001, tiny: 1e-12, variable: 0.032 })) {
+    const p = structuredClone(base);
+    p.projectName = `NekoC r3-knsched precision ${name}`;
+    const actor = Object.values(p.actors.actorsDict)[0];
+    actor.nekoBlockJsonList = [start(repeat(400, b("change_variables", { variable: "ready", method: "increase" }, { value: n(1) }), wait(seconds)))];
+    cases[name] = p;
+  }
+  return cases;
+}
+
+export async function observe(browser, source, frames = 8, frameMs = 16) {
   const page = await browser.newPage(), result = { sha256: hash(source), pageErrors: [], bundles: [] };
   page.on("pageerror", e => result.pageErrors.push(String(e)));
   try {
@@ -84,7 +97,7 @@ export async function observe(browser, source, frames = 8) {
     await page.addStyleTag({ content: "#DialogContainer{display:none!important}" });
     const complete = page.getByText(/^完成$/).last();
     if (await complete.isVisible()) await complete.dispatchEvent("click");
-    await page.evaluate(limit => {
+    await page.evaluate(({ limit, frameMs }) => {
       const { bcm, runtime } = window.__r3Handles, core = runtime.get_instance().getHeart().core;
       const manager = core.get_runtime_manager().run_mgr, update = manager.update;
       const trace = window.__r3Sched = { frames: [], runtimeErrors: [] };
@@ -96,7 +109,7 @@ export async function observe(browser, source, frames = 8) {
       manager.clock.update = () => {};
       manager.update = function(...args) {
         if (trace.frames.length >= limit) return;
-        now = trace.frames.length * 16;
+        if (trace.frames.length) now += Array.isArray(frameMs) ? frameMs[(trace.frames.length - 1) % frameMs.length] : frameMs;
         if (!trace.frames.length) manager.timer_block_date = 946684800000;
         window.Date = class extends NativeDate {
           constructor(...a) { super(...(a.length ? a : [946684800000 + now])); }
@@ -111,7 +124,7 @@ export async function observe(browser, source, frames = 8) {
           return result;
         } finally { window.Date = NativeDate; }
       };
-    }, frames);
+    }, { limit: frames, frameMs });
     await page.getByText(/^开始$/).last().dispatchEvent("click");
     await page.waitForFunction(limit => window.__r3Sched.frames.length >= limit || window.__r3Sched.runtimeErrors.length, frames, { timeout: 30000 });
     Object.assign(result, await page.evaluate(() => window.__r3Sched));
@@ -123,6 +136,48 @@ export async function observe(browser, source, frames = 8) {
 
 async function main() {
   await fs.mkdir(out, { recursive: true });
+  if (process.argv.includes("--precision")) {
+    const dir = path.join(fixtures, "precision");
+    await fs.mkdir(dir, { recursive: true });
+    const cases = await precisionProjects();
+    if (process.argv.includes("--archive")) {
+      const report = JSON.parse(await fs.readFile(path.join(out, "precision-official.json"), "utf8"));
+      const editor = JSON.parse(await fs.readFile(path.join(out, "precision-editor.json"), "utf8"));
+      if (!report.ok || !editor.ok || Object.keys(report.cases).length !== Object.keys(cases).length || editor.projects.length !== Object.keys(cases).length)
+        throw new Error("Incomplete precision evidence");
+      for (const name of Object.keys(cases)) {
+        const bytes = await fs.readFile(path.join(dir, `${name}.bcmkn`));
+        const c = report.cases[name];
+        const checked = editor.projects.find(p => path.basename(p.input) === `${name}.bcmkn`);
+        if (!c?.ok || c.sha256 !== hash(bytes) || c.frames.length !== 1200 || c.pageErrors.length || c.runtimeErrors.length ||
+            !checked?.ok || checked.sha256 !== c.sha256 || checked.issues.length || checked.pageErrors.length ||
+            c.frames.some((f, i) => f.elapsedFrames !== i + 1 || f.variables.trace !== "")) throw new Error(`Unpaired precision evidence: ${name}`);
+        c.ready = c.frames.map(f => f.variables.ready);
+        delete c.frames;
+        checked.input = `tests/fixtures/kn-r3-sched/precision/${name}.bcmkn`;
+      }
+      await fs.writeFile(path.join(root, "docs/kn-r3-wait-precision.json"), JSON.stringify({ ...report, editorCompat: editor }, null, 2) + "\n");
+      return;
+    }
+    if (process.argv.includes("--generate")) {
+      for (const [name, p] of Object.entries(cases)) await fs.writeFile(path.join(dir, `${name}.bcmkn`), JSON.stringify(p, null, 2) + "\n");
+      return;
+    }
+    const browser = await loadPlaywright().chromium.launch({ headless: true, channel: "msedge" });
+    const report = { verifiedAt: new Date().toISOString(), browserVersion: browser.version(), cases: {} };
+    try {
+      for (const name of Object.keys(cases)) {
+        const frameMs = name === "variable" ? [7, 9, 0, 16, 5, 11] : name === "tiny" ? [0, 0, 1e-8] : 16;
+        const observation = await observe(browser, await fs.readFile(path.join(dir, `${name}.bcmkn`), "utf8"), 1200, frameMs);
+        report.cases[name] = { ...observation, frameMs };
+        console.log(name, observation.ok, observation.frames.length);
+      }
+    } finally { await browser.close(); }
+    report.ok = Object.values(report.cases).every(c => c.ok);
+    await fs.writeFile(path.join(out, "precision-official.json"), JSON.stringify(report, null, 2) + "\n");
+    if (!report.ok) process.exitCode = 1;
+    return;
+  }
   if (process.argv.includes("--generate")) {
     await fs.mkdir(fixtures, { recursive: true });
     for (const [name, project] of Object.entries(await projects())) await fs.writeFile(path.join(fixtures, `${name}.bcmkn`), JSON.stringify(project, null, 2) + "\n");

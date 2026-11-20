@@ -1523,7 +1523,8 @@ fn pencraft_imported_mixed_lists_locals_and_procedures_execute() {
 
 #[test]
 fn coalescing_runs_invisible_ticks_but_never_shortens_waits() {
-    // A wait lock ends coalescing; only runnable invisible tails may coalesce.
+    // With no other runnable task, a wait lock ends coalescing. Other runnable
+    // invisible tasks can keep this opt-in mode ticking with zero dt.
     let mut p = project(json!({"type":"repeat_forever","statements":{"DO":{
         "type":"change_variables","fields":{"variable":"score","method":"increase"},"inputs":{"value":num(1.0)},
         "next":{"type":"wait","inputs":{"time":num(0.0)}}}}}));
@@ -1534,7 +1535,7 @@ fn coalescing_runs_invisible_ticks_but_never_shortens_waits() {
     let f = vm.advance_with(1.0 / 60.0, 1_000_000, budget, 1).unwrap();
     assert_eq!((f.ticks, vm.numeric_variables()[0]), (1, 1.0));
     let f = vm.advance_with(1.0 / 60.0, 1_000_000, budget, 16).unwrap();
-    // A wait lock prevents coalescing until its update-end expiry is released.
+    // With no other runnable task, coalescing stops until the lock is released.
     assert_eq!((f.ticks, vm.numeric_variables()[0]), (1, 1.0));
     let f = vm.advance_with(1.0 / 60.0, 1_000_000, budget, 16).unwrap();
     assert_eq!((f.ticks, vm.numeric_variables()[0]), (2, 2.0));

@@ -4,6 +4,51 @@ use sha2::{Digest, Sha256};
 use std::time::Duration;
 
 #[test]
+fn continuous_positive_waits_match_official_millisecond_clock() {
+    let report: Value =
+        serde_json::from_str(include_str!("../docs/kn-r3-wait-precision.json")).unwrap();
+    for (name, case) in report["cases"].as_object().unwrap() {
+        let bytes =
+            std::fs::read(format!("tests/fixtures/kn-r3-sched/precision/{name}.bcmkn")).unwrap();
+        assert_eq!(format!("{:x}", Sha256::digest(&bytes)), case["sha256"]);
+        let project: Value = serde_json::from_slice(&bytes).unwrap();
+        for jit in [false, true] {
+            let mut vm = Engine::new(Program::compile(&project).unwrap());
+            if !jit {
+                vm.disable_jit();
+            }
+            vm.use_virtual_clock();
+            vm.start();
+            let expected = case["ready"].as_array().unwrap();
+            assert_eq!(expected.len(), 1200);
+            for (frame, ready) in expected.iter().enumerate() {
+                let dt_ms = if frame == 0 {
+                    0.0
+                } else if let Some(sequence) = case["frameMs"].as_array() {
+                    sequence[(frame - 1) % sequence.len()].as_f64().unwrap()
+                } else {
+                    case["frameMs"].as_f64().unwrap()
+                };
+                let update = vm
+                    .advance(dt_ms / 1000.0, 100_000, Duration::from_secs(1))
+                    .unwrap();
+                assert!(!update.budget_yield);
+                assert_eq!(
+                    vm.variable_value("ready").number(),
+                    ready.as_f64().unwrap(),
+                    "{name}, frame {}, jit={jit}",
+                    frame + 1
+                );
+            }
+            // A new start resets both the compensated clock and per-task epoch.
+            vm.start();
+            vm.advance(0.0, 100_000, Duration::from_secs(1)).unwrap();
+            assert_eq!(vm.variable_value("ready").number(), 1.0);
+        }
+    }
+}
+
+#[test]
 fn waits_and_repeat_match_official_frame_boundaries() {
     let report: Value =
         serde_json::from_str(include_str!("../docs/kn-r3-scheduling-official.json")).unwrap();
