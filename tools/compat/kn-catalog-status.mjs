@@ -201,7 +201,7 @@ export function inventory(root, reference, engineSource) {
   // Fail closed if the type-agnostic import path changes. It clones *all* fields,
   // including type, without a block whitelist (not TS API emission support).
   if (!compiler.includes("graph::check(workspace_data)?;") ||
-      !compiler.includes("graph::nest(id, blocks, &connections)") ||
+      !compiler.includes("graph::nest(id, blocks, connections)") ||
       !graph.includes("crate::json::Json::new(crate::json::clone_value(&blocks[id]))") ||
       !graph.includes('for key in ["next", "inputs", "statements"]')) {
     throw new Error("Re-audit bcmkn_compiler::graph before classifying readable types");

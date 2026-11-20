@@ -118,8 +118,8 @@
 | 3 | `_break_statement` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:4875` | T21 | 官方注册/JS 转换已验证；KN 原生播放中的嵌套退出与调度差分未验证 |
 | 4 | `_continue_statement` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:4883` | T21, T43 | 官方注册/JS 转换已验证；KN 原生播放中的作用域与调度差分未验证 |
 | 5 | `_execute` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:3796` | T21, T42 | 官方域函数空体；NekoC 先求值 action 再丢弃结果，完整官方输入求值管线差分未验证 |
-| 6 | `_object_get` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:2055`<br>`src/engine.rs:2891` | T22, T24, T25, T28, T30, T31, T34, T42, T52 | KN 共享引用对象；属性缺失保留 undefined，完整 JS 原型链及特殊键未验证 |
-| 7 | `_object_literal` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:2054`<br>`src/engine.rs:2891` | T6, T22, T30, T52 | KN 共享引用对象；官方字面量/属性读写有限样例有证据，完整 JS 原型链及全部 JSON 边界未验证 |
+| 6 | `_object_get` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:2055`<br>`src/engine.rs:2891` | T12, T22, T24, T25, T28, T30, T31, T34, T42, T52 | KN 共享引用对象；属性缺失保留 undefined，完整 JS 原型链及特殊键未验证 |
+| 7 | `_object_literal` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:2054`<br>`src/engine.rs:2891` | T6, T12, T22, T30, T52 | KN 共享引用对象；官方字面量/属性读写有限样例有证据，完整 JS 原型链及全部 JSON 边界未验证 |
 | 8 | `_object_set` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:2056`<br>`src/engine.rs:2891`<br>`src/engine.rs:3797` | T22, T24, T25, T28, T30, T31, T34, T42 | KN 共享引用对象；赋值返回值及副作用有限样例有证据，完整 JS 原型链未验证 |
 | 9 | `_return_statement` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:4539` | T21 | 官方注册/JS 转换已验证；NekoC 复用过程返回，KN 原生播放差分未验证 |
 | 10 | `_variable_get` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:2227`<br>`src/engine.rs:2891` | T21, T23 | 有路径；完整语义未验证 |
@@ -303,10 +303,10 @@
 | 188 | `script_variables_value` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:2225`<br>`src/engine.rs:2866` | T9, T15, T21, T46 | 有路径；完整语义未验证 |
 | 189 | `self_appear` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4007` | T9, T46 | 有路径；完整语义未验证 |
 | 190 | `self_appear_animation` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4278` | T9, T46 | 有路径；完整语义未验证 |
-| 191 | `self_ask` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4417` | T9, T46 | 有路径；完整语义未验证 |
+| 191 | `self_ask` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4417` | T9, T12, T46 | 有路径；完整语义未验证 |
 | 192 | `self_bounce_off_edge` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4256` | T9, T46, T47 | 有路径；完整语义未验证 |
 | 193 | `self_broadcast` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4738` | T9, T20, T39, T46 | 有路径；完整语义未验证 |
-| 194 | `self_broadcast_and_wait` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4738` | T9, T46 | 有路径；完整语义未验证 |
+| 194 | `self_broadcast_and_wait` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4738` | T9, T12, T46 | 有路径；完整语义未验证 |
 | 195 | `self_broadcast_with_param` | 有执行路径／未完整验证 | 可配置面板／默认隐藏 | `src/engine.rs:4738` | T9, T46 | 有路径；完整语义未验证 |
 | 196 | `self_change_coordinate_x` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3992` | T9, T46 | 有路径；完整语义未验证 |
 | 197 | `self_change_coordinate_y` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3992` | T46 | 有路径；完整语义未验证 |
@@ -323,7 +323,7 @@
 | 208 | `self_glide_to` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4141` | T9, T39, T46 | 有路径；完整语义未验证 |
 | 209 | `self_go_forward` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3986` | T9, T12, T15, T43, T46, T53 | 有路径；完整语义未验证 |
 | 210 | `self_gradually_show_hide` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4180` | T9, T46 | 有路径；完整语义未验证 |
-| 211 | `self_listen` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3351` | T9, T20, T46 | 有路径；完整语义未验证 |
+| 211 | `self_listen` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3351` | T9, T12, T20, T46 | 有路径；完整语义未验证 |
 | 212 | `self_listen_value` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:2103`<br>`src/engine.rs:2891` | T9, T11, T46 | 有路径；完整语义未验证 |
 | 213 | `self_listen_with_param` | 有执行路径／未完整验证 | 可配置面板／默认隐藏 | `src/engine.rs:3351` | T9, T46 | 有路径；完整语义未验证 |
 | 214 | `self_move_specify` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4108` | T46 | 有路径；完整语义未验证 |
@@ -404,8 +404,8 @@
 | 289 | `variables_get` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2205`<br>`src/engine.rs:2852` | T1, T6, T8, T9, T10, T11, T12, T15, T16, T21, T22, T23, T24, T25, T28, T30, T31, T34, T36, T38, T42, T43, T46, T50, T51, T52, T54, T55, T57 | 有路径；完整语义未验证 |
 | 290 | `variables_set` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3802` | T1, T3, T6, T7, T8, T9, T11, T12, T15, T16, T22, T23, T26, T29, T30, T35, T36, T37, T38, T39, T43, T46, T47, T48, T50, T51, T52, T54, T55, T56, T57 | 有路径；完整语义未验证 |
 | 291 | `voice_recognition` | 部分语义 | 普通面板配置／默认未隐藏 | `src/engine.rs:3733` | T31, T32, T33, T34 | 仅未登录提前返回与宿主提示；真实权限/识别/登录 UI 未实现 |
-| 292 | `wait` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4721` | T1, T5, T9, T15, T21, T39, T46, T47, T51 | 有路径；完整语义未验证 |
-| 293 | `wait_until` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4722` | T9, T42, T46 | 有路径；完整语义未验证 |
+| 292 | `wait` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4721` | T1, T5, T9, T12, T15, T21, T39, T46, T47, T51 | 有路径；完整语义未验证 |
+| 293 | `wait_until` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4722` | T9, T12, T42, T46 | 有路径；完整语义未验证 |
 | 294 | `wand_button_is_pressed` | 部分语义 | 官方硬件扩展定义／未安装 | `src/engine.rs:1943`<br>`src/engine.rs:2794` | T25 | 仅空硬件 Map 时同步 boolean false；真实按键与未连接提示 UI 未实现 |
 | 295 | `wand_coordinate` | 部分语义 | 官方硬件扩展定义／未安装 | `src/engine.rs:1943`<br>`src/engine.rs:2794` | T25 | 仅空硬件 Map 时同步 numeric NaN；真实坐标与未连接提示 UI 未实现 |
 | 296 | `wand_direction_when` | 部分语义 | 官方硬件扩展定义／未安装 | `src/engine.rs:3338` | T42 | 仅无硬件后端时注册休眠事件并验证事件体；自然设备事件不触发，真实派发未实现 |

@@ -227,6 +227,180 @@ fn workspace_path_budget_and_iterative_expansion() {
     }
 }
 
+#[test]
+fn deep_connection_extensions_are_borrowed_without_recursive_clone_or_drop() {
+    let mut metadata = Json::new(Value::Null);
+    for _ in 0..30_000 {
+        metadata = Json::new(Value::Array(vec![metadata.into_value()]));
+    }
+    let mut w = Json::new(json!({"blocks":{
+        "a":{"type":"self_pen_up"},"b":{"type":"self_pen_down"}},
+        "connections":{"a":{"b":{"type":"next"}}}}));
+    w["connections"]["a"]["b"]["extension"] = metadata.into_value();
+    // Default harness stack, including normal return and error cleanup. The
+    // opaque edge metadata is legal JSON below MAX_DEPTH, not executable data.
+    let roots = bcmkn_compiler::workspace_data_to_neko_blocks(&w).unwrap();
+    assert_eq!(roots[0]["next"]["type"], "self_pen_down");
+    assert!(json::to_vec(&w).unwrap().len() < 61_000);
+    w["connections"]["a"]["b"]["type"] = json!(false);
+    assert!(bcmkn_compiler::workspace_data_to_neko_blocks(&w).is_err());
+}
+
+fn text_literal(text: &str) -> Value {
+    json!({"type":"text","fields":{"TEXT":text}})
+}
+
+fn missing_property() -> Value {
+    json!({"type":"_object_get","inputs":{"obj":{"type":"_object_literal","inputs":{}},
+        "key":text_literal("missing")}})
+}
+
+fn join(parts: Vec<Value>) -> Value {
+    let inputs: serde_json::Map<String, Value> = parts
+        .into_iter()
+        .enumerate()
+        .map(|(i, v)| (format!("ADD{i}"), v))
+        .collect();
+    json!({"type":"text_join","inputs":inputs})
+}
+
+fn assert_resource_error(p: &Value, block: &str) {
+    for interpreted in [true, false] {
+        let mut vm = Engine::new(Program::compile(p).unwrap());
+        if interpreted {
+            vm.disable_jit();
+        }
+        vm.use_virtual_clock();
+        vm.start();
+        let error = match vm.advance(1.0 / 60.0, 10_000, Duration::ZERO) {
+            Err(error) => error,
+            Ok(_) => panic!("{block}: expected resource error (interpreter={interpreted})"),
+        };
+        let message = format!("{error:#}");
+        assert!(
+            message.contains("text size exceeds VM safety limit"),
+            "{message}"
+        );
+        assert!(message.contains(&format!("at block {block}")), "{message}");
+    }
+}
+
+#[test]
+fn join_budget_covers_list_prefixes_and_undefined_truncation() {
+    let get = || json!({"type":"variables_get","fields":{"variable":"a"}});
+    // Every leaf is below 16 MiB; the coercion, not the initial JSON, exceeds it.
+    for parts in [
+        vec![get(), missing_property()],
+        vec![get(), text_literal("")],
+        vec![get(), missing_property(), text_literal("ignored")],
+        vec![text_literal("prefix"), get(), missing_property()],
+    ] {
+        let mut p = executable(
+            json!({"id":"join-limit","type":"variables_set","fields":{"variable":"out"},
+            "inputs":{"value":join(parts)}}),
+        );
+        p["variables"]["variablesDict"]["a"] = json!({"name":"a","isGlobal":true,
+            "value":["a".repeat(9*1024*1024), "b".repeat(9*1024*1024)]});
+        p["variables"]["variablesDict"]["out"] = json!({"name":"out","isGlobal":true,"value":""});
+        assert_resource_error(&p, "join-limit");
+    }
+    // A single existing Text can also be over the result budget even when the
+    // second operand truncates the join. No flattening is necessary to reject it.
+    let mut p = executable(
+        json!({"id":"text-limit","type":"variables_set","fields":{"variable":"out"},"inputs":{"value":join(vec![get(), missing_property()])}}),
+    );
+    p["variables"]["variablesDict"]["a"] =
+        json!({"name":"a","isGlobal":true,"value":"x".repeat(16*1024*1024+1)});
+    assert_resource_error(&p, "text-limit");
+    p["actors"]["actorsDict"]["nekoc-default-actor"]["nekoBlockJsonList"][0]["next"] = json!({"id":"log-limit","type":"console_log","inputs":{"console_log":join(vec![get(), missing_property()])}});
+    assert_resource_error(&p, "log-limit");
+}
+
+#[test]
+fn bounded_join_preserves_list_coercion_and_undefined_short_circuit() {
+    use nekoc::engine::Cell;
+    let get = || json!({"type":"variables_get","fields":{"variable":"a"}});
+    for (parts, expected) in [
+        (vec![get(), missing_property()], "x,,true,猫,"),
+        (
+            vec![get(), missing_property(), text_literal("ignored")],
+            "x,,true,猫,",
+        ),
+        (vec![missing_property(), get()], ""),
+    ] {
+        let mut p = executable(
+            json!({"type":"variables_set","fields":{"variable":"out"},"inputs":{"value":join(parts)}}),
+        );
+        p["variables"]["variablesDict"]["a"] =
+            json!({"name":"a","isGlobal":true,"value":["x",null,[true,"猫"],null]});
+        p["variables"]["variablesDict"]["out"] = json!({"name":"out","isGlobal":true,"value":""});
+        for interpreted in [true, false] {
+            let mut vm = Engine::new(Program::compile(&p).unwrap());
+            if interpreted {
+                vm.disable_jit();
+            }
+            vm.use_virtual_clock();
+            vm.start();
+            vm.advance(1.0 / 60.0, 100, Duration::ZERO).unwrap();
+            assert_eq!(
+                vm.variable_text("out"),
+                expected,
+                "interpreter={interpreted}, a={}",
+                vm.variable_text("a")
+            );
+        }
+    }
+    // Runtime cyclic lists and undefined list elements keep the old coercion.
+    // Break the reference cycle after execution so the test does not leak it.
+    let mut p = executable(json!({"type":"variables_set","fields":{"variable":"out"},
+        "inputs":{"value":join(vec![get(), missing_property()])}}));
+    p["variables"]["variablesDict"]["a"] = json!({"isGlobal":true,"value":["x"]});
+    for interpreted in [true, false] {
+        let mut vm = Engine::new(Program::compile(&p).unwrap());
+        if interpreted {
+            vm.disable_jit();
+        }
+        vm.use_virtual_clock();
+        vm.start();
+        let Cell::List(items) = vm.variable_value("a") else {
+            panic!("expected list")
+        };
+        items
+            .borrow_mut()
+            .extend([Cell::Undefined, Cell::List(items.clone())]);
+        let result = vm.advance(1.0 / 60.0, 100, Duration::ZERO);
+        items.borrow_mut().clear();
+        result.unwrap();
+        assert_eq!(vm.variable_text("out"), "x,,");
+    }
+}
+
+#[test]
+fn resource_errors_propagate_across_wait_broadcast_and_cold_op_yields() {
+    let get = || json!({"type":"variables_get","fields":{"variable":"s"}});
+    let too_long = || join(vec![get(), get()]);
+    for (kind, input) in [
+        ("wait_until", "condition"),
+        ("wait", "time"),
+        ("self_broadcast_and_wait", "message"),
+        ("self_ask", "text"),
+    ] {
+        let mut p = executable(json!({"id":"yield-limit","type":kind,"inputs":{input:too_long()}}));
+        p["variables"]["variablesDict"]["s"] =
+            json!({"name":"s","isGlobal":true,"value":"x".repeat(8*1024*1024+1)});
+        // Make broadcast(wait) take its early-return branch even when a failed
+        // reporter supplies the Undefined sentinel's message spelling.
+        p["actors"]["actorsDict"]["nekoc-default-actor"]["nekoBlockJsonList"]
+            .as_array_mut()
+            .unwrap()
+            .push(
+                json!({"type":"self_listen","inputs":{"message":{"type":"broadcast_input","fields":{"message":"undefined"}}},
+                "statements":{"DO":{"type":"wait","inputs":{"time":number(1.0)}}}}),
+            );
+        assert_resource_error(&p, "yield-limit");
+    }
+}
+
 fn doubling(kind: usize) -> Json {
     let get = || json!({"type":"variables_get","fields":{"variable":"s"}});
     let join = if kind == 1 {

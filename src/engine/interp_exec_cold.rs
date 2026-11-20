@@ -2,8 +2,8 @@
 use super::*;
 
 impl Engine {
-    /// `None` falls through to exec's shared value_error check; `Some` preserves
-    /// an original early return, including helpers that return directly.
+    /// `None` continues hot dispatch; `Some` preserves an original early return.
+    /// Both paths pass through exec's shared value_error boundary.
     #[cold]
     #[inline(never)]
     pub(super) fn exec_cold(

@@ -377,13 +377,13 @@ pub fn workspace_data_to_neko_blocks(workspace_data: &Value) -> Result<Vec<Value
     // Validate the complete graph before expanding it: a small shared DAG can
     // otherwise allocate an exponentially large tree, and cycles never finish.
     graph::check(workspace_data)?;
+    let empty_connections = Map::new();
     let connections = workspace_data
         .get("connections")
         .and_then(Value::as_object)
-        .cloned()
-        .unwrap_or_default();
+        .unwrap_or(&empty_connections);
 
-    let child_ids = collect_child_ids(&connections);
+    let child_ids = collect_child_ids(connections);
     let mut roots = blocks
         .iter()
         .filter(|(id, block)| {
@@ -399,7 +399,7 @@ pub fn workspace_data_to_neko_blocks(workspace_data: &Value) -> Result<Vec<Value
 
     roots
         .iter()
-        .map(|id| graph::nest(id, blocks, &connections))
+        .map(|id| graph::nest(id, blocks, connections))
         .collect()
 }
 

@@ -76,13 +76,61 @@ impl Cell {
         Self::Text(Text::concat(&a, &b))
     }
     pub(super) fn try_concat(a: &Self, b: &Self) -> Result<Self> {
-        let text = |value: &Self| match value {
-            Self::Text(text) => text.clone(),
-            _ => value.text().into(),
+        let text = |value: &Self| -> Result<Text> {
+            if let Self::Text(text) = value {
+                check_text_growth(0, text.len())?;
+                Ok(text.clone())
+            } else {
+                let mut out = String::new();
+                value.append_bounded_text(&mut out)?;
+                Ok(out.into())
+            }
         };
-        let (a, b) = (text(a), text(b));
+        let (a, b) = (text(a)?, text(b)?);
         check_text_growth(a.len(), b.len())?;
         Ok(Self::Text(Text::concat(&a, &b)))
+    }
+    /// Coerce lists directly into a bounded result, checking each leaf and
+    /// separator before allocating its bytes. Match text_guarded's cyclic-list
+    /// and null/undefined-element behavior without an intermediate Vec<String>.
+    pub(super) fn append_bounded_text(&self, out: &mut String) -> Result<()> {
+        self.append_bounded_text_at(out, &mut Vec::new())
+    }
+    fn append_bounded_text_at(&self, out: &mut String, active: &mut Vec<usize>) -> Result<()> {
+        fn append(out: &mut String, text: &str) -> Result<()> {
+            check_text_growth(out.len(), text.len())?;
+            out.push_str(text);
+            Ok(())
+        }
+        match self {
+            Self::Text(text) => {
+                check_text_growth(out.len(), text.len())?;
+                text.append_to(out);
+                Ok(())
+            }
+            Self::List(items) => {
+                let pointer = Rc::as_ptr(items) as usize;
+                if active.contains(&pointer) || active.len() >= 128 {
+                    return Ok(());
+                }
+                active.push(pointer);
+                let result = (|| {
+                    for (i, value) in items.borrow().iter().enumerate() {
+                        if i != 0 {
+                            append(out, ",")?;
+                        }
+                        if !matches!(value, Self::Null | Self::Undefined) {
+                            value.append_bounded_text_at(out, active)?;
+                        }
+                    }
+                    Ok(())
+                })();
+                active.pop();
+                result
+            }
+            // Scalar conversions are small, independent of user string length.
+            _ => append(out, &self.text()),
+        }
     }
     pub fn from_json(value: &Value) -> Result<Self> {
         Self::from_json_at(value, 0)
