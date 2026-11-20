@@ -584,7 +584,16 @@ impl Engine {
             | Op::Size(e)
             | Op::PenProperty(_, e, _) => pure(e),
             Op::Position(x, y) => pure(x) && pure(y),
-            Op::Visible(_) | Op::Pen(_) | Op::Color(_) | Op::Clear => true,
+            // Path storage/rasterization cannot re-enter the scheduler or move
+            // cached slots/locals. Keep exec's stage checks and fill ordering;
+            // h_transfer exits immediately when closing a path fills the output
+            // budget, before any following native instruction can run.
+            Op::Visible(_)
+            | Op::Pen(_)
+            | Op::Color(_)
+            | Op::Clear
+            | Op::PenPath(_)
+            | Op::FillColor(_) => true,
             Op::ClearList(r) => list(r),
             Op::SetValue(_, v)
             | Op::ReturnValue(v)
