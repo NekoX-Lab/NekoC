@@ -143,6 +143,12 @@ body.fullscreen-fallback-active{overflow:hidden}
   .virtual-controls-visible .play-controls{grid-template-columns:1fr 1fr}
   .virtual-controls-visible #toggle{grid-column:auto}
   .virtual-controls-visible .keyboard-hint{display:none}
+  .virtual-controls-visible .controls-tile{display:grid;grid-template-columns:1fr 1fr;align-content:start;gap:6px;padding:8px}
+  .virtual-controls-visible .controls-tile>*{grid-column:1/-1}
+  .virtual-controls-visible #virtual-toggle{grid-column:1;grid-row:2;white-space:normal;padding:6px;min-height:44px}
+  .virtual-controls-visible #record{grid-column:2;grid-row:2;white-space:normal;padding:6px;min-height:44px}
+  .virtual-controls-visible #record-help{display:none}
+  .virtual-controls-visible .play-controls button{min-height:40px;padding:6px}
 }
 #player-shell:is(:fullscreen,.fullscreen-fallback){height:100dvh;min-height:0}
 @media(min-width:901px) and (orientation:landscape){
@@ -175,7 +181,7 @@ body.app #viewport{width:auto;height:auto;max-height:none;aspect-ratio:auto;bord
 body.app .controls-tile{display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 12px;padding:6px 10px;border-radius:0}
 body.app .play-controls{display:flex;flex-wrap:wrap;gap:6px}
 body.app .play-controls button{padding:6px 10px}
-body.app .keyboard-hint,body.app #coverage{display:none}
+body.app .keyboard-hint,body.app #coverage,body.app #record-help,body.app #virtual-toggle,body.app #virtual-controls{display:none}
 body.app #notice{border-radius:0}
 body.app #stage-box{border-radius:0}
 body.app .settings-tile{display:block;position:fixed;top:8px;right:8px;z-index:10;width:280px;max-height:calc(100vh - 16px);overflow:auto;padding:4px;opacity:.3;transition:opacity .15s}

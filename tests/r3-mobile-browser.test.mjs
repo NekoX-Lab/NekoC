@@ -140,7 +140,7 @@ test('r3-mobile phone/tablet production player', {skip:!process.env.NEKOC_R3_MOB
         }
         await page.setViewportSize(landscape);await fit();
         // Lifecycle paths release admitted holds; no late touchEnd duplicates.
-        for(const end of ['hide','blur','orientation','pause','restart','background','capture']){
+        for(const end of ['hide','blur','orientation','pause','stop','restart','background','capture']){
           t.diagnostic(`${name}: release on ${end}`);
           await clear();const held={...await center('[data-key="90"]'),id:1};
           await touch('touchStart',[held]);await keySeen('90',true);
@@ -150,6 +150,7 @@ test('r3-mobile phone/tablet production player', {skip:!process.env.NEKOC_R3_MOB
             if(end==='blur')window.dispatchEvent(new Event('blur'));
             if(end==='orientation')window.dispatchEvent(new Event('orientationchange'));
             if(end==='pause')document.querySelector('#toggle').click();
+            if(end==='stop')document.querySelector('#stop').click();
             if(end==='restart')document.querySelector('#restart').click();
             if(end==='background'){Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;}
             if(end==='capture')document.querySelector('[data-key="90"]').releasePointerCapture(window.mobilePointer);
@@ -161,15 +162,15 @@ test('r3-mobile phone/tablet production player', {skip:!process.env.NEKOC_R3_MOB
           });
           await touch('touchEnd',[]);await ready();
           if(end==='hide')await page.locator('#virtual-toggle').tap();
-          if(['pause','background'].includes(end)){await page.locator('#toggle').tap();await running();}
-          if(end!=='restart')await keySeen('90',false);
+          if(['pause','stop','background'].includes(end)){await page.locator('#toggle').tap();await running();}
+          if(!['restart','stop'].includes(end))await keySeen('90',false);
         }
         // PR #81 integration: the real recorder must consume the same queue,
         // not disable virtual input or lose secondary stage touches.
         await page.setViewportSize(portrait);await fit();
         await page.locator('#record').tap();await ready();
         await page.waitForFunction(()=>window.nekoPlayDiagnostics().recording&&window.nekoPlayDiagnostics().totalUpdates>=2);
-        for(const selector of ['#import','#restart','#frame-limit','#budget','#resolution','#coalesce'])assert.equal(await page.locator(selector).isDisabled(),true,selector);
+        for(const selector of ['#import','#stop','#restart','#frame-limit','#budget','#resolution','#coalesce'])assert.equal(await page.locator(selector).isDisabled(),true,selector);
         assert.equal(await page.locator('#virtual-toggle').isEnabled(),true);
         await page.locator('#stage').scrollIntoViewIfNeeded();await clear();
         const recordedFinger={...await center('[data-key="37"]'),id:1},recordedStage={...await center('#stage'),id:2};
@@ -199,7 +200,7 @@ test('r3-mobile phone/tablet production player', {skip:!process.env.NEKOC_R3_MOB
           const stageBox=await page.locator('#stage').boundingBox();
           assert.ok(stageBox.height>=100&&stageBox.x>=0&&stageBox.y>=0&&stageBox.x+stageBox.width<=size.width+1&&stageBox.y+stageBox.height<=size.height+1,JSON.stringify({size,stageBox}));
           await screenshot(`fullscreen-${size.width}x${size.height}`);
-          const boxes=await page.locator('#fullscreen,#record,#virtual-controls button').evaluateAll(nodes=>nodes.map(el=>{const b=el.getBoundingClientRect();return {x:b.x,y:b.y,right:b.right,bottom:b.bottom,width:b.width,height:b.height};}));
+          const boxes=await page.locator('#stop,#fullscreen,#record,#virtual-controls button').evaluateAll(nodes=>nodes.map(el=>{const b=el.getBoundingClientRect();return {x:b.x,y:b.y,right:b.right,bottom:b.bottom,width:b.width,height:b.height};}));
           assert.ok(boxes.every(b=>b.width>=40&&b.height>=40&&b.x>=0&&b.y>=0&&b.right<=size.width+1&&b.bottom<=size.height+1),JSON.stringify({size,boxes}));
           await page.locator('#fullscreen').tap();await page.waitForFunction(()=>!document.fullscreenElement);
         }
@@ -247,11 +248,17 @@ test('r3-mobile phone/tablet production player', {skip:!process.env.NEKOC_R3_MOB
           await screenshot(`wide-portrait-work-${size.width}x${size.height}`);
         }
         await page.setViewportSize(portrait);
-        // Exported pure-stage mode must not inherit the phone shell's height
-        // cap or show controls intended for the normal player.
+        // PR #94 keeps app mode's compact playback strip and off-stage feedback.
+        // It must not inherit phone height caps or hide the new stop control.
         await page.goto(`${origin}/play?app`);await ready();await running();await fit();
         assert.equal(await page.locator('#virtual-toggle').isVisible(),false);
-        assert.equal(await page.locator('#viewport').evaluate(el=>Math.abs(el.getBoundingClientRect().height-innerHeight)<1),true);
+        assert.equal(await page.locator('#stop').isVisible(),true);
+        await page.locator('#stop').tap();await ready();
+        assert.equal(await page.evaluate(()=>window.nekoPlayDiagnostics().running),false);
+        assert.match(await page.locator('#status').textContent(),/已停止/);
+        await page.locator('#toggle').tap();await running();
+        const layout=await page.evaluate(()=>({stage:document.querySelector('#stage').getBoundingClientRect().toJSON(),controls:document.querySelector('.controls-tile').getBoundingClientRect().toJSON(),height:innerHeight}));
+        assert.ok(layout.stage.height>0&&layout.stage.bottom<=layout.controls.top+1&&layout.controls.bottom<=layout.height+1,JSON.stringify(layout));
         assert.deepEqual(errors,[]);
       }finally{await context.close();}
     });

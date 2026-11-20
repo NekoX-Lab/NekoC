@@ -101,7 +101,7 @@ test('player feedback browser: progress, modes, stop/restart and off-stage error
     server.listen(0,'127.0.0.1');await once(server,'listening');
     const origin=`http://127.0.0.1:${server.address().port}`;let browser;
     try{
-      browser=await loadPlaywright().chromium.launch({headless:true,channel:process.env.NEKOC_BROWSER_CHANNEL||'msedge',args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+      browser=await loadPlaywright().chromium.launch({headless:true,...(process.env.NEKOC_BROWSER_CHANNEL?{channel:process.env.NEKOC_BROWSER_CHANNEL}:process.platform==='win32'?{channel:'msedge'}:{}),args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox']});
       const page=await browser.newPage({viewport:{width:1280,height:800}}),errors=[];
       page.on('pageerror',error=>errors.push(error.message));
       const ready=()=>page.waitForFunction(()=>window.nekoPlayDiagnostics&&!window.nekoPlayDiagnostics().busy);
