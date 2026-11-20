@@ -1,5 +1,6 @@
 import ts from "typescript";
 import { copyClassNodeOrigins } from "./class-metadata.mjs";
+import { literalRegex, regexTestHelper } from "./tsstr-regex.mjs";
 
 const UNKNOWN = Symbol("not a constant");
 const f = ts.factory;
@@ -480,6 +481,9 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
   };
   const result = ts.transform(sourceFile, [context => {
     const visit = node => {
+      if ((ts.isNewExpression(node) || ts.isCallExpression(node)) && unshadowed(node.expression, "RegExp")) {
+        fail(node, "RegExp constructors are not supported", "use an immediate flag-free /literal/.test(text) call or explicit string operations");
+      }
       if (!ts.isCallExpression(node)) return ts.visitEachChild(node, visit, context);
       const callee = node.expression;
       const args = node.arguments;
@@ -514,6 +518,25 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
       }
       if (!ts.isPropertyAccessExpression(callee)) return ts.visitEachChild(node, visit, context);
       const receiver = callee.expression, method = callee.name.text;
+      if (method === "test" && ts.isRegularExpressionLiteral(unwrap(receiver))) {
+        optional();
+        arity(node, 1, 1, "RegExp.test");
+        const pattern = literalRegex(unwrap(receiver), fail);
+        const input = unwrap(args[0]);
+        const stringConversion = ts.isCallExpression(input) && unshadowed(input.expression, "String");
+        if (kind(input) !== "string" && !stringConversion) fail(args[0], "RegExp.test requires a statically string argument", "convert the argument explicitly with String(value) before matching");
+        for (const builtin of ["length", "String", "splitText", "join", "selectText"]) {
+          if (checker.resolveName(builtin, node, ts.SymbolFlags.Value, false)?.declarations?.length) {
+            fail(node, `Cannot lower RegExp.test while ${builtin} is shadowed`, `rename the local ${builtin} binding`);
+          }
+        }
+        const name = fresh(), text = fresh();
+        helpers.push(regexTestHelper(name, text, pattern));
+        return replace(node, f.createCallExpression(f.createIdentifier(name), undefined, [ts.visitNode(args[0], visit)]));
+      }
+      if (method === "localeCompare" && !checker.getSymbolAtLocation(callee.name)?.declarations?.some(ts.isMethodDeclaration)) {
+        fail(node, "String.localeCompare is not supported: locale/ICU collation cannot be reproduced by the available string blocks", "choose an explicit code-unit ordering with < and >, or supply a precomputed locale-specific ordering table");
+      }
       const listHandle = ts.isCallExpression(receiver) && ts.isPropertyAccessExpression(receiver.expression)
         && receiver.expression.name.text === "list" && dslReceiver(receiver.expression.expression);
       if (Object.hasOwn(stringLimits, method) && kind(receiver) !== "array" && !dslReceiver(receiver) && !listHandle) {

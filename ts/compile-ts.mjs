@@ -208,6 +208,24 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity) {
       if (ts.isIdentifier(node) && node.text.startsWith("__nekocBit_")) {
         fail("Names starting with __nekocBit_ are reserved for bitwise lowering; rename this identifier", nodeLocation(node));
       }
+      if (ts.isTaggedTemplateExpression(node)) {
+        fail("Tagged templates (including String.raw) are not supported: tag calls, raw escapes and template objects cannot be discarded; use an ordinary function call with explicit string arguments or an untagged template", nodeLocation(node));
+      }
+      if (ts.isRegularExpressionLiteral(node)) {
+        let receiver = node;
+        while (receiver.parent && stripParens(receiver.parent) === node) receiver = receiver.parent;
+        const member = receiver.parent, call = member?.parent;
+        const directTest = member && ts.isPropertyAccessExpression(member) && member.expression === receiver
+          && member.name.text === "test" && call && ts.isCallExpression(call) && call.expression === member;
+        // Keep existing, original-call diagnostics for unsupported String
+        // overloads (especially replacement calls inside class/nullable code).
+        const stringOverload = member && ts.isCallExpression(member) && member.arguments.includes(receiver)
+          && ts.isPropertyAccessExpression(member.expression)
+          && ["replace", "replaceAll", "split"].includes(member.expression.name.text);
+        if (!directTest && !stringOverload) {
+          fail("RegExp values are not supported: use an immediate flag-free /literal/.test(text) call; regex variables, properties and string replacement/separator overloads cannot be represented", nodeLocation(node));
+        }
+      }
       // JSON/Rust strings cannot represent lone UTF-16 units, even when a
       // literal reaches a replacement through a mutable variable or import.
       if ((ts.isStringLiteralLike(node) || ts.isTemplateHead(node)
@@ -4906,15 +4924,10 @@ class WorkspaceCompiler {
       return this.compileElementAccessExpression(expression, parentId);
     }
     if (ts.isTaggedTemplateExpression(expression)) {
-      return this.compileExpression(expression.template, parentId);
+      this.unsupported(expression, "Tagged templates are not supported; use an ordinary function call with explicit string arguments");
     }
     if (ts.isRegularExpressionLiteral(expression)) {
-      return this.addBlock({
-        type: "text",
-        parent_id: parentId,
-        fields: { TEXT: expression.text },
-        is_output: true,
-      });
+      this.unsupported(expression, "RegExp values are not supported; use an immediate flag-free /literal/.test(text) call");
     }
     if (expression.kind === ts.SyntaxKind.BigIntLiteral) {
       return this.addBlock({
