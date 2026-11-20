@@ -143,39 +143,67 @@ export function validateObjectOperations(file, types, reject) {
   const carries = node => types.contains(types.type(node));
   // Both directions matter: losing a nested handle leaks its numeric encoding;
   // inventing one lets a scalar address unrelated live heap cells.
-  const preserves = (source, target, seen = new Map()) => {
+  const preserves = (source, target, seen = new Map(), fresh = false) => {
     if (!source || !target) return true;
+    if (source === target) return true;
     let targets = seen.get(source);
     if (targets?.has(target)) return true;
     if (!targets) seen.set(source, targets = new Set());
     targets.add(target);
-    if (source.isUnion()) return source.types.every(part => preserves(part, target, seen));
-    if (target.isUnion()) return target.types.some(part => preserves(source, part, new Map(seen)));
+    const scalar = t => t.isUnion() ? t.types.every(scalar) : !(t.flags & ts.TypeFlags.Object);
+    if (scalar(source) && scalar(target)) {
+      // Mutable aliases share storage: widening number to number|string (or
+      // any) permits writes that invalidate the original alias's operators.
+      const from = checker.getBaseTypeOfLiteralType(source);
+      const to = checker.getBaseTypeOfLiteralType(target);
+      return !erased(source) && !erased(target)
+        && checker.isTypeAssignableTo(from, to) && checker.isTypeAssignableTo(to, from);
+    }
+    if (source.isUnion()) return source.types.every(part => preserves(part, target, seen, fresh));
+    if (target.isUnion()) return target.types.some(part => preserves(source, part, new Map(seen), fresh));
     const sourceArray = checker.isArrayType(source) || checker.isTupleType(source);
     const targetArray = checker.isArrayType(target) || checker.isTupleType(target);
     if (sourceArray || targetArray) {
-      if (!sourceArray || !targetArray) return !types.contains(source) && !types.contains(target);
+      if (!sourceArray || !targetArray) return false;
       return preserves(checker.getIndexTypeOfType(source, ts.IndexKind.Number), checker.getIndexTypeOfType(target, ts.IndexKind.Number), seen);
     }
     const a = types.objectType(source), b = types.objectType(target);
     if (a !== b) return false;
-    if (!a) return true;
+    // Property types also select scalar blocks (notably numeric + vs text_join).
+    // Erasing TS assertions cannot convert a stored number into a string.
+    // Literal refinements (including readonly class fields) use the same storage.
+    if (!a) return checker.isTypeAssignableTo(checker.getBaseTypeOfLiteralType(source), checker.getBaseTypeOfLiteralType(target));
     for (const property of checker.getPropertiesOfType(source)) {
       const from = checker.getTypeOfSymbolAtLocation(property, property.valueDeclaration ?? file);
       const other = checker.getPropertyOfType(target, property.name);
-      if (types.contains(from) && (!other || !preserves(from, checker.getTypeOfSymbolAtLocation(other, other.valueDeclaration ?? file), seen))) return false;
+      const initializer = property.valueDeclaration?.initializer;
+      const freshChild = fresh && initializer && ts.isObjectLiteralExpression(initializer);
+      if (types.contains(from) && (!other || !preserves(from, checker.getTypeOfSymbolAtLocation(other, other.valueDeclaration ?? file), seen, freshChild))) return false;
     }
     for (const property of checker.getPropertiesOfType(target)) {
       const other = checker.getPropertyOfType(source, property.name);
       if (!other || (other.flags & ts.SymbolFlags.Optional) && !(property.flags & ts.SymbolFlags.Optional)) return false;
+      // Generated class allocations reserve inaccessible slots (e.g. [] has
+      // type never[]) before the checked user field initializers run.
+      if (classAllocationPlaceholders.has(other.valueDeclaration?.initializer)) continue;
       const to = checker.getTypeOfSymbolAtLocation(property, property.valueDeclaration ?? file);
-      if (types.contains(to) && !preserves(checker.getTypeOfSymbolAtLocation(other, other.valueDeclaration ?? file), to, seen)) return false;
+      const from = checker.getTypeOfSymbolAtLocation(other, other.valueDeclaration ?? file);
+      // Fresh scalar slots have no narrower object alias yet. Contextual union
+      // or any annotations are safe here; nested existing references are not.
+      if (fresh && !erased(from) && scalar(from) && scalar(to) && checker.isTypeAssignableTo(from, to)) continue;
+      const initializer = other.valueDeclaration?.initializer;
+      const freshChild = fresh && initializer && ts.isObjectLiteralExpression(initializer);
+      if (!preserves(from, to, seen, freshChild)) return false;
     }
     return true;
   };
   const boundary = (node, source, target) => {
-    if ((types.contains(source) || types.contains(target)) && !preserves(source, target)) {
-      reject(node, "Object shapes must preserve initialized references recursively; replace any/unknown/generic erasure, optional properties or assertions with explicit matching object/container types");
+    const value = ts.isVariableDeclaration(node) ? node.initializer
+      : ts.isReturnStatement(node) ? node.expression
+      : ts.isBinaryExpression(node) ? node.right : node;
+    const fresh = value && ts.isObjectLiteralExpression(value);
+    if ((types.contains(source) || types.contains(target)) && !preserves(source, target, new Map(), fresh)) {
+      reject(node, "Object shapes must preserve initialized references recursively and compatible scalar property types; replace any/unknown/generic erasure, optional properties or assertions with explicit matching object/container types");
     }
   };
   const returnType = owner => {
@@ -229,10 +257,19 @@ export function validateObjectOperations(file, types, reject) {
         if (contextual) boundary(node, types.type(node), contextual);
       }
       if (ts.isArrowFunction(node) && !ts.isBlock(node.body)) boundary(node.body, types.type(node.body), returnType(node));
-      if (ts.isReturnStatement(node) && node.expression) {
+      if (ts.isReturnStatement(node)) {
         let owner = node.parent;
         while (owner && !ts.isFunctionLike(owner)) owner = owner.parent;
-        if (owner) boundary(node, types.type(node.expression), returnType(owner));
+        if (owner) {
+          const target = returnType(owner);
+          // A later value-return does not make an earlier bare return safe.
+          // An absent return must not enter numeric heap-address arithmetic;
+          // diagnose the user's return, not a generated helper.
+          if (!node.expression && types.contains(target)) {
+            reject(node, "Object-returning functions must return an initialized reference on every path; replace this empty return with an explicit object/container value");
+          }
+          if (node.expression) boundary(node, types.type(node.expression), target);
+        }
       }
     }
     if (ts.isExpression(node) && node.parent && (ts.isPropertyAssignment(node.parent) || ts.isArrayLiteralExpression(node.parent))

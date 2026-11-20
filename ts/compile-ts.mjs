@@ -2459,6 +2459,12 @@ class WorkspaceCompiler {
       if (statement.expression) {
         return this.compileReturn(statement.expression, parentId);
       }
+      // A void helper/callback must return to its caller. `stop` also aborts
+      // the caller, potentially leaving an object factory without a handle.
+      if (this.currentProcedureParams?.procedureType === "NORMAL") {
+        return this.addBlock({ type: "procedures_2_return_value", parent_id: parentId,
+          mutation: '<mutation xmlns="http://www.w3.org/1999/xhtml" type="NORMAL" items="0"></mutation>' });
+      }
       return this.addBlock({ type: "stop", parent_id: parentId });
     }
     if (ts.isEmptyStatement(statement)) {
@@ -7495,6 +7501,7 @@ function procedureParamIds(spec) {
   const params = spec.params.filter(param => param.type === "String");
   const ids = new Map(params.map(param => [param.bindingName ?? param.name, param.id]));
   ids.displayNames = new Map(params.map(param => [param.bindingName ?? param.name, param.name]));
+  ids.procedureType = spec.type;
   return ids;
 }
 
