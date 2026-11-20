@@ -131,6 +131,83 @@ fn operational_errors_are_json_with_hints_instead_of_rust_debug_output() {
 }
 
 #[test]
+fn user_paths_do_not_override_error_sources() {
+    let dir = tempfile::tempdir().unwrap();
+    for name in [
+        "with node.bcmkn",
+        "ENOENT.bcmkn",
+        "EACCES.bcmkn",
+        "EPERM.bcmkn",
+        "Cannot find package 'typescript'.bcmkn",
+    ] {
+        let input = dir.path().join(name);
+        for contents in [None, Some("not json")] {
+            if let Some(contents) = contents {
+                fs::write(&input, contents).unwrap();
+            }
+            let result = report(
+                nekoc()
+                    .arg("validate")
+                    .arg(&input)
+                    .arg("--json")
+                    .output()
+                    .unwrap(),
+                1,
+            );
+            let kind = if contents.is_some() {
+                "invalid_json"
+            } else {
+                "file_not_found"
+            };
+            assert_eq!(result["error"]["kind"], kind, "{result}");
+            assert!(result["error"]["message"].as_str().unwrap().contains(name));
+            assert!(
+                !result["error"]["hint"]
+                    .as_str()
+                    .unwrap()
+                    .contains("安装 Node.js")
+            );
+        }
+    }
+}
+
+#[test]
+fn test_json_preserves_stdin_and_only_captures_output_streams() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("stdin.ts");
+    fs::write(&input, "import fs from 'node:fs'; test('stdin', () => { expect(fs.readFileSync(0, 'utf8').trim()).toBe('hello'); });").unwrap();
+    let plain = nekoc()
+        .arg("test")
+        .arg(&input)
+        .write_stdin("hello\n")
+        .output()
+        .unwrap();
+    assert!(plain.status.success(), "{plain:?}");
+    assert!(plain.stderr.is_empty(), "{plain:?}");
+    let result = report(
+        nekoc()
+            .arg("test")
+            .arg(&input)
+            .arg("--json")
+            .write_stdin("hello\n")
+            .output()
+            .unwrap(),
+        0,
+    );
+    assert_eq!(
+        result["result"]["stdout"],
+        String::from_utf8(plain.stdout).unwrap()
+    );
+    assert_eq!(result["result"]["stderr"], "");
+    assert!(
+        result["result"]["stdout"]
+            .as_str()
+            .unwrap()
+            .contains("ok stdin")
+    );
+}
+
+#[test]
 fn json_flag_after_double_dash_is_a_filename() {
     let dir = tempfile::tempdir().unwrap();
     blank(&dir.path().join("--json"));

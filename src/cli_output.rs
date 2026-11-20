@@ -37,32 +37,13 @@ pub fn failure(command: &str, message: &str, hint: &str, result: Value) -> Resul
 
 pub fn error_report(command: Option<&str>, error: &anyhow::Error) -> Value {
     let message = format!("{error:#}");
-    let (kind, hint) = if message.contains("with node") {
+    let (kind, hint) = if error
+        .downcast_ref::<nekoc::ts_frontend::NodeLaunchError>()
+        .is_some()
+    {
         (
             "node_unavailable",
             "安装 Node.js 18 或更新版本，并确认 node --version 可用。",
-        )
-    } else if message.contains("Cannot find package 'typescript'")
-        || message.contains("Cannot find module 'typescript'")
-    {
-        (
-            "frontend_dependency",
-            "在 NekoC 安装目录运行 npm ci --ignore-scripts，安装 TypeScript 前端依赖。",
-        )
-    } else if message.contains("TypeScript frontend") && message.contains("not found") {
-        (
-            "frontend_unavailable",
-            "将 frontend/ 放在 nekoc 可执行文件旁，或把 NEKOC_FRONTEND 设置为前端目录。",
-        )
-    } else if message.contains("ENOENT") {
-        (
-            "file_not_found",
-            "检查源文件、导入文件和输出目录是否存在；含空格的路径请加引号。",
-        )
-    } else if message.contains("EACCES") || message.contains("EPERM") {
-        (
-            "permission_denied",
-            "检查文件读写权限，关闭占用文件的程序，或改用可写的输出目录。",
         )
     } else if let Some(io) = error.downcast_ref::<io::Error>() {
         match io.kind() {
@@ -76,6 +57,8 @@ pub fn error_report(command: Option<&str>, error: &anyhow::Error) -> Value {
             ),
             _ => ("io_error", "检查文件路径、读写权限及可用磁盘空间后重试。"),
         }
+    } else if let Some(frontend) = error.downcast_ref::<nekoc::ts_frontend::FrontendError>() {
+        frontend_hint(frontend)
     } else if error.downcast_ref::<serde_json::Error>().is_some()
         || message.contains("invalid JSON")
         || message.contains("JSON object at the root")
@@ -83,11 +66,6 @@ pub fn error_report(command: Option<&str>, error: &anyhow::Error) -> Value {
         (
             "invalid_json",
             "确认文件是完整的 UTF-8 JSON；作品文件应为 .bcmkn 或 .bcm，而不是网页或压缩包。",
-        )
-    } else if message.contains("TypeScript frontend") {
-        (
-            "compile_failed",
-            "先运行 nekoc check <源文件> --json，根据诊断中的文件、行和列修正源码。",
         )
     } else if message.contains("does not support local cloud") {
         (
@@ -117,6 +95,50 @@ pub fn error_report(command: Option<&str>, error: &anyhow::Error) -> Value {
     })
 }
 
+fn frontend_hint(error: &nekoc::ts_frontend::FrontendError) -> (&'static str, &'static str) {
+    use nekoc::ts_frontend::FrontendError;
+    let stderr = match error {
+        FrontendError::NotFound { .. } => {
+            return (
+                "frontend_unavailable",
+                "将 frontend/ 放在 nekoc 可执行文件旁，或把 NEKOC_FRONTEND 设置为前端目录。",
+            );
+        }
+        FrontendError::Failed { stderr, .. } => stderr,
+    };
+    // Only actual frontend stderr error headers, never formatted path contexts.
+    if stderr.lines().any(|line| {
+        line.starts_with("Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'typescript'")
+            || line.starts_with("Error: Cannot find module 'typescript'")
+    }) {
+        (
+            "frontend_dependency",
+            "在 NekoC 安装目录运行 npm ci --ignore-scripts，安装 TypeScript 前端依赖。",
+        )
+    } else if stderr
+        .lines()
+        .any(|line| line.starts_with("Error: ENOENT:"))
+    {
+        (
+            "file_not_found",
+            "检查源文件、导入文件和输出目录是否存在；含空格的路径请加引号。",
+        )
+    } else if stderr
+        .lines()
+        .any(|line| line.starts_with("Error: EACCES:") || line.starts_with("Error: EPERM:"))
+    {
+        (
+            "permission_denied",
+            "检查文件读写权限，关闭占用文件的程序，或改用可写的输出目录。",
+        )
+    } else {
+        (
+            "compile_failed",
+            "先运行 nekoc check <源文件> --json，根据诊断中的文件、行和列修正源码。",
+        )
+    }
+}
+
 pub fn print_error(report: &Value, json: bool) -> Result<()> {
     if json {
         print_json(report)
@@ -133,5 +155,76 @@ pub fn print_error(report: &Value, json: bool) -> Result<()> {
             report["error"]["hint"].as_str().unwrap_or_default()
         )?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Context;
+    use nekoc::ts_frontend::FrontendError;
+
+    #[test]
+    fn io_source_wins_over_path_text() {
+        for (source, expected) in [
+            (io::ErrorKind::NotFound, "file_not_found"),
+            (io::ErrorKind::PermissionDenied, "permission_denied"),
+            (io::ErrorKind::Other, "io_error"),
+        ] {
+            let error = anyhow::Error::new(io::Error::from(source)).context(
+                "failed to read with node ENOENT EACCES EPERM Cannot find package 'typescript' invalid JSON",
+            );
+            assert_eq!(
+                error_report(Some("validate"), &error)["error"]["kind"],
+                expected
+            );
+        }
+    }
+
+    #[test]
+    fn frontend_headers_are_classified_only_in_typed_stderr() {
+        for (stderr, expected) in [
+            (
+                "Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'typescript' imported from /frontend",
+                "frontend_dependency",
+            ),
+            (
+                "Error: Cannot find module 'typescript'\nRequire stack:",
+                "frontend_dependency",
+            ),
+            (
+                "Error: ENOENT: no such file or directory, open 'EACCES.ts'",
+                "file_not_found",
+            ),
+            (
+                "Error: EACCES: permission denied, open 'ENOENT.ts'",
+                "permission_denied",
+            ),
+            (
+                "Error: EPERM: operation not permitted, open 'with node.ts'",
+                "permission_denied",
+            ),
+            (
+                "with node ENOENT EACCES EPERM.ts:1:1: error NEKOC: unsupported",
+                "compile_failed",
+            ),
+        ] {
+            // Check mode has a JSON parse source when Node could not start the script.
+            let error = serde_json::from_str::<Value>("")
+                .context(FrontendError::Failed {
+                    action: " check",
+                    stderr: stderr.to_owned(),
+                })
+                .unwrap_err();
+            assert_eq!(
+                error_report(Some("check"), &error)["error"]["kind"],
+                expected
+            );
+        }
+        let error = anyhow::anyhow!("failed to read with node Error: EACCES: and ENOENT");
+        assert_eq!(
+            error_report(Some("validate"), &error)["error"]["kind"],
+            "command_failed"
+        );
     }
 }
