@@ -876,6 +876,8 @@ pub struct Program {
     /// All scenes in project order; only `scenes[current]` is drawn. K4 global
     /// Start tasks can run outside their owner's active scene.
     pub scenes: Vec<SceneInfo>,
+    /// Original K4 ordering, before unlisted scenes are retained for ID lookup.
+    k4_scene_order: Vec<String>,
     pub initial_scene: usize,
     /// The project uses bump_into_color: the VM keeps a pen raster and needs
     /// costume colours from the viewer.
@@ -1171,6 +1173,7 @@ impl Program {
                 scene: scene.clone(),
                 backdrop: scene_value["currentStyleId"].as_str().map(str::to_owned),
                 scenes: vec![],
+                k4_scene_order: vec![],
                 initial_scene: 0,
                 uses_color: false,
                 linked_clone_layers: false,
@@ -1314,6 +1317,14 @@ impl Program {
             .flatten()
             .filter_map(Value::as_str)
             .filter(|id| scenes_dict.contains_key(*id))
+            .map(str::to_owned)
+            .collect();
+        compiler.program.k4_scene_order = project
+            .pointer("/scenes/sortList")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
             .map(str::to_owned)
             .collect();
         for id in scenes_dict.keys() {
@@ -9851,6 +9862,13 @@ impl Engine {
             }
             Op::FaceTo(target) => {
                 let (x, y) = self.point(target, actor);
+                // K4 Tn6a/F.l ignores an uninitialized/nonfinite pointer.
+                // Evidence and original probes: docs/kitten4-r2-gaps.md.
+                if self.program.semantics == RuntimeSemantics::Kitten4
+                    && (!x.is_finite() || !y.is_finite())
+                {
+                    return Ok(true);
+                }
                 let a = &mut self.sprites[actor];
                 let (dx, dy) = (x - a.x, y - a.y);
                 if dx != 0.0 || dy != 0.0 {
@@ -9859,6 +9877,12 @@ impl Engine {
             }
             Op::MoveToTarget(target) => {
                 let (x, y) = self.point(target, actor);
+                // self_move_specify checks both coordinates before moving.
+                if self.program.semantics == RuntimeSemantics::Kitten4
+                    && (!x.is_finite() || !y.is_finite())
+                {
+                    return Ok(true);
+                }
                 self.sprites[actor].x = x;
                 self.sprites[actor].y = y;
                 self.line(actor, old);
@@ -10148,7 +10172,32 @@ impl Engine {
             }
             Op::SwitchScene(value) => {
                 let value = self.eval_value(value, actor);
-                let target = self.find_scene(&value).with_context(|| {
+                // K4 Tn6a/switch_to_screen: relative selectors use scene order;
+                // moving beyond either end is a no-op, never wrap or an error.
+                // Keep check_screen's ordinary scene lookup unchanged.
+                let target = match (self.program.semantics, &value) {
+                    (RuntimeSemantics::Kitten4, Cell::Text(text))
+                        if matches!(text.as_ref(), "__next_scene" | "__previous_scene") =>
+                    {
+                        let order = &self.program.k4_scene_order;
+                        let current_id = &self.program.scenes[self.current_scene].id;
+                        let adjacent = order
+                            .iter()
+                            .position(|id| id == current_id)
+                            .and_then(|i| {
+                                if text.as_ref() == "__next_scene" {
+                                    i.checked_add(1)
+                                } else {
+                                    i.checked_sub(1)
+                                }
+                            })
+                            .and_then(|i| order.get(i))
+                            .and_then(|id| self.program.scenes.iter().position(|s| &s.id == id));
+                        Some(adjacent.unwrap_or(self.current_scene))
+                    }
+                    _ => self.find_scene(&value),
+                }
+                .with_context(|| {
                     format!(
                         "unknown scene {} at block {}",
                         value.text(),

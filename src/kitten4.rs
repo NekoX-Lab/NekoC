@@ -710,7 +710,9 @@ fn lower_block(block: &mut Value, targets: &Targets) {
         }
         // No signed-in player in a local run.
         "username_get" => {
-            put_field(block, "TEXT", "");
+            // TL4g/R.username_get + N.not_logged_in_user, ordinary web player.
+            // An empty name changes cloud player-record split/index branches.
+            put_field(block, "TEXT", "未登录用户");
             "text"
         }
         "user_id_get" | "connected_users_get" => {
