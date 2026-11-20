@@ -26,7 +26,7 @@ test('r3-mobile phone/tablet production player', {skip:!process.env.NEKOC_R3_MOB
     }
     browser=await loadPlaywright().chromium.launch({headless:true,
       ...(process.env.NEKOC_BROWSER_CHANNEL?{channel:process.env.NEKOC_BROWSER_CHANNEL}:process.platform==='win32'?{channel:'msedge'}:{}),
-      args:['--use-angle=swiftshader','--enable-unsafe-swiftshader']});
+      args:['--use-angle=swiftshader','--enable-unsafe-swiftshader','--no-sandbox']});
     for(const [name,portrait,landscape] of [
       ['phone',{width:390,height:844},{width:844,height:390}],
       ['tablet',{width:768,height:1024},{width:1024,height:768}],
@@ -164,6 +164,33 @@ test('r3-mobile phone/tablet production player', {skip:!process.env.NEKOC_R3_MOB
           if(['pause','background'].includes(end)){await page.locator('#toggle').tap();await running();}
           if(end!=='restart')await keySeen('90',false);
         }
+        // PR #81 integration: the real recorder must consume the same queue,
+        // not disable virtual input or lose secondary stage touches.
+        await page.setViewportSize(portrait);await fit();
+        await page.locator('#record').tap();await ready();
+        await page.waitForFunction(()=>window.nekoPlayDiagnostics().recording&&window.nekoPlayDiagnostics().totalUpdates>=2);
+        for(const selector of ['#import','#restart','#frame-limit','#budget','#resolution','#coalesce'])assert.equal(await page.locator(selector).isDisabled(),true,selector);
+        assert.equal(await page.locator('#virtual-toggle').isEnabled(),true);
+        await page.locator('#stage').scrollIntoViewIfNeeded();await clear();
+        const recordedFinger={...await center('[data-key="37"]'),id:1},recordedStage={...await center('#stage'),id:2};
+        await touch('touchStart',[recordedFinger]);await keySeen('37',true);
+        await touch('touchStart',[recordedFinger,recordedStage]);
+        await page.waitForFunction(()=>window.mobileFrames.some(f=>f.pressed?.includes('37')&&f.events?.some(e=>e.state==='mouse_down')));
+        await touch('touchEnd',[recordedStage]);await touch('touchEnd',[]);await keySeen('37',false);
+        await page.locator('#toggle').tap();await ready();
+        await page.waitForFunction(()=>!window.nekoPlayDiagnostics().pending);
+        const downloading=page.waitForEvent('download');await page.locator('#record').tap();
+        const download=await downloading,stream=await download.createReadStream(),chunks=[];
+        for await(const chunk of stream)chunks.push(chunk);
+        const bundle=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        assert.equal(bundle.schema,'nekoc-repro-v1');
+        const recordedEvents=bundle.timeline.flatMap(frame=>frame.input.events);
+        assert.deepEqual(recordedEvents.filter(e=>e.kind==='key'&&e.key==='37').map(e=>e.down),[true,false]);
+        assert.ok(recordedEvents.some(e=>e.kind==='pointer'&&e.state==='mouse_down'));
+        assert.ok(recordedEvents.some(e=>e.kind==='pointer'&&e.state==='mouse_click'));
+        assert.ok(bundle.timeline.some(frame=>frame.input.pressed.includes('37')));
+        await ready();assert.equal(await page.locator('#restart').isEnabled(),true);
+        await page.locator('#toggle').tap();await running();
         // Real native fullscreen keeps the controls and stage contained on
         // portrait/landscape, including a narrow 320px phone.
         for(const size of [portrait,landscape,...(name==='phone'?[{width:320,height:568}]:[])]){
@@ -172,7 +199,7 @@ test('r3-mobile phone/tablet production player', {skip:!process.env.NEKOC_R3_MOB
           const stageBox=await page.locator('#stage').boundingBox();
           assert.ok(stageBox.height>=100&&stageBox.x>=0&&stageBox.y>=0&&stageBox.x+stageBox.width<=size.width+1&&stageBox.y+stageBox.height<=size.height+1,JSON.stringify({size,stageBox}));
           await screenshot(`fullscreen-${size.width}x${size.height}`);
-          const boxes=await page.locator('#fullscreen,#virtual-controls button').evaluateAll(nodes=>nodes.map(el=>{const b=el.getBoundingClientRect();return {x:b.x,y:b.y,right:b.right,bottom:b.bottom,width:b.width,height:b.height};}));
+          const boxes=await page.locator('#fullscreen,#record,#virtual-controls button').evaluateAll(nodes=>nodes.map(el=>{const b=el.getBoundingClientRect();return {x:b.x,y:b.y,right:b.right,bottom:b.bottom,width:b.width,height:b.height};}));
           assert.ok(boxes.every(b=>b.width>=40&&b.height>=40&&b.x>=0&&b.y>=0&&b.right<=size.width+1&&b.bottom<=size.height+1),JSON.stringify({size,boxes}));
           await page.locator('#fullscreen').tap();await page.waitForFunction(()=>!document.fullscreenElement);
         }

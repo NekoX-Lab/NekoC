@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {StageInput,VirtualControls} from '../web/input.js';
+import {ReproRecorder,REPRO_DT} from '../web/repro.js';
 
 class Element {
   listeners=new Map();captures=new Set();attributes={};dataset={};hidden=false;
@@ -27,6 +28,23 @@ function fixture(t){
     touch(type,button,id=1){return root.emit(type,{target:button,pointerId:id,button:0,pointerType:'touch',isPrimary:id===1});}};
 }
 const key=(code,down)=>({kind:'key',key:String(code),down});
+
+test('r3-mobile recording consumes virtual keys and secondary stage touch from the shared queue',t=>{
+  const f=fixture(t),button=f.button(37);f.controls.setVisible(true);
+  const hash='a'.repeat(64),status=frame_count=>({frame_count,state_sha256:hash,budget_yields:0});
+  const recorder=new ReproRecorder({runner:{name:'nekoc',version:'test',protocol:2},work_sha256:hash,seed:'1',dt:REPRO_DT},status(0));
+  const pointer={pointerId:2,pointerType:'touch',isPrimary:false,button:0,clientX:120,clientY:90};
+  f.touch('pointerdown',button);f.canvas.emit('pointerdown',pointer);
+  const held=f.input.take();recorder.commit(recorder.prepare(held),status(1));
+  assert.deepEqual(held.pressed,['37']);assert.equal(held.events[1].state,'mouse_down');
+  f.canvas.emit('pointerup',pointer);f.touch('pointerup',button);
+  const released=f.input.take();recorder.commit(recorder.prepare(released),status(2));
+  const bundle=recorder.package(f.input.queueStats);
+  assert.deepEqual(bundle.timeline.map(frame=>frame.input),[held,released]);
+  assert.deepEqual(bundle.timeline.flatMap(frame=>frame.input.events).filter(e=>e.kind==='key'),[key(37,true),key(37,false)]);
+  assert.equal(bundle.diagnostics.warnings.includes('omitted_inputs'),false);
+  assert.deepEqual(f.input.take().events,[]);
+});
 
 test('r3-mobile hidden controls ignore touches; visible simultaneous directions/actions emit pairs',t=>{
   const f=fixture(t),left=f.button(37),space=f.button(32);

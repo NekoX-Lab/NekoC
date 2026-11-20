@@ -69,6 +69,7 @@ h1{font-size:17px;font-weight:650;margin-top:4px;white-space:nowrap;overflow:hid
 
 /* Controls */
 .controls-tile{grid-area:controls;display:flex;flex-direction:column;gap:12px}
+.controls-tile>*{flex-shrink:0}
 .play-controls{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 #runtime-mode{font-size:12px;color:var(--ink-2);overflow-wrap:anywhere}
 #status{font-size:13px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -157,6 +158,11 @@ body.fullscreen-fallback-active{overflow:hidden}
   #player-shell:is(:fullscreen,.fullscreen-fallback) #viewport{height:100%;max-height:none;aspect-ratio:auto}
   #player-shell:is(:fullscreen,.fullscreen-fallback) .fps-tile,#player-shell:is(:fullscreen,.fullscreen-fallback) .timings-tile,#player-shell:is(:fullscreen,.fullscreen-fallback) .settings-tile{display:none}
   #player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) .controls-tile{gap:8px}
+  #player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) .controls-tile{display:grid;grid-template-columns:1fr 1fr}
+  #player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) .controls-tile>*{grid-column:1/-1}
+  #player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) #virtual-toggle{grid-column:1;grid-row:2}
+  #player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) #record{grid-column:2;grid-row:2;white-space:normal;padding:6px;min-height:44px}
+  #player-shell.virtual-controls-visible:is(:fullscreen,.fullscreen-fallback) #record-help{display:none}
 }
 @supports(padding:max(0px)){
   #player-shell{padding:max(var(--gap),env(safe-area-inset-top)) max(var(--gap),env(safe-area-inset-right)) max(var(--gap),env(safe-area-inset-bottom)) max(var(--gap),env(safe-area-inset-left))}
