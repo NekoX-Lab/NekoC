@@ -73,6 +73,12 @@ h1{font-size:17px;font-weight:650;margin-top:4px;white-space:nowrap;overflow:hid
 .controls-tile{grid-area:controls;display:flex;flex-direction:column;gap:12px}
 .controls-tile>*{flex-shrink:0}
 #runtime-mode{font-size:12px;color:var(--ink-2);overflow-wrap:anywhere}
+#offline-controls{font-size:12px;color:var(--ink-2);min-width:0}
+#offline-controls summary{cursor:pointer;padding:6px 0}
+#offline-controls[open]{display:flex;flex-direction:column;gap:8px}
+#offline-controls button,#offline-controls select{width:100%;min-width:0;white-space:normal;overflow-wrap:anywhere}
+#offline-controls select{background:var(--tile-2);border:1px solid var(--muted);border-radius:6px;padding:6px}
+#offline-controls small{display:block;font-size:11px;line-height:1.55;color:var(--muted)}
 .play-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .play-controls button{min-width:0;white-space:normal;overflow-wrap:anywhere}
 #status{font-size:13px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

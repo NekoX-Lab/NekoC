@@ -27,6 +27,16 @@
   <section class="tile controls-tile">
     <div class="play-controls"><button id="toggle" class="primary" disabled>▶ 开始游玩</button><button id="stop" disabled title="结束运行；再次开始将从头运行" data-i18n-title="stopPlayHint" data-i18n="stopPlay">■ 停止</button><button id="restart" disabled title="从头开始" data-i18n-title="restartHint" data-i18n="restart">↻ 重玩</button><button id="fullscreen" title="全屏游玩" aria-label="全屏游玩" aria-pressed="false">⛶ <span>全屏</span></button></div>
     <span id="runtime-mode" role="status">运行模式：正在连接…</span>
+    <details id="offline-controls" hidden>
+      <summary data-i18n="offlineTitle">离线作品</summary>
+      <p id="offline-status" role="status"></p>
+      <button id="offline-save" disabled data-i18n="offlineSave">保存当前作品供离线使用</button>
+      <label for="offline-projects" data-i18n="offlineProjects">已保存的离线作品</label>
+      <select id="offline-projects" disabled></select>
+      <button id="offline-open" disabled data-i18n="offlineOpen">打开离线作品</button>
+      <button id="offline-clear" disabled data-i18n="offlineClear">清除已保存作品</button>
+      <small data-i18n="offlinePrivacy">不会自动保存作品、账户或运行数据。仅在你确认后保存作品源码与素材；请勿保存含隐私的作品。浏览器可能回收离线缓存。</small>
+    </details>
     <span class="keyboard-hint" data-i18n="webglHint">需要 WebGL 2；浏览器内运行重作品会占用较多内存，请等待加载完成后开始。</span>
     <button id="virtual-toggle" aria-expanded="false" aria-controls="virtual-controls">显示虚拟按键</button>
     <div id="virtual-controls" hidden role="group" aria-label="虚拟游戏按键" data-i18n-aria-label="virtualControls">

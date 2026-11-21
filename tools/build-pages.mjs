@@ -4,6 +4,7 @@ import {access,copyFile,cp,mkdir,readFile,rm,writeFile} from 'node:fs/promises';
 import {createRequire} from 'node:module';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {writeOfflineWorker} from './player-offline.mjs';
 
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
 const output=path.resolve(process.argv[2]||path.join(root,'dist/pages'));
@@ -18,12 +19,14 @@ for(const file of ['index.html','app.js','style.css'])await copyFile(path.join(r
 await writeFile(path.join(output,'logo.svg'),'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#f2f2f2"/><text x="16" y="23" text-anchor="middle" font-family="Segoe UI,Arial,sans-serif" font-size="20" font-weight="700" fill="#111112">n</text></svg>\n');
 
 // 播放器：静态站固定使用 wasm 后端，资源路径改为相对路径。
-for(const file of ['play.js','play.css','i18n.js','player-feedback.js','player.js','repro.js','backend.js','wasm-worker.js','extensions.js','kn-microphone.js','k4-device.js','renderer.js','pen-k4.js','audio.js','input.js','overlay.js'])
+const playerFiles=['play.js','play.css','i18n.js','player-feedback.js','player.js','repro.js','backend.js','wasm-worker.js','extensions.js','kn-microphone.js','k4-device.js','renderer.js','pen-k4.js','audio.js','input.js','overlay.js','offline.js'];
+for(const file of playerFiles)
   await copyFile(path.join(root,'web',file),path.join(output,'play',file));
 for(const file of ['nekoc_wasm.js','nekoc_wasm_bg.wasm'])await copyFile(path.join(pkg,'dist/web',file),path.join(output,'play/wasm',file));
 const play=(await readFile(path.join(root,'web/play.html'),'utf8')).replaceAll('href="/','href="./').replaceAll('src="/','src="./')
-  .replace('<head>','<head><meta name="nekoc-engine" content="wasm">');
+  .replace('<head>','<head><meta name="nekoc-engine" content="wasm"><meta name="nekoc-offline" content="enabled">');
 await writeFile(path.join(output,'play/play.html'),play);
+await writeOfflineWorker(path.join(output,'play'),['play.html',...playerFiles,'wasm/nekoc_wasm.js','wasm/nekoc_wasm_bg.wasm']);
 
 // 编译器：npm 包的浏览器入口原样复制（不含 nodejs 绑定）。
 for(const file of ['browser.mjs','api.mjs'])await copyFile(path.join(pkg,file),path.join(output,'nekoc',file));
