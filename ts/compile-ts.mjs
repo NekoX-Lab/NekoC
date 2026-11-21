@@ -198,15 +198,35 @@ function rejectAsyncSyntax(node, scopes = new WeakMap()) {
   ts.forEachChild(node, child => rejectAsyncSyntax(child, scopes));
 }
 
-function lowerFrontendFeatures(sourceFile, sourceIdentity) {
+function lowerFrontendFeatures(sourceFile, sourceIdentity, declarations) {
   try {
     rejectAsyncSyntax(sourceFile);
     validateUnsupportedSyntax(sourceFile, (node, message) => fail(message, nodeLocation(node)));
+    let hasRegexTest = false;
     // Validate raw entry/module identifiers before lexical renaming or helper
     // registration can hide a collision with the compiler's bitwise procedures.
     const validateRawSyntax = node => {
       if (ts.isIdentifier(node) && node.text.startsWith("__nekocBit_")) {
         fail("Names starting with __nekocBit_ are reserved for bitwise lowering; rename this identifier", nodeLocation(node));
+      }
+      if (ts.isTaggedTemplateExpression(node)) {
+        fail("Tagged templates (including String.raw) are not supported: tag calls, raw escapes and template objects cannot be discarded; use an ordinary function call with explicit string arguments or an untagged template", nodeLocation(node));
+      }
+      if (ts.isRegularExpressionLiteral(node)) {
+        let receiver = node;
+        while (receiver.parent && stripParens(receiver.parent) === node) receiver = receiver.parent;
+        const member = receiver.parent, call = member?.parent;
+        const directTest = member && ts.isPropertyAccessExpression(member) && member.expression === receiver
+          && member.name.text === "test" && call && ts.isCallExpression(call) && call.expression === member;
+        hasRegexTest ||= directTest;
+        // Keep existing, original-call diagnostics for unsupported String
+        // overloads (especially replacement calls inside class/nullable code).
+        const stringOverload = member && ts.isCallExpression(member) && member.arguments.includes(receiver)
+          && ts.isPropertyAccessExpression(member.expression)
+          && ["replace", "replaceAll", "split"].includes(member.expression.name.text);
+        if (!directTest && !stringOverload) {
+          fail("RegExp values are not supported: use an immediate flag-free /literal/.test(text) call; regex variables, properties and string replacement/separator overloads cannot be represented", nodeLocation(node));
+        }
       }
       // JSON/Rust strings cannot represent lone UTF-16 units, even when a
       // literal reaches a replacement through a mutable variable or import.
@@ -224,13 +244,16 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity) {
     // Generated names use the entry-relative module identity, never the machine
     // path. Keep SourceFile.fileName intact for resolution and diagnostics.
     const destructured = lowerTsDestructuring(sourceFile, sourceIdentity);
+    // Collections supply typed helpers for Map.get and its undefined result.
+    // Check those facts before nullable lowering erases null/undefined types.
     const collections = lowerTsCollections(destructured, sourceIdentity);
+    if (hasRegexTest) lowerTsMethods(collections, sourceIdentity, { declarations, validateRegexOnly: true });
     const nullable = lowerTsNullable(collections, sourceIdentity);
     const classes = lowerTsClasses(nullable, sourceIdentity);
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
       .map(node => node.name.text));
-    const lowered = lowerTsFeatures(lowerTsSequences(lowerTsValues(lowerTsMethods(classes, sourceIdentity))), sourceIdentity);
+    const lowered = lowerTsFeatures(lowerTsSequences(lowerTsValues(lowerTsMethods(classes, sourceIdentity, { declarations }))), sourceIdentity);
     if (names.size) {
       const file = ts.getOriginalNode(lowered);
       markClassHelpers(file, names);
@@ -692,7 +715,8 @@ class WorkspaceCompiler {
       rejectParseDiagnostics(moduleSourceFile);
       const originalModule = moduleSourceFile;
       moduleSourceFile = lowerFrontendFeatures(moduleSourceFile,
-        path.relative(path.dirname(this.entryPath), resolvedPath).replaceAll("\\", "/"));
+        path.relative(path.dirname(this.entryPath), resolvedPath).replaceAll("\\", "/"),
+        this.host.readFile(DECLARATIONS) ?? defaultHost.readFile(DECLARATIONS) ?? "");
       const staticBindings = staticFunctionBindings.get(moduleSourceFile);
       // Modules only register functions; never silently omit initialization.
       for (const statement of originalModule.statements) {
@@ -4906,15 +4930,10 @@ class WorkspaceCompiler {
       return this.compileElementAccessExpression(expression, parentId);
     }
     if (ts.isTaggedTemplateExpression(expression)) {
-      return this.compileExpression(expression.template, parentId);
+      this.unsupported(expression, "Tagged templates are not supported; use an ordinary function call with explicit string arguments");
     }
     if (ts.isRegularExpressionLiteral(expression)) {
-      return this.addBlock({
-        type: "text",
-        parent_id: parentId,
-        fields: { TEXT: expression.text },
-        is_output: true,
-      });
+      this.unsupported(expression, "RegExp values are not supported; use an immediate flag-free /literal/.test(text) call");
     }
     if (expression.kind === ts.SyntaxKind.BigIntLiteral) {
       return this.addBlock({
@@ -7984,7 +8003,8 @@ export function compileFile(inputPath, host = defaultHost, { target = "kitten-n"
     );
     rejectParseDiagnostics(sourceFile);
     sourceFile = lowerFrontendFeatures(sourceFile,
-      path.relative(path.dirname(path.resolve(inputPath)), path.resolve(inputPath)).replaceAll("\\", "/"));
+      path.relative(path.dirname(path.resolve(inputPath)), path.resolve(inputPath)).replaceAll("\\", "/"),
+      host.readFile(DECLARATIONS) ?? defaultHost.readFile(DECLARATIONS) ?? "");
     compiler = new WorkspaceCompiler(inputPath, sourceFile, host, compileTarget(target));
     const report = compiler.compile(sourceFile);
     // Preserve target-independent source errors (including helper validation)

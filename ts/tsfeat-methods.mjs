@@ -1,5 +1,7 @@
 import ts from "typescript";
 import { copyClassNodeOrigins } from "./class-metadata.mjs";
+import { literalRegex, regexTestHelper } from "./tsstr-regex.mjs";
+import { expressionTypeAmbient } from "./tsstr-types.mjs";
 
 const UNKNOWN = Symbol("not a constant");
 const f = ts.factory;
@@ -13,25 +15,31 @@ const f = ts.factory;
  * Throws an Error with CompileError-compatible name/code/location properties.
  * The integration layer can wrap it in its own CompileError if required.
  */
-export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName) {
+export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName, { declarations = "", validateRegexOnly = false } = {}) {
   const originalFile = sourceFile;
   // Binding a SourceFile caches checker symbols on it. Do not hand those caches
   // to the independent checker in the following lexical-lowering pass.
   sourceFile = ts.createSourceFile(sourceFile.fileName, sourceFile.text,
     sourceFile.languageVersion, true, sourceFile.scriptKind);
   copyClassNodeOrigins(originalFile, sourceFile);
+  // The lexical checker also classifies method results and iterable elements.
+  // Share the expression checker's supported primitive/collection type facts,
+  // in memory so browser/virtual-host compilation never reads a host TS lib.
+  // These are type facts, not permission to lower an unsupported operation.
+  const lib = ts.createSourceFile("__nekoc_method_types.d.ts", expressionTypeAmbient + declarations, ts.ScriptTarget.Latest, true);
   const host = {
-    getSourceFile: name => name === sourceFile.fileName ? sourceFile : undefined,
+    getSourceFile: name => name === sourceFile.fileName ? sourceFile : name === lib.fileName ? lib : undefined,
     getDefaultLibFileName: () => "lib.d.ts",
     writeFile() {}, getCurrentDirectory: () => "", getDirectories: () => [],
-    fileExists: name => name === sourceFile.fileName,
-    readFile: name => name === sourceFile.fileName ? sourceFile.text : undefined,
+    fileExists: name => name === sourceFile.fileName || name === lib.fileName,
+    readFile: name => name === sourceFile.fileName ? sourceFile.text : name === lib.fileName ? lib.text : undefined,
     getCanonicalFileName: name => name, useCaseSensitiveFileNames: () => true,
     getNewLine: () => "\n",
   };
-  // The checker is only used for lexical symbol identity and primitive types;
-  // no filesystem, standard library, or project type-checking is needed.
-  const program = ts.createProgram([sourceFile.fileName], { noLib: true, noResolve: true }, host);
+  // Keep null/undefined in unions: the absence of an ambient lib must not turn
+  // a nullable result into an apparently safe string argument.
+  const program = ts.createProgram([sourceFile.fileName, lib.fileName],
+    { noLib: true, noResolve: true, strictNullChecks: true }, host);
   const checker = program.getTypeChecker();
   const names = new Set();
   const collect = node => {
@@ -133,8 +141,12 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
     error.location = { file: sourceFile.fileName, line: line + 1, column: character + 1 };
     throw error;
   };
+  // Ambient facts describe trusted intrinsics; only user declarations shadow
+  // helpers. A merged global with even one user declaration is not trusted.
+  const userDeclared = symbol => symbol?.declarations?.some(declaration => declaration.getSourceFile() !== lib);
+  const shadowed = (name, node) => userDeclared(checker.resolveName(name, node, ts.SymbolFlags.Value, false));
   const unshadowed = (node, name) => ts.isIdentifier(node) && node.text === name
-    && !checker.getSymbolAtLocation(node)?.declarations?.length;
+    && !userDeclared(checker.getSymbolAtLocation(node));
   const globalMember = (node, owner, member) => ts.isPropertyAccessExpression(node)
     && node.name.text === member && unshadowed(node.expression, owner);
   const constant = (node, seen = new Set()) => {
@@ -210,7 +222,7 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
     if (typeof value === "boolean") return value ? f.createTrue() : f.createFalse();
     if (typeof value === "number") {
       if (Number.isNaN(value)) {
-        if (checker.resolveName("Number", node, ts.SymbolFlags.Value, false)?.declarations?.length) fail(node, "Cannot emit numeric NaN while Number is shadowed", "rename the local Number binding");
+        if (shadowed("Number", node)) fail(node, "Cannot emit numeric NaN while Number is shadowed", "rename the local Number binding");
         return f.createCallExpression(f.createIdentifier("Number"), undefined, [f.createStringLiteral("NaN")]);
       }
       if (!Number.isFinite(value)) fail(node, "Non-finite numeric result cannot be emitted portably", "keep the result as a constant string");
@@ -240,7 +252,9 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
     }
     const value = constant(node);
     if (value !== UNKNOWN) return Array.isArray(value) ? "array" : typeof value;
-    const type = checker.getTypeAtLocation(node);
+    // Preserve the existing receiver classifier; nullable access diagnostics
+    // belong to lexical lowering. Regex arguments use the strict type below.
+    const type = checker.getNonNullableType(checker.getTypeAtLocation(node));
     if (type.flags & ts.TypeFlags.NumberLike) return "number";
     if (type.flags & ts.TypeFlags.StringLike) return "string";
     return "unknown";
@@ -418,7 +432,7 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
   };
   const growthHelper = (node, receiver, method, args, visit) => {
     for (const builtin of ["Math", "String", "join", "length", "selectText", "splitText"]) {
-      if (checker.resolveName(builtin, node, ts.SymbolFlags.Value, false)?.declarations?.length) {
+      if (shadowed(builtin, node)) {
         fail(node, `Cannot lower ${method} while ${builtin} is shadowed`, `rename the local ${builtin} binding`);
       }
     }
@@ -458,8 +472,7 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
   // explicit empty-range guard avoids text_select's reverse-selection behavior.
   const sliceHelper = (call, receiver, start, end, context) => {
     for (const builtin of ["Math", "selectText", "length"]) {
-      const symbol = checker.resolveName(builtin, call, ts.SymbolFlags.Value, false);
-      if (symbol?.declarations?.length) fail(call, `Cannot lower slice while ${builtin} is shadowed`, `rename the local ${builtin} binding`);
+      if (shadowed(builtin, call)) fail(call, `Cannot lower slice while ${builtin} is shadowed`, `rename the local ${builtin} binding`);
     }
     const name = fresh(), text = fresh(), len = fresh(), lo = fresh(), hi = fresh();
     const bound = value => {
@@ -480,6 +493,13 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
   };
   const result = ts.transform(sourceFile, [context => {
     const visit = node => {
+      if (validateRegexOnly && !(ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+        && node.expression.name.text === "test" && ts.isRegularExpressionLiteral(unwrap(node.expression.expression)))) {
+        return ts.visitEachChild(node, visit, context);
+      }
+      if ((ts.isNewExpression(node) || ts.isCallExpression(node)) && unshadowed(node.expression, "RegExp")) {
+        fail(node, "RegExp constructors are not supported", "use an immediate flag-free /literal/.test(text) call or explicit string operations");
+      }
       if (!ts.isCallExpression(node)) return ts.visitEachChild(node, visit, context);
       const callee = node.expression;
       const args = node.arguments;
@@ -514,6 +534,28 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
       }
       if (!ts.isPropertyAccessExpression(callee)) return ts.visitEachChild(node, visit, context);
       const receiver = callee.expression, method = callee.name.text;
+      if (method === "test" && ts.isRegularExpressionLiteral(unwrap(receiver))) {
+        optional();
+        arity(node, 1, 1, "RegExp.test");
+        const pattern = literalRegex(unwrap(receiver), fail);
+        const input = unwrap(args[0]);
+        const stringConversion = ts.isCallExpression(input) && unshadowed(input.expression, "String");
+        const inputType = checker.getTypeAtLocation(input);
+        const stringType = type => type.isUnion() ? type.types.every(stringType) : !!(type.flags & ts.TypeFlags.StringLike);
+        if (!stringType(inputType) && !stringConversion) fail(args[0], "RegExp.test requires a statically string argument", "convert the argument explicitly with String(value) before matching");
+        for (const builtin of ["length", "String", "splitText", "join", "selectText"]) {
+          if (shadowed(builtin, node)) {
+            fail(node, `Cannot lower RegExp.test while ${builtin} is shadowed`, `rename the local ${builtin} binding`);
+          }
+        }
+        if (validateRegexOnly) return ts.visitEachChild(node, visit, context);
+        const name = fresh(), text = fresh();
+        helpers.push(regexTestHelper(name, text, pattern));
+        return replace(node, f.createCallExpression(f.createIdentifier(name), undefined, [ts.visitNode(args[0], visit)]));
+      }
+      if (method === "localeCompare" && !checker.getSymbolAtLocation(callee.name)?.declarations?.some(ts.isMethodDeclaration)) {
+        fail(node, "String.localeCompare is not supported: locale/ICU collation cannot be reproduced by the available string blocks", "choose an explicit code-unit ordering with < and >, or supply a precomputed locale-specific ordering table");
+      }
       const listHandle = ts.isCallExpression(receiver) && ts.isPropertyAccessExpression(receiver.expression)
         && receiver.expression.name.text === "list" && dslReceiver(receiver.expression.expression);
       if (Object.hasOwn(stringLimits, method) && kind(receiver) !== "array" && !dslReceiver(receiver) && !listHandle) {
@@ -550,7 +592,7 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
             || method === "split" && args.length > 0 && !(possible(args[0])?.every(v => typeof v === "string" && v.length > 0));
           if (selectsUnits && !bmp(receiver)) {
             for (const builtin of ["String", "join", "splitText"]) {
-              if (checker.resolveName(builtin, node, ts.SymbolFlags.Value, false)?.declarations?.length) {
+              if (shadowed(builtin, node)) {
                 fail(node, `Cannot guard ${method} while ${builtin} is shadowed`, `rename the local ${builtin} binding`);
               }
             }
@@ -579,7 +621,7 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
           return replace(node, fold(node, () => literal(method === "toFixed" ? value.toFixed(argument) : value.toString(argument), node)));
         }
         if (method === "toString" && (argument === undefined || argument === 10)) {
-          if (checker.resolveName("String", node, ts.SymbolFlags.Value, false)?.declarations?.length) fail(node, "Cannot lower numeric toString while String is shadowed", "rename the local String binding");
+          if (shadowed("String", node)) fail(node, "Cannot lower numeric toString while String is shadowed", "rename the local String binding");
           return replace(node, f.createCallExpression(f.createIdentifier("String"), undefined, [ts.visitNode(receiver, visit)]));
         }
         fail(node, `Dynamic ${method} is not supported${method === "toFixed" ? ": scaled rounding does not reproduce JavaScript binary floating-point formatting" : " for nondecimal or dynamic radices"}`, method === "toFixed" ? "format a constant with toFixed, or explicitly use Math.round and label it as rounded rather than fixed-decimal formatting" : "use numericValue.toString() or numericValue.toString(10), or a constant receiver and radix");

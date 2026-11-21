@@ -136,6 +136,24 @@ The ES2020 declarations include the implemented
 
 ## TypeScript strings
 
+Immediate, flag-free regular expression literals support `.test(text)` for plain
+text with optional `^`/`$` anchors: `/word/`, `/^word/`, `/word$/`, `/^word$/`.
+Escaped regex punctuation and `\n`, `\r`, `\t`, `\f`, `\v` are supported. Matching
+is case-sensitive; the string argument evaluates once, even for empty patterns.
+Suffix tests preserve overlapping matches, numeric-looking text and complete
+Unicode characters. Generated procedures use string/list blocks, not RegExp
+objects. Flags (including `g`/`y` state), character classes, repetition, groups,
+alternation, regex variables/constructors and coercing arguments are rejected.
+Use explicit string operations for patterns outside this deliberately small subset.
+`localeCompare` is rejected with an ordering-policy alternative: locale/ICU
+collation must not silently become code-unit comparison. `String.at` supports
+constant receivers and indices; undefined or isolated-surrogate results and
+dynamic calls are rejected (use `charAt` if empty-string fallback is desired).
+Ordinary templates retain interpolation evaluation order. Tagged templates,
+including `String.raw`, are rejected rather than discarding tag calls or treating
+raw escapes as cooked text; use explicit string arguments to an ordinary function.
+See [r3 string boundaries and official block evidence](ts-r3-string.md).
+
 - `charAt(index = 0)` truncates numeric indices toward zero and returns `""`
   outside the string. `substring(start = 0, end = length)` clamps both indices,
   swaps reversed bounds and returns `""` for equal bounds. Receivers and arguments

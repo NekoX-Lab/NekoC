@@ -51,6 +51,9 @@ interface ReadonlyArray<T> {
 }
 
 interface String {
+  /** Constant receiver/index only; out-of-range and isolated surrogate results
+   * are rejected. Use charAt when an empty-string fallback is acceptable. */
+  at(index: number): string | undefined;
   /** String search/replacement only. Supports $$, $&, $` and $' substitutions.
    * RegExp, callback replacers and implicit coercion are rejected by the compiler.
    * Nullable arguments must be narrowed first, use ?? with a string fallback,
@@ -82,6 +85,10 @@ interface String {
 // Runtime code-unit selecting/searching paths guard unknown text for BMP safety;
 // safe native includes(search) and split(nonemptySeparator, limit?) also accept
 // complete emoji variables/parameters. See the API's conservative proof boundary.
+// Immediate /literal/.test(text) supports flag-free plain text, escaped regex
+// punctuation/control whitespace and optional ^/$ anchors, including overlaps.
+// RegExp objects, classes, repetition, flags and implicit coercion are rejected.
+// localeCompare is rejected: use an explicit ordering policy instead.
 
 // Native ES2020 Map/Set declarations provide the public signatures (including
 // Map.get: V | undefined). NekoC lowers concrete string/number keys to heap
