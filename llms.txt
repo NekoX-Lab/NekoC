@@ -5,7 +5,7 @@
 ## Workflow for AI agents
 
 1. Write `game.nk.ts`.
-2. `nekoc check game.nk.ts --json` — type check (against `ts/nekoc.d.ts`), Kitten N compatibility check, project structure check. Writes nothing. Exit code 1 on errors. Each diagnostic: `{severity, source: "syntax"|"types"|"compat"|"project", code, message, file, line, column}`. Fix and re-run until `{"ok": true}`.
+2. `nekoc check game.nk.ts --json` — type check (against `ts/nekoc.d.ts`), Kitten N compatibility check, project structure check. Writes nothing. Exit code 1 on errors. Each diagnostic: `{severity, source: "syntax"|"types"|"compat"|"project", code, message, file?, line?, column?, snippet, suggestion}`. Source positions are 1-based; unavailable coordinates are omitted and unavailable snippets are null. See docs/ts-diagnostics.md for the stable JSON contract. Fix and re-run until `{"ok": true}`.
 3. `nekoc build game.nk.ts` → `game.bcmkn` next to the source (`-o` to change). No template needed.
 4. `nekoc run game.bcmkn --ticks 120` — headless run, 60 ticks per second, prints a JSON snapshot (`logs` holds `console.log` output, plus variables, lists, actors). Add `--event key-down:space` or `--event click:100,200` to simulate input.
 5. Optional, needs Playwright: `node tools/editor-compat.mjs game.bcmkn` loads the work in the official online editor; `ok: true` means it opens cleanly.

@@ -1,6 +1,6 @@
 import ts from "typescript";
 import { objectTypes } from "./share-objects.mjs";
-import { classSourceOrigins } from "./class-metadata.mjs";
+import { classSourceOrigins, mapPrintedClassNodes } from "./class-metadata.mjs";
 import { needsClassInheritance, lowerClassInheritance } from "./tsfeat-class-inherit.mjs";
 
 // Classes are statically bound functions plus ordinary share-object handles.
@@ -560,7 +560,8 @@ export function lowerTsClasses(input, sourceIdentity = input.fileName) {
             fields.map(field => f.createPropertyAssignment(f.createStringLiteral(field.name), placeholder(field))))),
         ], ts.NodeFlags.Const));
         const initialization = [];
-        for (const field of fields) if (field.initializer) initialization.push(assign(property(instance, field.name), ts.visitNode(field.initializer, visitor(record.self))));
+        for (const field of fields) if (field.initializer) initialization.push(ts.setOriginalNode(
+          assign(property(instance, field.name), ts.visitNode(field.initializer, visitor(record.self))), field.initializer));
         const constructorName = fresh(record.name + "_constructor");
         for (const arity of record.arities) {
           origins.set(record.factory + "_" + arity, { file: input, offset: node.getStart(sourceFile) });
@@ -620,6 +621,11 @@ export function lowerTsClasses(input, sourceIdentity = input.fileName) {
     }
     text += "\n" + helpers.map(helper => printer.printNode(ts.EmitHint.Unspecified, helper, sourceFile)).join("\n") + "\n";
     const output = ts.createSourceFile(sourceFile.fileName, text, sourceFile.languageVersion, true, sourceFile.scriptKind);
+    const originals = new Map(helpers.map(helper => [helper.name.text, helper]));
+    for (const statement of output.statements) {
+      const helper = originals.get(statement.name?.text);
+      if (helper) mapPrintedClassNodes(statement, helper, input, origins.get(statement.name.text));
+    }
     classSourceOrigins.set(output, origins);
     return output;
   } finally { result.dispose(); }

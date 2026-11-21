@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { copyClassNodeOrigins } from "./class-metadata.mjs";
 
 const UNKNOWN = Symbol("not a constant");
 const f = ts.factory;
@@ -18,6 +19,7 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
   // to the independent checker in the following lexical-lowering pass.
   sourceFile = ts.createSourceFile(sourceFile.fileName, sourceFile.text,
     sourceFile.languageVersion, true, sourceFile.scriptKind);
+  copyClassNodeOrigins(originalFile, sourceFile);
   const host = {
     getSourceFile: name => name === sourceFile.fileName ? sourceFile : undefined,
     getDefaultLibFileName: () => "lib.d.ts",
@@ -613,10 +615,13 @@ export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName)
       const newLines = edit.text.match(/\n/g)?.length ?? 0;
       let replacement = edit.text + "\n".repeat(Math.max(0, oldLines - newLines));
       if (!oldLines && !newLines) replacement = replacement.padEnd(original.length, " ");
+      edit.text = replacement;
       text = text.slice(0, edit.start) + replacement + text.slice(edit.end);
     }
     if (helpers.length) text += `\n${helpers.join("\n")}\n`;
-    return ts.createSourceFile(sourceFile.fileName, text, sourceFile.languageVersion, true, sourceFile.scriptKind);
+    const output = ts.createSourceFile(sourceFile.fileName, text, sourceFile.languageVersion, true, sourceFile.scriptKind);
+    copyClassNodeOrigins(sourceFile, output, selected);
+    return output;
   } finally {
     result.dispose();
   }

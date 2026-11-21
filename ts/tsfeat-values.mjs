@@ -1,4 +1,5 @@
 import ts from "typescript";
+import { mapPrintedClassNodes } from "./class-metadata.mjs";
 
 // Nullish values are erased only after every read has been proven to be a
 // compile-time comparison/typeof. They must never become a magic string or 0:
@@ -135,6 +136,9 @@ export function lowerTsValues(sourceFile) {
   }]);
   try {
     if (!changed) return sourceFile;
-    return ts.createSourceFile(sourceFile.fileName, ts.createPrinter().printFile(result.transformed[0]), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    const printed = result.transformed[0];
+    const output = ts.createSourceFile(sourceFile.fileName, ts.createPrinter().printFile(printed), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    mapPrintedClassNodes(output, printed, sourceFile);
+    return output;
   } finally { result.dispose(); }
 }

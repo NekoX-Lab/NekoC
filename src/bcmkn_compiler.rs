@@ -245,18 +245,18 @@ fn assemble_workspace_inner(
 #[derive(Debug)]
 pub(crate) struct ActorTargetErrors(pub Vec<Value>);
 
+impl ActorTargetErrors {
+    pub(crate) fn diagnostics(&self) -> impl Iterator<Item = crate::check::Diagnostic> + '_ {
+        self.0
+            .iter()
+            .map(crate::check::Diagnostic::from_actor_target)
+    }
+}
+
 impl std::fmt::Display for ActorTargetErrors {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for issue in &self.0 {
-            let source = &issue["source"];
-            if let Some(file) = source["file"].as_str() {
-                write!(f, "{}:{}:{}: ", file, source["line"], source["column"])?;
-            }
-            writeln!(
-                f,
-                "invalid_actor_menu_target: {}",
-                issue["message"].as_str().unwrap_or("")
-            )?;
+        for diagnostic in self.diagnostics() {
+            writeln!(f, "{diagnostic}")?;
         }
         Ok(())
     }
