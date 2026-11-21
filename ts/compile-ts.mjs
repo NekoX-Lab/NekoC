@@ -4921,7 +4921,7 @@ class WorkspaceCompiler {
       this.unsupported(expression, ASYNC_UNSUPPORTED);
     }
     if (ts.isSpreadElement(expression)) {
-      return this.compileExpression(expression.expression, parentId);
+      this.unsupported(expression, "Spread expressions are not supported; pass explicit arguments or use array slice()/concat() instead");
     }
     if (ts.isPropertyAccessExpression(expression)) {
       return this.compilePropertyAccessExpression(expression, parentId);

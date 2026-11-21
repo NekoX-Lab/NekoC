@@ -14,6 +14,7 @@ export const docs = [
   "operators.md", "web-studio.md", "cli-run.md", "pack.md", "extensions.md",
   "kitten-n-compatibility.md", "kitten4.md", "kitten4-block-coverage.md",
   "kn-block-coverage.md", "player-sdk.md", "ts-diagnostics.md", "ts-r3-string.md",
+  "ts-r4-spread.md",
 
 ];
 export const samples = [

@@ -5,7 +5,10 @@ import ts from "typescript";
 // drop effects (spread/disposal/tagged templates). Do not scan type-only syntax.
 export function validateUnsupportedSyntax(sourceFile, reject) {
   const visit = node => {
-    if (ts.isTypeNode(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)
+    // Runtime class heritage expressions also satisfy isTypeNode. Keep their
+    // calls/defaults visible, while erased signatures and declarations stay out.
+    if ((ts.isTypeNode(node) && !ts.isExpressionWithTypeArguments(node))
+      || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)
       || node.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.DeclareKeyword)) return;
     if (ts.isVariableDeclarationList(node) && (node.flags & ts.NodeFlags.Using)) {
       reject(node, "using declarations are not supported: automatic resource disposal is not implemented; use an ordinary const binding and call an explicit cleanup function");
@@ -43,9 +46,9 @@ export function validateUnsupportedSyntax(sourceFile, reject) {
     if (ts.isSpreadElement(node) && (ts.isCallExpression(node.parent) || ts.isNewExpression(node.parent))) {
       const callee = node.parent.expression;
       if (ts.isPropertyAccessExpression(callee) && ["replace", "replaceAll"].includes(callee.name.text)) {
-        reject(node.parent, `String.${callee.name.text} supports 2 non-spread argument(s); pass the string search and replacement explicitly`);
+        return reject(node.parent, `String.${callee.name.text} supports 2 non-spread argument(s); pass the string search and replacement explicitly`);
       }
-      reject(node, "Spread arguments are not supported: calls need an explicit argument list; pass each argument explicitly or pass an array to a function that accepts an array");
+      return reject(node, "Spread arguments are not supported: calls need an explicit argument list; pass each argument explicitly or pass an array to a function that accepts an array");
     }
     if (ts.isSpreadElement(node) && ts.isArrayLiteralExpression(node.parent)) {
       // Assignment patterns share ArrayLiteralExpression syntax with values.
@@ -60,8 +63,18 @@ export function validateUnsupportedSyntax(sourceFile, reject) {
         && assignment.operatorToken.kind === ts.SyntaxKind.EqualsToken
         && target && ts.isArrayLiteralExpression(target);
       if (!destructuring) {
-        reject(node, "Array spread is not supported: the list backend does not expand iterable elements; use slice() for a shallow copy, concat() for arrays, or an explicit for-of loop");
+        return reject(node, "Array spread is not supported: the list backend does not expand iterable elements; use slice() for a shallow copy, concat() for arrays, or an explicit for-of loop");
       }
+    }
+    if (ts.isSpreadAssignment(node)) {
+      return reject(node, "Object spread (...value) is not supported; alternative: copy known data properties explicitly into a new object, evaluating the source once");
+    }
+    if (ts.isParameter(node) && node.dotDotDotToken && node.parent.body) {
+      return reject(node.dotDotDotToken, "Rest parameters (...args) are not supported; alternative: use an explicit array parameter and pass an array instead");
+    }
+    // Preserve array binding rest and main's object-destructuring diagnostic.
+    if (ts.isBindingElement(node) && node.dotDotDotToken && ts.isObjectBindingPattern(node.parent)) {
+      return reject(node.dotDotDotToken, "Object destructuring rest, defaults and nested patterns are not supported; read properties explicitly and use ?? for an undefined fallback");
     }
     if (ts.isVoidExpression(node)) {
       let value = node.expression;
