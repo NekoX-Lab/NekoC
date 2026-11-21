@@ -2,10 +2,22 @@
 
 Complete reference for all functions and APIs available in NekoC TypeScript projects.
 
+## TypeScript spread and rest
+
+Runtime array/object spread, rest parameters and call/constructor argument spread
+are compile errors, including combinations with default parameters and code in
+unused functions or imports. Diagnostics normally point to the original `...` (the
+existing String overload and destructuring RHS diagnostics retain their call/array
+locations) and provide
+explicit-copy/array-parameter alternatives; `--no-types` does not bypass them.
+Array binding rest (`const [head, ...tail] = array`) retains its existing shallow
+copy semantics. Ordinary default parameters keep their existing boundaries.
+See [TS spread and rest boundaries](ts-r4-spread.md) for examples and limitations.
+
 ## TypeScript vector length
 
-`Math.hypot(...components)` supports any fixed number of finite numeric arguments,
-including variables, function results and loop values. It saves each argument
+`Math.hypot(x, y, z)` supports any fixed number of explicitly written finite numeric arguments
+(not call spread), including variables, function results and loop values. It saves each argument
 once, left to right, in invocation-local procedure parameters. It finds the
 maximum absolute component, sums squares of normalized components, then rescales
 the square root. Empty and all-zero vectors return 0 without division by zero.

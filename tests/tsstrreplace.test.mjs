@@ -21,7 +21,7 @@ const invalid = [
   ['"abc".replaceAll("b", "X", "ignored")', /exactly two string arguments|supports 2 non-spread argument/],
   ['"abc".replace(1, "X")', /exactly two string arguments/],
   ['"abc".replace("b", 1)', /exactly two string arguments/],
-  ['"abc".replaceAll(...["b", "X"])', /exactly two string arguments|supports 2 non-spread argument/],
+  ['"abc".replaceAll(...["b", "X"])', /supports 2 non-spread argument/],
   ['"😀".replaceAll("", "X")', /UTF-16.*nonempty constant string search/],
   ['(getVar("s") as string).replaceAll("", "X")', /UTF-16.*nonempty constant string search/],
 ];

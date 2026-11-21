@@ -113,7 +113,7 @@ for (const [source, pattern] of [
   ['function f({x}: {x: number}) { console.log(x); } f({x: 1});', /standalone variable declaration/],
   ['const {} = {x: 1};', /at least one property/],
   ['let a = 0; const values = [1]; [a] = values;', /dense array literal/],
-  ['let a = 0; [a] = [...[1]];', /without spread/],
+  ['let a = 0; [a] = [...[1]];', /dense array literal without spread/],
   ['let a = 0; [a] = [,];', /dense array literal/],
   ['let a = 0, b = 0; [a, b] = [1];', /missing element/],
   ['let a = 0; [a = 2] = [1];', /defaults.*explicit statements/],
