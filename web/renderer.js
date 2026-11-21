@@ -1,4 +1,4 @@
-// Incremental renderer with a persistent FBO: KN instanced capsules, K4 Canvas
+// Incremental renderer with a persistent FBO: KN instanced brushes, K4 Canvas
 // origin disks + closed strokes. No retained CPU stroke history.
 import { drawK4PenLines } from './pen-k4.js';
 // Transition helpers stay here to avoid another dependency in visual harnesses.
@@ -70,7 +70,11 @@ vec2 world=segment.xy+axis*local.x+vec2(-axis.y,axis.x)*local.y;gl_Position=vec4
 const PEN_FRAGMENT = `#version 300 es
 precision highp float;
 in vec2 local;flat in float lengthPx;flat in float radius;flat in vec4 tint;out vec4 outColor;
-void main(){vec2 p=vec2(local.x-clamp(local.x,0.,lengthPx),local.y);float distanceToEdge=length(p)-radius;float aa=max(fwidth(distanceToEdge),.3);float alpha=(1.-smoothstep(-aa*.5,aa*.5,distanceToEdge))*tint.a;outColor=vec4(tint.rgb*alpha,alpha);}`;
+float coverage(float distanceToEdge){float aa=max(fwidth(distanceToEdge),.3);return 1.-smoothstep(-aa*.5,aa*.5,distanceToEdge);}
+// Native KN brush: origin disk THEN closed round-joined stroke. Compose within
+// each instance (not two global passes) to retain interleaved colours/order.
+// A zero-length Canvas stroke is empty, leaving only the origin disk.
+void main(){vec2 p=vec2(local.x-clamp(local.x,0.,lengthPx),local.y);float disk=coverage(length(local)-radius)*tint.a;float stroke=coverage(length(p)-radius)*tint.a;if(lengthPx==0.)stroke=0.;float alpha=disk+stroke*(1.-disk);outColor=vec4(tint.rgb*alpha,alpha);}`;
 const TEXTURE_VERTEX = `#version 300 es
 precision highp float;
 uniform vec2 stageSize;uniform vec2 position;uniform vec2 dimensions;uniform float angle;

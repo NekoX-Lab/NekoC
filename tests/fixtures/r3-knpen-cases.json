@@ -1,0 +1,22 @@
+[
+  {"name":"opaque-endpoints","actions":[["color","#204060"],["size",20],["move",-120,30],["down"],["move",-20,30],["up"]]},
+  {"name":"alpha-endpoints","actions":[["color","#204060"],["size",20],["alpha",50],["move",-120,30],["down"],["move",-20,30],["up"]]},
+  {"name":"alpha-corner","actions":[["color","#204060"],["size",20],["alpha",50],["move",-120,30],["down"],["move",-20,30],["move",-20,100],["up"]]},
+  {"name":"repeated-down-zero","actions":[["size",20],["alpha",50],["move",0,0],["down"],["down"],["up"]]},
+  {"name":"repeated-down-x-axis","actions":[["size",20],["alpha",50],["move",-120,0],["down"],["down"],["up"]]},
+  {"name":"repeated-down-y-axis","actions":[["size",20],["alpha",50],["move",0,30],["down"],["down"],["up"]]},
+  {"name":"repeated-down-nonzero","actions":[["size",20],["alpha",50],["move",-120,30],["down"],["down"],["up"]]},
+  {"name":"same-position","actions":[["size",20],["alpha",50],["move",-120,30],["down"],["move",-120,30],["up"]]},
+  {"name":"fractional-width","actions":[["color","#204060"],["size",3.5],["move",-120.25,30.5],["down"],["move",-20.75,80.25],["up"]]},
+  {"name":"colours-crossing","actions":[["size",20],["alpha",50],["color","#ff0000"],["move",-120,30],["down"],["move",-20,30],["color","#0000ff"],["move",-120,30],["up"]]},
+  {"name":"clear-while-down","actions":[["size",20],["alpha",50],["move",-120,30],["down"],["move",-20,30],["clear"],["move",-20,100],["up"]]},
+  {"name":"double-origin-move","actions":[["color","#204060"],["size",20],["alpha",50],["move",0,0],["down"],["down"],["move",100,60],["up"]]},
+  {"name":"double-x-axis-move","actions":[["color","#204060"],["size",20],["alpha",50],["move",-120,0],["down"],["down"],["move",100,60],["up"]]},
+  {"name":"double-y-axis-move","actions":[["color","#204060"],["size",20],["alpha",50],["move",0,30],["down"],["down"],["move",100,60],["up"]]},
+  {"name":"double-nonzero-move","actions":[["color","#204060"],["size",20],["alpha",50],["move",-120,30],["down"],["down"],["move",100,60],["up"]]},
+  {"name":"triple-origin-move","actions":[["color","#204060"],["size",20],["alpha",50],["move",0,0],["down"],["down"],["down"],["move",100,60],["up"]]},
+  {"name":"double-two-moves","actions":[["color","#204060"],["size",20],["alpha",50],["move",0,0],["down"],["down"],["move",50,60],["move",100,60],["up"]]},
+  {"name":"double-clear-move","actions":[["color","#204060"],["size",20],["alpha",50],["move",0,0],["down"],["down"],["clear"],["move",100,60],["up"]]},
+  {"name":"double-up-move","actions":[["color","#204060"],["size",20],["alpha",50],["move",0,0],["down"],["down"],["up"],["move",100,60]]},
+  {"name":"double-up-redown-move","actions":[["color","#204060"],["size",20],["alpha",50],["move",0,0],["down"],["down"],["up"],["move",-120,30],["down"],["move",100,60],["up"]]}
+]

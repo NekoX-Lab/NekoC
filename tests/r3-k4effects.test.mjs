@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { StageRenderer } from '../web/renderer.js';
 import { completeCapture } from '../tools/compat/r3-k4effects.mjs';
+import { mainlineK4Renderer } from './renderer-evidence.mjs';
 
 const read = async file => JSON.parse(await readFile(file, 'utf8'));
 const hash = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -65,9 +66,12 @@ test('r3-k4effects: enabled-only deltas invalidate the renderer and clear remove
 
 test('r3-k4effects: paired real VM pixels remove the neutral-filter failure', async () => {
   const evidence = await read('docs/r3-k4effects-pixels.json');
+  // Keep the capture's original hash. The helper first proves that current
+  // differs from its approved K4 renderer only in the unused KN pen shader.
+  const renderer = hash(await mainlineK4Renderer());
   for (const [name, pair] of Object.entries(evidence.cases)) {
     assert.equal(pair.baseline.rendererLfSha256, 'eb5f51230e59c5fc695cd489e173282803d568d3b0b3eb54b623692679e028a3');
-    assert.equal(pair.fixed.rendererLfSha256, hash((await readFile('web/renderer.js', 'utf8')).replaceAll('\r\n', '\n')));
+    assert.equal(pair.fixed.rendererLfSha256, renderer);
     assert.equal(pair.baseline.fixtureSha256, pair.fixed.fixtureSha256);
     assert.equal(pair.fixed.fixtureSha256, hash(await readFile(`tests/fixtures/kitten4/partial-effects-11-${name}.bcm`)));
     assert.notEqual(pair.baseline.executableSha256, pair.fixed.executableSha256);

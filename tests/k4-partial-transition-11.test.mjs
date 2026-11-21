@@ -5,11 +5,13 @@ import { createHash } from 'node:crypto';
 import { transition10Fixtures } from '../tools/compat/k4-partial-transition-10.mjs';
 import { recordTransition11 } from '../tools/compat/k4-partial-transition-11.mjs';
 import { StageRenderer } from '../web/renderer.js';
+import { round11K4Renderer } from './renderer-evidence.mjs';
 const hash=b=>createHash('sha256').update(b).digest('hex');
 test('round 11 historical evidence closes the original slide/distort inherited-filter negatives at tolerance 8',async()=>{
   // Historical round-11 identity; current pixel preservation is exercised by
   // r3-render.test.mjs against this exact source revision (7b057f2).
   const renderer='eb5f51230e59c5fc695cd489e173282803d568d3b0b3eb54b623692679e028a3';
+  assert.equal(hash(await round11K4Renderer()),renderer);
   for(const [name,spec]of Object.entries(await transition10Fixtures())){
     const file=`docs/kitten4-partial-transition-11-${name}.json`,c=JSON.parse(await readFile(file,'utf8'));
     assert.ok((await stat(file)).size<300000);assert.equal(c.rendererLfSha256,renderer);
