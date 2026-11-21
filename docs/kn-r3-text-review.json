@@ -1,0 +1,111 @@
+{
+  "schema": "nekoc-kn-r3-text-review-v1",
+  "source": "tests/tsnonfiniteinit-cases.mjs#reviewEqualitySource",
+  "scope": "Three review blockers; official original and optimized editor compatibility; console-to-store observation of unchanged generated reporters during official playback.",
+  "playback": {
+    "checkedAt": "2026-11-20T19:15:51.268Z",
+    "fixtureSha256": "c9901da804c38f0801ec98790fd68b22812657cb50cfad7acf0633beb79a44c6",
+    "browserVersion": "157.0.4341.60",
+    "method": "Generated TS work; only console statements replaced by stores of unchanged reporter inputs.",
+    "expected": [
+      "ok",
+      "ok2",
+      "matched d012",
+      "false true false true",
+      "true true false true",
+      "true false",
+      "true",
+      "false true false true",
+      "true false false true",
+      "true true false",
+      "false 12",
+      "false 12",
+      "false false true true",
+      "true false false true",
+      "true false",
+      "false true",
+      "true 2 r",
+      "300",
+      "text"
+    ],
+    "bundles": [
+      {
+        "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+        "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+      },
+      {
+        "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+        "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+      }
+    ],
+    "pageErrors": [],
+    "actual": [
+      "ok",
+      "ok2",
+      "matched d012",
+      "false true false true",
+      "true true false true",
+      "true false",
+      "true",
+      "false true false true",
+      "true false false true",
+      "true true false",
+      "false 12",
+      "false 12",
+      "false false true true",
+      "true false false true",
+      "true false",
+      "false true",
+      "true 2 r",
+      "300",
+      "text"
+    ],
+    "ok": true
+  },
+  "editorCompat": {
+    "editorUrl": "https://kn.codemao.cn/editor",
+    "checkedAt": "2026-11-20T19:14:09.440Z",
+    "projects": [
+      {
+        "input": "dist/r3-kntext-official/r3-review-equality.bcmkn",
+        "sha256": "73a323c8821d90d90ea61031fa3001012b76b32890479c5b6c5fc37eb58082da",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 1537,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      },
+      {
+        "input": "dist/r3-kntext-official/r3-review-equality-opt.bcmkn",
+        "sha256": "73a323c8821d90d90ea61031fa3001012b76b32890479c5b6c5fc37eb58082da",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 1537,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      }
+    ],
+    "bundleUrl": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+    "ok": true
+  },
+  "playbackCompat": {
+    "editorUrl": "https://kn.codemao.cn/editor",
+    "checkedAt": "2026-11-20T19:15:56.120Z",
+    "projects": [
+      {
+        "input": "dist/r3-kntext-official/review-equality-playback.bcmkn",
+        "sha256": "c9901da804c38f0801ec98790fd68b22812657cb50cfad7acf0633beb79a44c6",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 1539,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      }
+    ],
+    "bundleUrl": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+    "ok": true
+  }
+}

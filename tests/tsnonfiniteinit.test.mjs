@@ -6,7 +6,7 @@ import { spawnSync } from "node:child_process";
 import { test } from "node:test";
 import { compileFile, checkFile } from "../ts/compile-ts.mjs";
 import { checkProject, readManifest } from "../tools/compat/kn-share-player-check.mjs";
-import { source, importedSource, moduleSource, barrierSource, concurrentSource, expectedFor, hostFor, prepare } from "./tsnonfiniteinit-cases.mjs";
+import { source, importedSource, moduleSource, barrierSource, concurrentSource, equalitySource, reviewEqualitySource, expectedFor, hostFor, prepare } from "./tsnonfiniteinit-cases.mjs";
 
 const compile = body => compileFile("tsnonfiniteinit.ts", hostFor(body));
 const blocks = report => [report.workspaceData, ...report.procedures.map(p => p.workspaceData)]
@@ -72,7 +72,7 @@ test("tsnonfiniteinit real CLI check/build/run matches Node with optimization on
       assert.equal(result.status, 0, result.stderr || result.error?.message);
       return result.stdout;
     };
-    for (const [index, body] of [source, importedSource, barrierSource, concurrentSource].entries()) {
+    for (const [index, body] of [source, importedSource, barrierSource, concurrentSource, equalitySource, reviewEqualitySource].entries()) {
       const input = path.join(dir, `case-${index}.ts`);
       const output = path.join(dir, `case-${index}.bcmkn`);
       await fs.writeFile(input, body);

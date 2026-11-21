@@ -1,0 +1,48 @@
+{
+  "checkedAt": "2026-11-20T12:45:09.474Z",
+  "fixtureSha256": "d1218b7a49a06f08c1f6ec10cdf8ed894478d893af96bb9b62fce50bea4ee2f2",
+  "browserVersion": "157.0.4341.60",
+  "bundles": [
+    {
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+      "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+    },
+    {
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+      "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+    }
+  ],
+  "pageErrors": [],
+  "variables": {
+    "nanEq": true,
+    "nanNe": false,
+    "unicode": true,
+    "caseSensitive": false,
+    "numericText": "1e+21",
+    "joinStop": "a",
+    "joinNested": "abc",
+    "joinNull": "a",
+    "nullText": "undefined",
+    "undefinedContains": false,
+    "done": 1
+  },
+  "ok": true,
+  "editorCompat": {
+    "editorUrl": "https://kn.codemao.cn/editor",
+    "checkedAt": "2026-11-19T15:16:19.326Z",
+    "projects": [
+      {
+        "input": "dist/r3-kntext-official/playback.bcmkn",
+        "sha256": "d1218b7a49a06f08c1f6ec10cdf8ed894478d893af96bb9b62fce50bea4ee2f2",
+        "editorVersion": "0.27.4",
+        "projectVersion": "0.27.4",
+        "blockCount": 62,
+        "issues": [],
+        "pageErrors": [],
+        "ok": true
+      }
+    ],
+    "bundleUrl": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+    "ok": true
+  }
+}

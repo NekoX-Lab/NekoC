@@ -185,7 +185,11 @@ impl Ord for Text {
         if Rc::ptr_eq(&self.0, &other.0) {
             std::cmp::Ordering::Equal
         } else {
-            self.as_ref().cmp(other.as_ref())
+            // KN's logic_compare uses JS relational operators (official
+            // crc_libs.a21338b6.js:819970, base-domain LT/LTE/GT/GTE).
+            // JS orders UTF-16 code units: e.g. U+10000 precedes U+E000,
+            // the opposite of UTF-8/scalar ordering. K4 uses JS ordering too.
+            self.encode_utf16().cmp(other.encode_utf16())
         }
     }
 }

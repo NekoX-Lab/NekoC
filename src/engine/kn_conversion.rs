@@ -41,7 +41,7 @@ fn convert(value: Cell, number: bool) -> Result<Cell, &'static str> {
 // Keep traversal on the heap: the generic display's 128-level safety cutoff
 // silently turned a perfectly ordinary deeply nested [7] into "" / number 0.
 // This is KN conversion only; do not alter K4 or generic Cell display semantics.
-fn js_string(value: &Cell) -> Result<String, &'static str> {
+pub(super) fn js_string(value: &Cell) -> Result<String, &'static str> {
     enum Work {
         Value(Cell, bool),
         Comma,

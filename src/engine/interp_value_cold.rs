@@ -80,6 +80,10 @@ impl Engine {
             ValueExpr::Decode64(i) => {
                 Cell::Text(kn_helpers::decode64(&self.eval_value(i, actor).text()).into())
             }
+            ValueExpr::KnTextCase(i, upper) => {
+                let value = self.eval_value(i, actor);
+                self.eval_kn_text_case(value, upper)
+            }
             ValueExpr::ParseFloat(i) => {
                 Cell::Number(kn_helpers::parse_float(&self.eval_value(i, actor).text()))
             }

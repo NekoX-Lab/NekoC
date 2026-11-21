@@ -1,5 +1,6 @@
 import ts from "typescript";
 import { evaluatedChoice, evaluatedValue, lazyChoice, returnChoice } from "./control-expressions.mjs";
+import { equalityValue } from "./js-equality.mjs";
 
 // Block lowering for the reserved calls emitted by tsfeat-nullable.mjs.
 // Only official text/number/compare/logic/control/custom-block blocks are used.
@@ -88,6 +89,7 @@ export function compileNilIntrinsic(c, { op, domain }, call, parentId) {
         c.connectInput(ret, logic(c, "or",
           id => logic(c, "and", x => isNil(c, domain, left, x), x => isNil(c, domain, right, x), id),
           id => {
+            if (domain === "N" && c.target.name === "kitten-n") return equalityValue(c, left, right, id);
             const eq = c.addBlock({ type: "logic_compare", parent_id: id, fields: { OP: "EQ" }, is_output: true });
             c.connectInput(eq, c.compileExpression(left, eq), "A", "value");
             c.connectInput(eq, c.compileExpression(right, eq), "B", "value");

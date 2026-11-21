@@ -1,0 +1,7421 @@
+{
+  "schema": "nekoc-kn-r3-text-v1",
+  "editorUrl": "https://kn.codemao.cn/editor",
+  "checkedAt": "2026-11-19T15:13:55.643Z",
+  "method": "Anonymous official editor; expose webpack loader and call unchanged registered domain functions. Inputs and results preserve type, negative zero and nonfinite values. No domain functions replaced.",
+  "limitations": [
+    "Direct domain calls, not project scheduling or input normalization.",
+    "Case conversion tests registered String code APIs, not a visible text-change-case block.",
+    "UI number display, lone surrogates and custom prototypes are outside this probe."
+  ],
+  "bundles": [
+    {
+      "name": "base.7fcb1304.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/base.7fcb1304.js",
+      "bytes": 949623,
+      "sha256": "634a770dba982c690664bdfaaa2bc9fed54b3d17c767228f7b3653ba08f77d6a"
+    },
+    {
+      "name": "crc_libs.a21338b6.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/crc_libs.a21338b6.js",
+      "bytes": 1297537,
+      "sha256": "bd3b9858abe09d7552acd560d0f318139cd61a5b7a44364c153737421246c850"
+    },
+    {
+      "name": "main.bfc86683.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main.bfc86683.js",
+      "bytes": 5598455,
+      "sha256": "e2b26e0bdc9decfa8d53c0e40eb8e6c9e68d91157e96e82197efd19a14eae4d4"
+    },
+    {
+      "name": "main-vendors.6054cd72.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/main-vendors.6054cd72.js",
+      "bytes": 6460507,
+      "sha256": "6858f40e293ae316f48ecb84f0b311174bffb3ef50bd217b9359588839fcc2a3"
+    },
+    {
+      "name": "3872.cc53f08f.chunk.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/3872.cc53f08f.chunk.js",
+      "bytes": 5156,
+      "sha256": "75be7f1182ea1a766ace3ea1bd07ee53512768d18ca8e1e38ace06e9b4c8615f"
+    },
+    {
+      "name": "4374.185ed3d3.chunk.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/4374.185ed3d3.chunk.js",
+      "bytes": 181360,
+      "sha256": "12090804e0ae39ba196365748999734e053289f9b6f536fbfe8e5be933ddaf0b"
+    },
+    {
+      "name": "8421.b6f56ec0.chunk.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/8421.b6f56ec0.chunk.js",
+      "bytes": 13487,
+      "sha256": "98b7b9e67baef19fe3c5b78653aa2adcdd11247c82c3812f8f2a451ac3ab0a6b"
+    },
+    {
+      "name": "1659.47e0a643.chunk.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/1659.47e0a643.chunk.js",
+      "bytes": 18723,
+      "sha256": "ec5631e6d9a5d40624b6f045400c6620a9538fee9225b26a0c7d903e0dc6c3a2"
+    },
+    {
+      "name": "catui2.a9eaeca5.chunk.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/catui2.a9eaeca5.chunk.js",
+      "bytes": 36027,
+      "sha256": "24f35cf200f10c1713fdaee632b1df8efd244f0071a3a1cfa4a272abf1023d7a"
+    },
+    {
+      "name": "6818.e383fd97.chunk.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/6818.e383fd97.chunk.js",
+      "bytes": 34788,
+      "sha256": "6a724f010b2dea9c7c7b91517731f1e614e39662390a860a3f3976bfe88c301b"
+    },
+    {
+      "name": "2459.45804767.chunk.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/2459.45804767.chunk.js",
+      "bytes": 110,
+      "sha256": "ec902ba85e75f9135df1e52aeacbb813bf19dd6f3fbfdade202255768ab94f28"
+    },
+    {
+      "name": "5460.ec1c4b85.chunk.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/5460.ec1c4b85.chunk.js",
+      "bytes": 64257,
+      "sha256": "352cfc1c20cb1cae22cc7c0ccffd847b40400c0f89716951fd148c5799b40a7f"
+    },
+    {
+      "name": "1410.5f1c7776.chunk.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/1410.5f1c7776.chunk.js",
+      "bytes": 10635,
+      "sha256": "6c91d1c6298ed8f4b086a56ef7e1bcf03f1c785cd39638634ab385973d4f847f"
+    },
+    {
+      "name": "505.da0d5240.chunk.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/505.da0d5240.chunk.js",
+      "bytes": 95897,
+      "sha256": "762322467a06b08126ca8df0b70f1e4d191d9b84102bbc9fbca50912616df96a"
+    },
+    {
+      "name": "stage_animation.364b7b81.chunk.js",
+      "url": "https://creation.bcmcdn.com/neko/web/release/static/js/stage_animation.364b7b81.chunk.js",
+      "bytes": 202142,
+      "sha256": "73b4f2c82feddd3504d4d471bf0ad78329728b5ed5e9bd0020b64af81c183c5a"
+    }
+  ],
+  "pageErrors": [],
+  "browserVersion": "157.0.4341.60",
+  "observation": {
+    "version": "0.27.4",
+    "calls": [
+      {
+        "label": "number-0/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 0
+        },
+        "result": "0"
+      },
+      {
+        "label": "number-0/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 0,
+          "ADD2": "]"
+        },
+        "result": "[0]"
+      },
+      {
+        "label": "number-0/length",
+        "type": "text_length",
+        "args": {
+          "text": 0
+        },
+        "result": 1
+      },
+      {
+        "label": "number-1/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": {
+            "$number": "-0"
+          }
+        },
+        "result": "0"
+      },
+      {
+        "label": "number-1/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": {
+            "$number": "-0"
+          },
+          "ADD2": "]"
+        },
+        "result": "[0]"
+      },
+      {
+        "label": "number-1/length",
+        "type": "text_length",
+        "args": {
+          "text": {
+            "$number": "-0"
+          }
+        },
+        "result": 1
+      },
+      {
+        "label": "number-2/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 1
+        },
+        "result": "1"
+      },
+      {
+        "label": "number-2/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 1,
+          "ADD2": "]"
+        },
+        "result": "[1]"
+      },
+      {
+        "label": "number-2/length",
+        "type": "text_length",
+        "args": {
+          "text": 1
+        },
+        "result": 1
+      },
+      {
+        "label": "number-3/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -1
+        },
+        "result": "-1"
+      },
+      {
+        "label": "number-3/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -1,
+          "ADD2": "]"
+        },
+        "result": "[-1]"
+      },
+      {
+        "label": "number-3/length",
+        "type": "text_length",
+        "args": {
+          "text": -1
+        },
+        "result": 2
+      },
+      {
+        "label": "number-4/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 1.23
+        },
+        "result": "1.23"
+      },
+      {
+        "label": "number-4/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 1.23,
+          "ADD2": "]"
+        },
+        "result": "[1.23]"
+      },
+      {
+        "label": "number-4/length",
+        "type": "text_length",
+        "args": {
+          "text": 1.23
+        },
+        "result": 4
+      },
+      {
+        "label": "number-5/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 1.005
+        },
+        "result": "1.005"
+      },
+      {
+        "label": "number-5/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 1.005,
+          "ADD2": "]"
+        },
+        "result": "[1.005]"
+      },
+      {
+        "label": "number-5/length",
+        "type": "text_length",
+        "args": {
+          "text": 1.005
+        },
+        "result": 5
+      },
+      {
+        "label": "number-6/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 2.675
+        },
+        "result": "2.675"
+      },
+      {
+        "label": "number-6/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 2.675,
+          "ADD2": "]"
+        },
+        "result": "[2.675]"
+      },
+      {
+        "label": "number-6/length",
+        "type": "text_length",
+        "args": {
+          "text": 2.675
+        },
+        "result": 5
+      },
+      {
+        "label": "number-7/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 0.30000000000000004
+        },
+        "result": "0.30000000000000004"
+      },
+      {
+        "label": "number-7/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 0.30000000000000004,
+          "ADD2": "]"
+        },
+        "result": "[0.30000000000000004]"
+      },
+      {
+        "label": "number-7/length",
+        "type": "text_length",
+        "args": {
+          "text": 0.30000000000000004
+        },
+        "result": 19
+      },
+      {
+        "label": "number-8/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 1.2345678901234567
+        },
+        "result": "1.2345678901234567"
+      },
+      {
+        "label": "number-8/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 1.2345678901234567,
+          "ADD2": "]"
+        },
+        "result": "[1.2345678901234567]"
+      },
+      {
+        "label": "number-8/length",
+        "type": "text_length",
+        "args": {
+          "text": 1.2345678901234567
+        },
+        "result": 18
+      },
+      {
+        "label": "number-9/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 1.0000000000000002
+        },
+        "result": "1.0000000000000002"
+      },
+      {
+        "label": "number-9/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 1.0000000000000002,
+          "ADD2": "]"
+        },
+        "result": "[1.0000000000000002]"
+      },
+      {
+        "label": "number-9/length",
+        "type": "text_length",
+        "args": {
+          "text": 1.0000000000000002
+        },
+        "result": 18
+      },
+      {
+        "label": "number-10/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 1000000000000000100
+        },
+        "result": "1000000000000000100"
+      },
+      {
+        "label": "number-10/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 1000000000000000100,
+          "ADD2": "]"
+        },
+        "result": "[1000000000000000100]"
+      },
+      {
+        "label": "number-10/length",
+        "type": "text_length",
+        "args": {
+          "text": 1000000000000000100
+        },
+        "result": 19
+      },
+      {
+        "label": "number-11/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 9007199254740991
+        },
+        "result": "9007199254740991"
+      },
+      {
+        "label": "number-11/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 9007199254740991,
+          "ADD2": "]"
+        },
+        "result": "[9007199254740991]"
+      },
+      {
+        "label": "number-11/length",
+        "type": "text_length",
+        "args": {
+          "text": 9007199254740991
+        },
+        "result": 16
+      },
+      {
+        "label": "number-12/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 9007199254740992
+        },
+        "result": "9007199254740992"
+      },
+      {
+        "label": "number-12/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 9007199254740992,
+          "ADD2": "]"
+        },
+        "result": "[9007199254740992]"
+      },
+      {
+        "label": "number-12/length",
+        "type": "text_length",
+        "args": {
+          "text": 9007199254740992
+        },
+        "result": 16
+      },
+      {
+        "label": "number-13/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 5e-324
+        },
+        "result": "5e-324"
+      },
+      {
+        "label": "number-13/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 5e-324,
+          "ADD2": "]"
+        },
+        "result": "[5e-324]"
+      },
+      {
+        "label": "number-13/length",
+        "type": "text_length",
+        "args": {
+          "text": 5e-324
+        },
+        "result": 6
+      },
+      {
+        "label": "number-14/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -5e-324
+        },
+        "result": "-5e-324"
+      },
+      {
+        "label": "number-14/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -5e-324,
+          "ADD2": "]"
+        },
+        "result": "[-5e-324]"
+      },
+      {
+        "label": "number-14/length",
+        "type": "text_length",
+        "args": {
+          "text": -5e-324
+        },
+        "result": 7
+      },
+      {
+        "label": "number-15/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 1.7976931348623157e+308
+        },
+        "result": "1.7976931348623157e+308"
+      },
+      {
+        "label": "number-15/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 1.7976931348623157e+308,
+          "ADD2": "]"
+        },
+        "result": "[1.7976931348623157e+308]"
+      },
+      {
+        "label": "number-15/length",
+        "type": "text_length",
+        "args": {
+          "text": 1.7976931348623157e+308
+        },
+        "result": 23
+      },
+      {
+        "label": "number-16/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -1.7976931348623157e+308
+        },
+        "result": "-1.7976931348623157e+308"
+      },
+      {
+        "label": "number-16/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -1.7976931348623157e+308,
+          "ADD2": "]"
+        },
+        "result": "[-1.7976931348623157e+308]"
+      },
+      {
+        "label": "number-16/length",
+        "type": "text_length",
+        "args": {
+          "text": -1.7976931348623157e+308
+        },
+        "result": 24
+      },
+      {
+        "label": "number-17/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 2.2250738585072014e-308
+        },
+        "result": "2.2250738585072014e-308"
+      },
+      {
+        "label": "number-17/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 2.2250738585072014e-308,
+          "ADD2": "]"
+        },
+        "result": "[2.2250738585072014e-308]"
+      },
+      {
+        "label": "number-17/length",
+        "type": "text_length",
+        "args": {
+          "text": 2.2250738585072014e-308
+        },
+        "result": 23
+      },
+      {
+        "label": "number-18/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": {
+            "$number": "NaN"
+          }
+        },
+        "result": "NaN"
+      },
+      {
+        "label": "number-18/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": {
+            "$number": "NaN"
+          },
+          "ADD2": "]"
+        },
+        "result": "[NaN]"
+      },
+      {
+        "label": "number-18/length",
+        "type": "text_length",
+        "args": {
+          "text": {
+            "$number": "NaN"
+          }
+        },
+        "result": 3
+      },
+      {
+        "label": "number-19/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": {
+            "$number": "Infinity"
+          }
+        },
+        "result": "Infinity"
+      },
+      {
+        "label": "number-19/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": {
+            "$number": "Infinity"
+          },
+          "ADD2": "]"
+        },
+        "result": "[Infinity]"
+      },
+      {
+        "label": "number-19/length",
+        "type": "text_length",
+        "args": {
+          "text": {
+            "$number": "Infinity"
+          }
+        },
+        "result": 8
+      },
+      {
+        "label": "number-20/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": "-Infinity"
+      },
+      {
+        "label": "number-20/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": {
+            "$number": "-Infinity"
+          },
+          "ADD2": "]"
+        },
+        "result": "[-Infinity]"
+      },
+      {
+        "label": "number-20/length",
+        "type": "text_length",
+        "args": {
+          "text": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": 9
+      },
+      {
+        "label": "number-21/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 9.999999999999998e-8
+        },
+        "result": "9.999999999999998e-8"
+      },
+      {
+        "label": "number-21/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 9.999999999999998e-8,
+          "ADD2": "]"
+        },
+        "result": "[9.999999999999998e-8]"
+      },
+      {
+        "label": "number-21/length",
+        "type": "text_length",
+        "args": {
+          "text": 9.999999999999998e-8
+        },
+        "result": 20
+      },
+      {
+        "label": "number-22/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -9.999999999999998e-8
+        },
+        "result": "-9.999999999999998e-8"
+      },
+      {
+        "label": "number-22/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -9.999999999999998e-8,
+          "ADD2": "]"
+        },
+        "result": "[-9.999999999999998e-8]"
+      },
+      {
+        "label": "number-22/length",
+        "type": "text_length",
+        "args": {
+          "text": -9.999999999999998e-8
+        },
+        "result": 21
+      },
+      {
+        "label": "number-23/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 1e-7
+        },
+        "result": "1e-7"
+      },
+      {
+        "label": "number-23/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 1e-7,
+          "ADD2": "]"
+        },
+        "result": "[1e-7]"
+      },
+      {
+        "label": "number-23/length",
+        "type": "text_length",
+        "args": {
+          "text": 1e-7
+        },
+        "result": 4
+      },
+      {
+        "label": "number-24/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -1e-7
+        },
+        "result": "-1e-7"
+      },
+      {
+        "label": "number-24/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -1e-7,
+          "ADD2": "]"
+        },
+        "result": "[-1e-7]"
+      },
+      {
+        "label": "number-24/length",
+        "type": "text_length",
+        "args": {
+          "text": -1e-7
+        },
+        "result": 5
+      },
+      {
+        "label": "number-25/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 1.0000000000000001e-7
+        },
+        "result": "1.0000000000000001e-7"
+      },
+      {
+        "label": "number-25/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 1.0000000000000001e-7,
+          "ADD2": "]"
+        },
+        "result": "[1.0000000000000001e-7]"
+      },
+      {
+        "label": "number-25/length",
+        "type": "text_length",
+        "args": {
+          "text": 1.0000000000000001e-7
+        },
+        "result": 21
+      },
+      {
+        "label": "number-26/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -1.0000000000000001e-7
+        },
+        "result": "-1.0000000000000001e-7"
+      },
+      {
+        "label": "number-26/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -1.0000000000000001e-7,
+          "ADD2": "]"
+        },
+        "result": "[-1.0000000000000001e-7]"
+      },
+      {
+        "label": "number-26/length",
+        "type": "text_length",
+        "args": {
+          "text": -1.0000000000000001e-7
+        },
+        "result": 22
+      },
+      {
+        "label": "number-27/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 9.999999999999997e-7
+        },
+        "result": "9.999999999999997e-7"
+      },
+      {
+        "label": "number-27/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 9.999999999999997e-7,
+          "ADD2": "]"
+        },
+        "result": "[9.999999999999997e-7]"
+      },
+      {
+        "label": "number-27/length",
+        "type": "text_length",
+        "args": {
+          "text": 9.999999999999997e-7
+        },
+        "result": 20
+      },
+      {
+        "label": "number-28/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -9.999999999999997e-7
+        },
+        "result": "-9.999999999999997e-7"
+      },
+      {
+        "label": "number-28/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -9.999999999999997e-7,
+          "ADD2": "]"
+        },
+        "result": "[-9.999999999999997e-7]"
+      },
+      {
+        "label": "number-28/length",
+        "type": "text_length",
+        "args": {
+          "text": -9.999999999999997e-7
+        },
+        "result": 21
+      },
+      {
+        "label": "number-29/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 0.000001
+        },
+        "result": "0.000001"
+      },
+      {
+        "label": "number-29/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 0.000001,
+          "ADD2": "]"
+        },
+        "result": "[0.000001]"
+      },
+      {
+        "label": "number-29/length",
+        "type": "text_length",
+        "args": {
+          "text": 0.000001
+        },
+        "result": 8
+      },
+      {
+        "label": "number-30/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -0.000001
+        },
+        "result": "-0.000001"
+      },
+      {
+        "label": "number-30/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -0.000001,
+          "ADD2": "]"
+        },
+        "result": "[-0.000001]"
+      },
+      {
+        "label": "number-30/length",
+        "type": "text_length",
+        "args": {
+          "text": -0.000001
+        },
+        "result": 9
+      },
+      {
+        "label": "number-31/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 0.0000010000000000000002
+        },
+        "result": "0.0000010000000000000002"
+      },
+      {
+        "label": "number-31/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 0.0000010000000000000002,
+          "ADD2": "]"
+        },
+        "result": "[0.0000010000000000000002]"
+      },
+      {
+        "label": "number-31/length",
+        "type": "text_length",
+        "args": {
+          "text": 0.0000010000000000000002
+        },
+        "result": 24
+      },
+      {
+        "label": "number-32/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -0.0000010000000000000002
+        },
+        "result": "-0.0000010000000000000002"
+      },
+      {
+        "label": "number-32/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -0.0000010000000000000002,
+          "ADD2": "]"
+        },
+        "result": "[-0.0000010000000000000002]"
+      },
+      {
+        "label": "number-32/length",
+        "type": "text_length",
+        "args": {
+          "text": -0.0000010000000000000002
+        },
+        "result": 25
+      },
+      {
+        "label": "number-33/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 99999999999999980000
+        },
+        "result": "99999999999999980000"
+      },
+      {
+        "label": "number-33/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 99999999999999980000,
+          "ADD2": "]"
+        },
+        "result": "[99999999999999980000]"
+      },
+      {
+        "label": "number-33/length",
+        "type": "text_length",
+        "args": {
+          "text": 99999999999999980000
+        },
+        "result": 20
+      },
+      {
+        "label": "number-34/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -99999999999999980000
+        },
+        "result": "-99999999999999980000"
+      },
+      {
+        "label": "number-34/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -99999999999999980000,
+          "ADD2": "]"
+        },
+        "result": "[-99999999999999980000]"
+      },
+      {
+        "label": "number-34/length",
+        "type": "text_length",
+        "args": {
+          "text": -99999999999999980000
+        },
+        "result": 21
+      },
+      {
+        "label": "number-35/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 100000000000000000000
+        },
+        "result": "100000000000000000000"
+      },
+      {
+        "label": "number-35/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 100000000000000000000,
+          "ADD2": "]"
+        },
+        "result": "[100000000000000000000]"
+      },
+      {
+        "label": "number-35/length",
+        "type": "text_length",
+        "args": {
+          "text": 100000000000000000000
+        },
+        "result": 21
+      },
+      {
+        "label": "number-36/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -100000000000000000000
+        },
+        "result": "-100000000000000000000"
+      },
+      {
+        "label": "number-36/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -100000000000000000000,
+          "ADD2": "]"
+        },
+        "result": "[-100000000000000000000]"
+      },
+      {
+        "label": "number-36/length",
+        "type": "text_length",
+        "args": {
+          "text": -100000000000000000000
+        },
+        "result": 22
+      },
+      {
+        "label": "number-37/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 100000000000000020000
+        },
+        "result": "100000000000000020000"
+      },
+      {
+        "label": "number-37/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 100000000000000020000,
+          "ADD2": "]"
+        },
+        "result": "[100000000000000020000]"
+      },
+      {
+        "label": "number-37/length",
+        "type": "text_length",
+        "args": {
+          "text": 100000000000000020000
+        },
+        "result": 21
+      },
+      {
+        "label": "number-38/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -100000000000000020000
+        },
+        "result": "-100000000000000020000"
+      },
+      {
+        "label": "number-38/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -100000000000000020000,
+          "ADD2": "]"
+        },
+        "result": "[-100000000000000020000]"
+      },
+      {
+        "label": "number-38/length",
+        "type": "text_length",
+        "args": {
+          "text": -100000000000000020000
+        },
+        "result": 22
+      },
+      {
+        "label": "number-39/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 999999999999999900000
+        },
+        "result": "999999999999999900000"
+      },
+      {
+        "label": "number-39/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 999999999999999900000,
+          "ADD2": "]"
+        },
+        "result": "[999999999999999900000]"
+      },
+      {
+        "label": "number-39/length",
+        "type": "text_length",
+        "args": {
+          "text": 999999999999999900000
+        },
+        "result": 21
+      },
+      {
+        "label": "number-40/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -999999999999999900000
+        },
+        "result": "-999999999999999900000"
+      },
+      {
+        "label": "number-40/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -999999999999999900000,
+          "ADD2": "]"
+        },
+        "result": "[-999999999999999900000]"
+      },
+      {
+        "label": "number-40/length",
+        "type": "text_length",
+        "args": {
+          "text": -999999999999999900000
+        },
+        "result": 22
+      },
+      {
+        "label": "number-41/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 1e+21
+        },
+        "result": "1e+21"
+      },
+      {
+        "label": "number-41/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 1e+21,
+          "ADD2": "]"
+        },
+        "result": "[1e+21]"
+      },
+      {
+        "label": "number-41/length",
+        "type": "text_length",
+        "args": {
+          "text": 1e+21
+        },
+        "result": 5
+      },
+      {
+        "label": "number-42/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -1e+21
+        },
+        "result": "-1e+21"
+      },
+      {
+        "label": "number-42/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -1e+21,
+          "ADD2": "]"
+        },
+        "result": "[-1e+21]"
+      },
+      {
+        "label": "number-42/length",
+        "type": "text_length",
+        "args": {
+          "text": -1e+21
+        },
+        "result": 6
+      },
+      {
+        "label": "number-43/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": 1.0000000000000001e+21
+        },
+        "result": "1.0000000000000001e+21"
+      },
+      {
+        "label": "number-43/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": 1.0000000000000001e+21,
+          "ADD2": "]"
+        },
+        "result": "[1.0000000000000001e+21]"
+      },
+      {
+        "label": "number-43/length",
+        "type": "text_length",
+        "args": {
+          "text": 1.0000000000000001e+21
+        },
+        "result": 22
+      },
+      {
+        "label": "number-44/convert",
+        "type": "convert_type",
+        "args": {
+          "type": "string",
+          "text": -1.0000000000000001e+21
+        },
+        "result": "-1.0000000000000001e+21"
+      },
+      {
+        "label": "number-44/join",
+        "type": "text_join",
+        "args": {
+          "ADD0": "[",
+          "ADD1": -1.0000000000000001e+21,
+          "ADD2": "]"
+        },
+        "result": "[-1.0000000000000001e+21]"
+      },
+      {
+        "label": "number-44/length",
+        "type": "text_length",
+        "args": {
+          "text": -1.0000000000000001e+21
+        },
+        "result": 23
+      },
+      {
+        "label": "compare-0/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-0/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "",
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-0/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "",
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-0/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-0/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "",
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-0/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-0/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-0/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "",
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-0/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "",
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-0/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-0/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "",
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-0/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-1/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-1/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-1/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-1/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-1/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-1/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-1/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "a",
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-1/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "a",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-1/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "a",
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-1/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "a",
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-1/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "a",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-1/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "a",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-2/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "a",
+          "B": "aa"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-2/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "a",
+          "B": "aa"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-2/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "a",
+          "B": "aa"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-2/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "a",
+          "B": "aa"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-2/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "a",
+          "B": "aa"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-2/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "a",
+          "B": "aa"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-2/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "aa",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-2/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "aa",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-2/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "aa",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-2/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "aa",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-2/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "aa",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-2/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "aa",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-3/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "A",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-3/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "A",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-3/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "A",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-3/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "A",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-3/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "A",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-3/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "A",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-3/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "a",
+          "B": "A"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-3/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "a",
+          "B": "A"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-3/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "a",
+          "B": "A"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-3/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "a",
+          "B": "A"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-3/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "a",
+          "B": "A"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-3/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "a",
+          "B": "A"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-4/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "Z",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-4/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "Z",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-4/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "Z",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-4/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "Z",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-4/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "Z",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-4/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "Z",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-4/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "a",
+          "B": "Z"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-4/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "a",
+          "B": "Z"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-4/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "a",
+          "B": "Z"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-4/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "a",
+          "B": "Z"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-4/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "a",
+          "B": "Z"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-4/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "a",
+          "B": "Z"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-5/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "ABC",
+          "B": "abc"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-5/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "ABC",
+          "B": "abc"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-5/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "ABC",
+          "B": "abc"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-5/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "ABC",
+          "B": "abc"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-5/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "ABC",
+          "B": "abc"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-5/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "ABC",
+          "B": "abc"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-5/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "abc",
+          "B": "ABC"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-5/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "abc",
+          "B": "ABC"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-5/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "abc",
+          "B": "ABC"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-5/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "abc",
+          "B": "ABC"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-5/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "abc",
+          "B": "ABC"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-5/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "abc",
+          "B": "ABC"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-6/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "Straße",
+          "B": "STRASSE"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-6/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "Straße",
+          "B": "STRASSE"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-6/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "Straße",
+          "B": "STRASSE"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-6/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "Straße",
+          "B": "STRASSE"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-6/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "Straße",
+          "B": "STRASSE"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-6/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "Straße",
+          "B": "STRASSE"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-6/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "STRASSE",
+          "B": "Straße"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-6/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "STRASSE",
+          "B": "Straße"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-6/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "STRASSE",
+          "B": "Straße"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-6/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "STRASSE",
+          "B": "Straße"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-6/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "STRASSE",
+          "B": "Straße"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-6/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "STRASSE",
+          "B": "Straße"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-7/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "İ",
+          "B": "i"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-7/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "İ",
+          "B": "i"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-7/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "İ",
+          "B": "i"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-7/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "İ",
+          "B": "i"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-7/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "İ",
+          "B": "i"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-7/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "İ",
+          "B": "i"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-7/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "i",
+          "B": "İ"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-7/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "i",
+          "B": "İ"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-7/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "i",
+          "B": "İ"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-7/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "i",
+          "B": "İ"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-7/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "i",
+          "B": "İ"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-7/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "i",
+          "B": "İ"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-8/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "I",
+          "B": "ı"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-8/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "I",
+          "B": "ı"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-8/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "I",
+          "B": "ı"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-8/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "I",
+          "B": "ı"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-8/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "I",
+          "B": "ı"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-8/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "I",
+          "B": "ı"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-8/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "ı",
+          "B": "I"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-8/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "ı",
+          "B": "I"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-8/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "ı",
+          "B": "I"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-8/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "ı",
+          "B": "I"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-8/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "ı",
+          "B": "I"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-8/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "ı",
+          "B": "I"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-9/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "Σ",
+          "B": "σ"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-9/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "Σ",
+          "B": "σ"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-9/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "Σ",
+          "B": "σ"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-9/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "Σ",
+          "B": "σ"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-9/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "Σ",
+          "B": "σ"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-9/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "Σ",
+          "B": "σ"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-9/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "σ",
+          "B": "Σ"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-9/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "σ",
+          "B": "Σ"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-9/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "σ",
+          "B": "Σ"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-9/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "σ",
+          "B": "Σ"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-9/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "σ",
+          "B": "Σ"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-9/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "σ",
+          "B": "Σ"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-10/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "σ",
+          "B": "ς"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-10/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "σ",
+          "B": "ς"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-10/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "σ",
+          "B": "ς"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-10/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "σ",
+          "B": "ς"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-10/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "σ",
+          "B": "ς"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-10/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "σ",
+          "B": "ς"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-10/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "ς",
+          "B": "σ"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-10/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "ς",
+          "B": "σ"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-10/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "ς",
+          "B": "σ"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-10/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "ς",
+          "B": "σ"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-10/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "ς",
+          "B": "σ"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-10/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "ς",
+          "B": "σ"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-11/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "é",
+          "B": "é"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-11/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "é",
+          "B": "é"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-11/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "é",
+          "B": "é"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-11/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "é",
+          "B": "é"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-11/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "é",
+          "B": "é"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-11/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "é",
+          "B": "é"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-11/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "é",
+          "B": "é"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-11/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "é",
+          "B": "é"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-11/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "é",
+          "B": "é"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-11/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "é",
+          "B": "é"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-11/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "é",
+          "B": "é"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-11/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "é",
+          "B": "é"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-12/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "猫",
+          "B": "狗"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-12/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "猫",
+          "B": "狗"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-12/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "猫",
+          "B": "狗"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-12/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "猫",
+          "B": "狗"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-12/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "猫",
+          "B": "狗"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-12/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "猫",
+          "B": "狗"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-12/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "狗",
+          "B": "猫"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-12/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "狗",
+          "B": "猫"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-12/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "狗",
+          "B": "猫"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-12/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "狗",
+          "B": "猫"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-12/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "狗",
+          "B": "猫"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-12/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "狗",
+          "B": "猫"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-13/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "𐀀",
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-13/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "𐀀",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-13/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "𐀀",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-13/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "𐀀",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-13/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "𐀀",
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-13/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "𐀀",
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-13/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "",
+          "B": "𐀀"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-13/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "",
+          "B": "𐀀"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-13/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "",
+          "B": "𐀀"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-13/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "",
+          "B": "𐀀"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-13/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "",
+          "B": "𐀀"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-13/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "",
+          "B": "𐀀"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-14/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "😀",
+          "B": "￿"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-14/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "😀",
+          "B": "￿"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-14/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "😀",
+          "B": "￿"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-14/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "😀",
+          "B": "￿"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-14/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "😀",
+          "B": "￿"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-14/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "😀",
+          "B": "￿"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-14/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "￿",
+          "B": "😀"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-14/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "￿",
+          "B": "😀"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-14/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "￿",
+          "B": "😀"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-14/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "￿",
+          "B": "😀"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-14/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "￿",
+          "B": "😀"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-14/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "￿",
+          "B": "😀"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-15/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "a😀",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-15/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "a😀",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-15/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "a😀",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-15/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "a😀",
+          "B": "a"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-15/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "a😀",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-15/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "a😀",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-15/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "a",
+          "B": "a😀"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-15/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "a",
+          "B": "a😀"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-15/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "a",
+          "B": "a😀"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-15/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "a",
+          "B": "a😀"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-15/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "a",
+          "B": "a😀"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-15/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "a",
+          "B": "a😀"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-16/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "😀",
+          "B": "😁"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-16/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "😀",
+          "B": "😁"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-16/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "😀",
+          "B": "😁"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-16/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "😀",
+          "B": "😁"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-16/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "😀",
+          "B": "😁"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-16/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "😀",
+          "B": "😁"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-16/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "😁",
+          "B": "😀"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-16/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "😁",
+          "B": "😀"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-16/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "😁",
+          "B": "😀"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-16/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "😁",
+          "B": "😀"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-16/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "😁",
+          "B": "😀"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-16/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "😁",
+          "B": "😀"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-17/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "􏿿",
+          "B": "￿"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-17/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "􏿿",
+          "B": "￿"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-17/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "􏿿",
+          "B": "￿"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-17/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "􏿿",
+          "B": "￿"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-17/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "􏿿",
+          "B": "￿"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-17/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "􏿿",
+          "B": "￿"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-17/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "￿",
+          "B": "􏿿"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-17/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "￿",
+          "B": "􏿿"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-17/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "￿",
+          "B": "􏿿"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-17/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "￿",
+          "B": "􏿿"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-17/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "￿",
+          "B": "􏿿"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-17/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "￿",
+          "B": "􏿿"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-18/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "a\u0000b",
+          "B": "a\u0000c"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-18/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "a\u0000b",
+          "B": "a\u0000c"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-18/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "a\u0000b",
+          "B": "a\u0000c"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-18/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "a\u0000b",
+          "B": "a\u0000c"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-18/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "a\u0000b",
+          "B": "a\u0000c"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-18/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "a\u0000b",
+          "B": "a\u0000c"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-18/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "a\u0000c",
+          "B": "a\u0000b"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-18/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "a\u0000c",
+          "B": "a\u0000b"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-18/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "a\u0000c",
+          "B": "a\u0000b"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-18/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "a\u0000c",
+          "B": "a\u0000b"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-18/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "a\u0000c",
+          "B": "a\u0000b"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-18/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "a\u0000c",
+          "B": "a\u0000b"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-19/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "10",
+          "B": "2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-19/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "10",
+          "B": "2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-19/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "10",
+          "B": "2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-19/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "10",
+          "B": "2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-19/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "10",
+          "B": "2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-19/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "10",
+          "B": "2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-19/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "2",
+          "B": "10"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-19/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "2",
+          "B": "10"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-19/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "2",
+          "B": "10"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-19/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "2",
+          "B": "10"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-19/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "2",
+          "B": "10"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-19/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "2",
+          "B": "10"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-20/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "02",
+          "B": "2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-20/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "02",
+          "B": "2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-20/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "02",
+          "B": "2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-20/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "02",
+          "B": "2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-20/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "02",
+          "B": "2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-20/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "02",
+          "B": "2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-20/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "2",
+          "B": "02"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-20/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "2",
+          "B": "02"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-20/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "2",
+          "B": "02"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-20/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "2",
+          "B": "02"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-20/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "2",
+          "B": "02"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-20/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "2",
+          "B": "02"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-21/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "1e2",
+          "B": "99"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-21/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "1e2",
+          "B": "99"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-21/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "1e2",
+          "B": "99"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-21/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "1e2",
+          "B": "99"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-21/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "1e2",
+          "B": "99"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-21/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "1e2",
+          "B": "99"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-21/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "99",
+          "B": "1e2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-21/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "99",
+          "B": "1e2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-21/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "99",
+          "B": "1e2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-21/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "99",
+          "B": "1e2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-21/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "99",
+          "B": "1e2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-21/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "99",
+          "B": "1e2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-22/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": " 2",
+          "B": "2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-22/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": " 2",
+          "B": "2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-22/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": " 2",
+          "B": "2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-22/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": " 2",
+          "B": "2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-22/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": " 2",
+          "B": "2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-22/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": " 2",
+          "B": "2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-22/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "2",
+          "B": " 2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-22/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "2",
+          "B": " 2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-22/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "2",
+          "B": " 2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-22/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "2",
+          "B": " 2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-22/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "2",
+          "B": " 2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-22/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "2",
+          "B": " 2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-23/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "Infinity",
+          "B": "NaN"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-23/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "Infinity",
+          "B": "NaN"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-23/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "Infinity",
+          "B": "NaN"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-23/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "Infinity",
+          "B": "NaN"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-23/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "Infinity",
+          "B": "NaN"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-23/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "Infinity",
+          "B": "NaN"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-23/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "NaN",
+          "B": "Infinity"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-23/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "NaN",
+          "B": "Infinity"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-23/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "NaN",
+          "B": "Infinity"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-23/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "NaN",
+          "B": "Infinity"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-23/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "NaN",
+          "B": "Infinity"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-23/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "NaN",
+          "B": "Infinity"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-24/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "10",
+          "B": 2
+        },
+        "result": false
+      },
+      {
+        "label": "compare-24/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "10",
+          "B": 2
+        },
+        "result": true
+      },
+      {
+        "label": "compare-24/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "10",
+          "B": 2
+        },
+        "result": false
+      },
+      {
+        "label": "compare-24/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "10",
+          "B": 2
+        },
+        "result": false
+      },
+      {
+        "label": "compare-24/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "10",
+          "B": 2
+        },
+        "result": true
+      },
+      {
+        "label": "compare-24/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "10",
+          "B": 2
+        },
+        "result": true
+      },
+      {
+        "label": "compare-24/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": 2,
+          "B": "10"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-24/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": 2,
+          "B": "10"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-24/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": 2,
+          "B": "10"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-24/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": 2,
+          "B": "10"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-24/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": 2,
+          "B": "10"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-24/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": 2,
+          "B": "10"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-25/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "2",
+          "B": 2
+        },
+        "result": false
+      },
+      {
+        "label": "compare-25/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "2",
+          "B": 2
+        },
+        "result": true
+      },
+      {
+        "label": "compare-25/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "2",
+          "B": 2
+        },
+        "result": false
+      },
+      {
+        "label": "compare-25/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "2",
+          "B": 2
+        },
+        "result": true
+      },
+      {
+        "label": "compare-25/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "2",
+          "B": 2
+        },
+        "result": false
+      },
+      {
+        "label": "compare-25/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "2",
+          "B": 2
+        },
+        "result": true
+      },
+      {
+        "label": "compare-25/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": 2,
+          "B": "2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-25/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": 2,
+          "B": "2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-25/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": 2,
+          "B": "2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-25/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": 2,
+          "B": "2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-25/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": 2,
+          "B": "2"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-25/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": 2,
+          "B": "2"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-26/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "02",
+          "B": 2
+        },
+        "result": false
+      },
+      {
+        "label": "compare-26/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "02",
+          "B": 2
+        },
+        "result": true
+      },
+      {
+        "label": "compare-26/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "02",
+          "B": 2
+        },
+        "result": false
+      },
+      {
+        "label": "compare-26/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "02",
+          "B": 2
+        },
+        "result": true
+      },
+      {
+        "label": "compare-26/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "02",
+          "B": 2
+        },
+        "result": false
+      },
+      {
+        "label": "compare-26/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "02",
+          "B": 2
+        },
+        "result": true
+      },
+      {
+        "label": "compare-26/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": 2,
+          "B": "02"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-26/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": 2,
+          "B": "02"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-26/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": 2,
+          "B": "02"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-26/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": 2,
+          "B": "02"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-26/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": 2,
+          "B": "02"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-26/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": 2,
+          "B": "02"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-27/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "",
+          "B": 0
+        },
+        "result": false
+      },
+      {
+        "label": "compare-27/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "",
+          "B": 0
+        },
+        "result": true
+      },
+      {
+        "label": "compare-27/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "",
+          "B": 0
+        },
+        "result": false
+      },
+      {
+        "label": "compare-27/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "",
+          "B": 0
+        },
+        "result": true
+      },
+      {
+        "label": "compare-27/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "",
+          "B": 0
+        },
+        "result": false
+      },
+      {
+        "label": "compare-27/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "",
+          "B": 0
+        },
+        "result": true
+      },
+      {
+        "label": "compare-27/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": 0,
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-27/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": 0,
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-27/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": 0,
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-27/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": 0,
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-27/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": 0,
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "compare-27/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": 0,
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "compare-28/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": " ",
+          "B": 0
+        },
+        "result": false
+      },
+      {
+        "label": "compare-28/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": " ",
+          "B": 0
+        },
+        "result": true
+      },
+      {
+        "label": "compare-28/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": " ",
+          "B": 0
+        },
+        "result": false
+      },
+      {
+        "label": "compare-28/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": " ",
+          "B": 0
+        },
+        "result": true
+      },
+      {
+        "label": "compare-28/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": " ",
+          "B": 0
+        },
+        "result": false
+      },
+      {
+        "label": "compare-28/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": " ",
+          "B": 0
+        },
+        "result": true
+      },
+      {
+        "label": "compare-28/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": 0,
+          "B": " "
+        },
+        "result": false
+      },
+      {
+        "label": "compare-28/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": 0,
+          "B": " "
+        },
+        "result": true
+      },
+      {
+        "label": "compare-28/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": 0,
+          "B": " "
+        },
+        "result": false
+      },
+      {
+        "label": "compare-28/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": 0,
+          "B": " "
+        },
+        "result": true
+      },
+      {
+        "label": "compare-28/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": 0,
+          "B": " "
+        },
+        "result": false
+      },
+      {
+        "label": "compare-28/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": 0,
+          "B": " "
+        },
+        "result": true
+      },
+      {
+        "label": "compare-29/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "0x10",
+          "B": 16
+        },
+        "result": false
+      },
+      {
+        "label": "compare-29/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "0x10",
+          "B": 16
+        },
+        "result": true
+      },
+      {
+        "label": "compare-29/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "0x10",
+          "B": 16
+        },
+        "result": false
+      },
+      {
+        "label": "compare-29/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "0x10",
+          "B": 16
+        },
+        "result": true
+      },
+      {
+        "label": "compare-29/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "0x10",
+          "B": 16
+        },
+        "result": false
+      },
+      {
+        "label": "compare-29/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "0x10",
+          "B": 16
+        },
+        "result": true
+      },
+      {
+        "label": "compare-29/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": 16,
+          "B": "0x10"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-29/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": 16,
+          "B": "0x10"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-29/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": 16,
+          "B": "0x10"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-29/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": 16,
+          "B": "0x10"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-29/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": 16,
+          "B": "0x10"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-29/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": 16,
+          "B": "0x10"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-30/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "0b11",
+          "B": 3
+        },
+        "result": false
+      },
+      {
+        "label": "compare-30/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "0b11",
+          "B": 3
+        },
+        "result": true
+      },
+      {
+        "label": "compare-30/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "0b11",
+          "B": 3
+        },
+        "result": false
+      },
+      {
+        "label": "compare-30/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "0b11",
+          "B": 3
+        },
+        "result": true
+      },
+      {
+        "label": "compare-30/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "0b11",
+          "B": 3
+        },
+        "result": false
+      },
+      {
+        "label": "compare-30/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "0b11",
+          "B": 3
+        },
+        "result": true
+      },
+      {
+        "label": "compare-30/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": 3,
+          "B": "0b11"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-30/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": 3,
+          "B": "0b11"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-30/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": 3,
+          "B": "0b11"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-30/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": 3,
+          "B": "0b11"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-30/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": 3,
+          "B": "0b11"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-30/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": 3,
+          "B": "0b11"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-31/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "bad",
+          "B": 1
+        },
+        "result": false
+      },
+      {
+        "label": "compare-31/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "bad",
+          "B": 1
+        },
+        "result": true
+      },
+      {
+        "label": "compare-31/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "bad",
+          "B": 1
+        },
+        "result": false
+      },
+      {
+        "label": "compare-31/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "bad",
+          "B": 1
+        },
+        "result": false
+      },
+      {
+        "label": "compare-31/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "bad",
+          "B": 1
+        },
+        "result": false
+      },
+      {
+        "label": "compare-31/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "bad",
+          "B": 1
+        },
+        "result": false
+      },
+      {
+        "label": "compare-31/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": 1,
+          "B": "bad"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-31/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": 1,
+          "B": "bad"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-31/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": 1,
+          "B": "bad"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-31/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": 1,
+          "B": "bad"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-31/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": 1,
+          "B": "bad"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-31/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": 1,
+          "B": "bad"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-32/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "NaN",
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-32/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "NaN",
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-32/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "NaN",
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-32/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "NaN",
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-32/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "NaN",
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-32/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "NaN",
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-32/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": "NaN"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-32/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": "NaN"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-32/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": "NaN"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-32/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": "NaN"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-32/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": "NaN"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-32/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": "NaN"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-33/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "Infinity",
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-33/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "Infinity",
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-33/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "Infinity",
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-33/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "Infinity",
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-33/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "Infinity",
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-33/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "Infinity",
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-33/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": "Infinity"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-33/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": "Infinity"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-33/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": "Infinity"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-33/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": "Infinity"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-33/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": "Infinity"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-33/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": "Infinity"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-34/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "-Infinity",
+          "B": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-34/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "-Infinity",
+          "B": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-34/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "-Infinity",
+          "B": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-34/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "-Infinity",
+          "B": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-34/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "-Infinity",
+          "B": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-34/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "-Infinity",
+          "B": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-34/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": {
+            "$number": "-Infinity"
+          },
+          "B": "-Infinity"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-34/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": {
+            "$number": "-Infinity"
+          },
+          "B": "-Infinity"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-34/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": {
+            "$number": "-Infinity"
+          },
+          "B": "-Infinity"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-34/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": {
+            "$number": "-Infinity"
+          },
+          "B": "-Infinity"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-34/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": {
+            "$number": "-Infinity"
+          },
+          "B": "-Infinity"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-34/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": {
+            "$number": "-Infinity"
+          },
+          "B": "-Infinity"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-35/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": "1",
+          "B": true
+        },
+        "result": false
+      },
+      {
+        "label": "compare-35/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": "1",
+          "B": true
+        },
+        "result": true
+      },
+      {
+        "label": "compare-35/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": "1",
+          "B": true
+        },
+        "result": false
+      },
+      {
+        "label": "compare-35/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": "1",
+          "B": true
+        },
+        "result": true
+      },
+      {
+        "label": "compare-35/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": "1",
+          "B": true
+        },
+        "result": false
+      },
+      {
+        "label": "compare-35/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": "1",
+          "B": true
+        },
+        "result": true
+      },
+      {
+        "label": "compare-35/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": true,
+          "B": "1"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-35/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": true,
+          "B": "1"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-35/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": true,
+          "B": "1"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-35/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": true,
+          "B": "1"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-35/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": true,
+          "B": "1"
+        },
+        "result": false
+      },
+      {
+        "label": "compare-35/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": true,
+          "B": "1"
+        },
+        "result": true
+      },
+      {
+        "label": "compare-36/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": 0,
+          "B": false
+        },
+        "result": false
+      },
+      {
+        "label": "compare-36/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": 0,
+          "B": false
+        },
+        "result": true
+      },
+      {
+        "label": "compare-36/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": 0,
+          "B": false
+        },
+        "result": false
+      },
+      {
+        "label": "compare-36/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": 0,
+          "B": false
+        },
+        "result": true
+      },
+      {
+        "label": "compare-36/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": 0,
+          "B": false
+        },
+        "result": false
+      },
+      {
+        "label": "compare-36/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": 0,
+          "B": false
+        },
+        "result": true
+      },
+      {
+        "label": "compare-36/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": false,
+          "B": 0
+        },
+        "result": false
+      },
+      {
+        "label": "compare-36/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": false,
+          "B": 0
+        },
+        "result": true
+      },
+      {
+        "label": "compare-36/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": false,
+          "B": 0
+        },
+        "result": false
+      },
+      {
+        "label": "compare-36/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": false,
+          "B": 0
+        },
+        "result": true
+      },
+      {
+        "label": "compare-36/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": false,
+          "B": 0
+        },
+        "result": false
+      },
+      {
+        "label": "compare-36/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": false,
+          "B": 0
+        },
+        "result": true
+      },
+      {
+        "label": "compare-37/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-37/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-37/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-37/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-37/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-37/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-37/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-37/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-37/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-37/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-37/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-37/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": {
+            "$number": "NaN"
+          },
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-38/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": {
+            "$number": "-0"
+          },
+          "B": 0
+        },
+        "result": true
+      },
+      {
+        "label": "compare-38/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": {
+            "$number": "-0"
+          },
+          "B": 0
+        },
+        "result": false
+      },
+      {
+        "label": "compare-38/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": {
+            "$number": "-0"
+          },
+          "B": 0
+        },
+        "result": false
+      },
+      {
+        "label": "compare-38/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": {
+            "$number": "-0"
+          },
+          "B": 0
+        },
+        "result": true
+      },
+      {
+        "label": "compare-38/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": {
+            "$number": "-0"
+          },
+          "B": 0
+        },
+        "result": false
+      },
+      {
+        "label": "compare-38/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": {
+            "$number": "-0"
+          },
+          "B": 0
+        },
+        "result": true
+      },
+      {
+        "label": "compare-38/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": 0,
+          "B": {
+            "$number": "-0"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-38/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": 0,
+          "B": {
+            "$number": "-0"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-38/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": 0,
+          "B": {
+            "$number": "-0"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-38/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": 0,
+          "B": {
+            "$number": "-0"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-38/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": 0,
+          "B": {
+            "$number": "-0"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-38/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": 0,
+          "B": {
+            "$number": "-0"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-39/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-39/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-39/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-39/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-39/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-39/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-39/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-39/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-39/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-39/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-39/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-39/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-40/forward/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": {
+            "$number": "-Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-40/forward/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": {
+            "$number": "-Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-40/forward/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": {
+            "$number": "-Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-40/forward/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": {
+            "$number": "-Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-40/forward/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": {
+            "$number": "-Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-40/forward/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": {
+            "$number": "-Infinity"
+          },
+          "B": {
+            "$number": "Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-40/reverse/EQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "EQ",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-40/reverse/NEQ",
+        "type": "logic_compare",
+        "args": {
+          "OP": "NEQ",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-40/reverse/LT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LT",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-40/reverse/LTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "LTE",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "compare-40/reverse/GT",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GT",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "compare-40/reverse/GTE",
+        "type": "logic_compare",
+        "args": {
+          "OP": "GTE",
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": true
+      },
+      {
+        "label": "join-0",
+        "type": "text_join",
+        "args": {},
+        "result": ""
+      },
+      {
+        "label": "join-1",
+        "type": "text_join",
+        "args": {
+          "ADD0": ""
+        },
+        "result": ""
+      },
+      {
+        "label": "join-2",
+        "type": "text_join",
+        "args": {
+          "ADD0": 1
+        },
+        "result": "1"
+      },
+      {
+        "label": "join-3",
+        "type": "text_join",
+        "args": {
+          "ADD0": true,
+          "ADD1": false
+        },
+        "result": "truefalse"
+      },
+      {
+        "label": "join-4",
+        "type": "text_join",
+        "args": {
+          "ADD0": "A",
+          "ADD1": "b",
+          "ADD2": "猫",
+          "ADD3": "😀"
+        },
+        "result": "Ab猫😀"
+      },
+      {
+        "label": "join-5",
+        "type": "text_join",
+        "args": {
+          "ADD0": "1.2300",
+          "ADD1": "|",
+          "ADD2": 1.23
+        },
+        "result": "1.2300|1.23"
+      },
+      {
+        "label": "join-6",
+        "type": "text_join",
+        "args": {
+          "ADD0": "1E+21",
+          "ADD1": "|",
+          "ADD2": 1e+21
+        },
+        "result": "1E+21|1e+21"
+      },
+      {
+        "label": "join-7",
+        "type": "text_join",
+        "args": {
+          "ADD0": "-0",
+          "ADD1": "|",
+          "ADD2": {
+            "$number": "-0"
+          }
+        },
+        "result": "-0|0"
+      },
+      {
+        "label": "join-8",
+        "type": "text_join",
+        "args": {
+          "ADD0": {
+            "$number": "NaN"
+          },
+          "ADD1": "|",
+          "ADD2": {
+            "$number": "Infinity"
+          },
+          "ADD3": "|",
+          "ADD4": {
+            "$number": "-Infinity"
+          }
+        },
+        "result": "NaN|Infinity|-Infinity"
+      },
+      {
+        "label": "join-9",
+        "type": "text_join",
+        "args": {
+          "ADD0": "a",
+          "ADD1": {
+            "$undefined": true
+          },
+          "ADD2": "b"
+        },
+        "result": "a"
+      },
+      {
+        "label": "join-10",
+        "type": "text_join",
+        "args": {
+          "ADD0": {
+            "$undefined": true
+          },
+          "ADD1": "b"
+        },
+        "result": ""
+      },
+      {
+        "label": "join-11",
+        "type": "text_join",
+        "args": {
+          "ADD0": "a",
+          "ADD1": "b",
+          "ADD2": {
+            "$undefined": true
+          }
+        },
+        "result": "ab"
+      },
+      {
+        "label": "join-12",
+        "type": "text_join",
+        "args": {
+          "ADD0": [
+            1,
+            "猫",
+            [
+              2,
+              3
+            ]
+          ]
+        },
+        "result": "1,猫,2,3"
+      },
+      {
+        "label": "join-13",
+        "type": "text_join",
+        "args": {
+          "ADD0": [
+            null,
+            {
+              "$undefined": true
+            },
+            {
+              "$number": "NaN"
+            },
+            {
+              "$number": "-0"
+            }
+          ]
+        },
+        "result": ",,NaN,0"
+      },
+      {
+        "label": "join-14",
+        "type": "text_join",
+        "args": {
+          "ADD0": [],
+          "ADD1": "x",
+          "ADD2": [
+            [],
+            []
+          ]
+        },
+        "result": "x,"
+      },
+      {
+        "label": "join-15",
+        "type": "text_join",
+        "args": {
+          "ADD0": null
+        },
+        "result": "null"
+      },
+      {
+        "label": "join-16",
+        "type": "text_join",
+        "args": {
+          "ADD0": "a",
+          "ADD1": null,
+          "ADD2": "b"
+        },
+        "result": "anullb"
+      },
+      {
+        "label": "contains-0",
+        "type": "text_contain",
+        "args": {
+          "A": "ABC",
+          "B": "a"
+        },
+        "result": false
+      },
+      {
+        "label": "contains-1",
+        "type": "text_contain",
+        "args": {
+          "A": "ABC",
+          "B": "A"
+        },
+        "result": true
+      },
+      {
+        "label": "contains-2",
+        "type": "text_contain",
+        "args": {
+          "A": "Straße",
+          "B": "SS"
+        },
+        "result": false
+      },
+      {
+        "label": "contains-3",
+        "type": "text_contain",
+        "args": {
+          "A": "İ",
+          "B": "i"
+        },
+        "result": false
+      },
+      {
+        "label": "contains-4",
+        "type": "text_contain",
+        "args": {
+          "A": "Σ",
+          "B": "σ"
+        },
+        "result": false
+      },
+      {
+        "label": "contains-5",
+        "type": "text_contain",
+        "args": {
+          "A": "猫😀犬",
+          "B": "😀"
+        },
+        "result": true
+      },
+      {
+        "label": "contains-6",
+        "type": "text_contain",
+        "args": {
+          "A": "é",
+          "B": "é"
+        },
+        "result": false
+      },
+      {
+        "label": "contains-7",
+        "type": "text_contain",
+        "args": {
+          "A": "",
+          "B": ""
+        },
+        "result": true
+      },
+      {
+        "label": "contains-8",
+        "type": "text_contain",
+        "args": {
+          "A": 1e+21,
+          "B": "e+21"
+        },
+        "result": true
+      },
+      {
+        "label": "contains-9",
+        "type": "text_contain",
+        "args": {
+          "A": {
+            "$number": "NaN"
+          },
+          "B": "NaN"
+        },
+        "result": false
+      },
+      {
+        "label": "contains-10",
+        "type": "text_contain",
+        "args": {
+          "A": "NaN",
+          "B": {
+            "$number": "NaN"
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "contains-11",
+        "type": "text_contain",
+        "args": {
+          "A": "NaN",
+          "B": "NaN"
+        },
+        "result": true
+      },
+      {
+        "label": "contains-12",
+        "type": "text_contain",
+        "args": {
+          "A": {
+            "$number": "Infinity"
+          },
+          "B": "Infinity"
+        },
+        "result": true
+      },
+      {
+        "label": "contains-13",
+        "type": "text_contain",
+        "args": {
+          "A": {
+            "$number": "-0"
+          },
+          "B": "-0"
+        },
+        "result": false
+      },
+      {
+        "label": "contains-14",
+        "type": "text_contain",
+        "args": {
+          "A": true,
+          "B": "true"
+        },
+        "result": true
+      },
+      {
+        "label": "contains-15",
+        "type": "text_contain",
+        "args": {
+          "A": {
+            "$undefined": true
+          },
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "contains-16",
+        "type": "text_contain",
+        "args": {
+          "A": "undefined",
+          "B": {
+            "$undefined": true
+          }
+        },
+        "result": false
+      },
+      {
+        "label": "contains-17",
+        "type": "text_contain",
+        "args": {
+          "A": null,
+          "B": ""
+        },
+        "result": false
+      },
+      {
+        "label": "case-0/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": ""
+        },
+        "result": ""
+      },
+      {
+        "label": "case-0/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": ""
+        },
+        "result": ""
+      },
+      {
+        "label": "case-1/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "AbC猫😀"
+        },
+        "result": "abc猫😀"
+      },
+      {
+        "label": "case-1/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "AbC猫😀"
+        },
+        "result": "ABC猫😀"
+      },
+      {
+        "label": "case-2/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "Straße"
+        },
+        "result": "straße"
+      },
+      {
+        "label": "case-2/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "Straße"
+        },
+        "result": "STRASSE"
+      },
+      {
+        "label": "case-3/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "ẞ"
+        },
+        "result": "ß"
+      },
+      {
+        "label": "case-3/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "ẞ"
+        },
+        "result": "ẞ"
+      },
+      {
+        "label": "case-4/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "İ"
+        },
+        "result": "i̇"
+      },
+      {
+        "label": "case-4/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "İ"
+        },
+        "result": "İ"
+      },
+      {
+        "label": "case-5/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "Iıi"
+        },
+        "result": "iıi"
+      },
+      {
+        "label": "case-5/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "Iıi"
+        },
+        "result": "III"
+      },
+      {
+        "label": "case-6/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "Σ"
+        },
+        "result": "σ"
+      },
+      {
+        "label": "case-6/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "Σ"
+        },
+        "result": "Σ"
+      },
+      {
+        "label": "case-7/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "ΟΣ"
+        },
+        "result": "ος"
+      },
+      {
+        "label": "case-7/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "ΟΣ"
+        },
+        "result": "ΟΣ"
+      },
+      {
+        "label": "case-8/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "ΟΣΑ"
+        },
+        "result": "οσα"
+      },
+      {
+        "label": "case-8/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "ΟΣΑ"
+        },
+        "result": "ΟΣΑ"
+      },
+      {
+        "label": "case-9/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "ΣΣ"
+        },
+        "result": "σς"
+      },
+      {
+        "label": "case-9/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "ΣΣ"
+        },
+        "result": "ΣΣ"
+      },
+      {
+        "label": "case-10/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "ΌΣ"
+        },
+        "result": "ός"
+      },
+      {
+        "label": "case-10/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "ΌΣ"
+        },
+        "result": "ΌΣ"
+      },
+      {
+        "label": "case-11/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "ΟΣ́"
+        },
+        "result": "ος́"
+      },
+      {
+        "label": "case-11/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "ΟΣ́"
+        },
+        "result": "ΟΣ́"
+      },
+      {
+        "label": "case-12/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "ﬃ"
+        },
+        "result": "ﬃ"
+      },
+      {
+        "label": "case-12/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "ﬃ"
+        },
+        "result": "FFI"
+      },
+      {
+        "label": "case-13/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "ǰ"
+        },
+        "result": "ǰ"
+      },
+      {
+        "label": "case-13/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "ǰ"
+        },
+        "result": "J̌"
+      },
+      {
+        "label": "case-14/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "éÉ"
+        },
+        "result": "éé"
+      },
+      {
+        "label": "case-14/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "éÉ"
+        },
+        "result": "ÉÉ"
+      },
+      {
+        "label": "case-15/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "𐐀𐐨"
+        },
+        "result": "𐐨𐐨"
+      },
+      {
+        "label": "case-15/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "𐐀𐐨"
+        },
+        "result": "𐐀𐐀"
+      },
+      {
+        "label": "case-16/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": "123"
+        },
+        "result": "123"
+      },
+      {
+        "label": "case-16/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": "123"
+        },
+        "result": "123"
+      },
+      {
+        "label": "case-17/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": 1.23
+        },
+        "result": "1.23"
+      },
+      {
+        "label": "case-17/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": 1.23
+        },
+        "result": "1.23"
+      },
+      {
+        "label": "case-18/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": {
+            "$number": "-0"
+          }
+        },
+        "result": "0"
+      },
+      {
+        "label": "case-18/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": {
+            "$number": "-0"
+          }
+        },
+        "result": "0"
+      },
+      {
+        "label": "case-19/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": 1e+21
+        },
+        "result": "1e+21"
+      },
+      {
+        "label": "case-19/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": 1e+21
+        },
+        "result": "1E+21"
+      },
+      {
+        "label": "case-20/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": {
+            "$number": "NaN"
+          }
+        },
+        "result": "nan"
+      },
+      {
+        "label": "case-20/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": {
+            "$number": "NaN"
+          }
+        },
+        "result": "NAN"
+      },
+      {
+        "label": "case-21/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": {
+            "$number": "Infinity"
+          }
+        },
+        "result": "infinity"
+      },
+      {
+        "label": "case-21/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": {
+            "$number": "Infinity"
+          }
+        },
+        "result": "INFINITY"
+      },
+      {
+        "label": "case-22/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": true
+        },
+        "result": "true"
+      },
+      {
+        "label": "case-22/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": true
+        },
+        "result": "TRUE"
+      },
+      {
+        "label": "case-23/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": false
+        },
+        "result": "false"
+      },
+      {
+        "label": "case-23/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": false
+        },
+        "result": "FALSE"
+      },
+      {
+        "label": "case-24/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": null
+        },
+        "result": ""
+      },
+      {
+        "label": "case-24/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": null
+        },
+        "result": ""
+      },
+      {
+        "label": "case-25/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": {
+            "$undefined": true
+          }
+        },
+        "result": ""
+      },
+      {
+        "label": "case-25/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": {
+            "$undefined": true
+          }
+        },
+        "result": ""
+      },
+      {
+        "label": "case-26/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": [
+            "AbC",
+            "ß",
+            [
+              "Σ"
+            ]
+          ]
+        },
+        "result": "abc,ß,σ"
+      },
+      {
+        "label": "case-26/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": [
+            "AbC",
+            "ß",
+            [
+              "Σ"
+            ]
+          ]
+        },
+        "result": "ABC,SS,Σ"
+      },
+      {
+        "label": "case-27/String.toLowerCase",
+        "type": "String.toLowerCase",
+        "args": {
+          "CONSTRUCTOR": []
+        },
+        "result": ""
+      },
+      {
+        "label": "case-27/String.toUpperCase",
+        "type": "String.toUpperCase",
+        "args": {
+          "CONSTRUCTOR": []
+        },
+        "result": ""
+      }
+    ],
+    "caseConversionDomains": [
+      "String.toLowerCase",
+      "String.toUpperCase"
+    ]
+  },
+  "sourceLocations": [
+    {
+      "type": "convert_type",
+      "bundle": "main.bfc86683.js",
+      "utf16Offset": 1633709,
+      "byteOffset": 1633709,
+      "anchor": "convertType,(function",
+      "excerptLength": 1000,
+      "excerptSha256": "08d913abfd968eb06f1e14d5cd76b69f93cd827de426208ebbc409abc79cea27"
+    },
+    {
+      "type": "text_join",
+      "bundle": "crc_libs.a21338b6.js",
+      "utf16Offset": 822175,
+      "byteOffset": 822175,
+      "anchor": "text_join:function",
+      "excerptLength": 1000,
+      "excerptSha256": "aa95183d8d3b33bcb3725eb3ef5813f288cce49f974d548667ec30fbf7542eb1"
+    },
+    {
+      "type": "text_length",
+      "bundle": "main.bfc86683.js",
+      "utf16Offset": 1633566,
+      "byteOffset": 1633566,
+      "anchor": "textLength,(function",
+      "excerptLength": 1000,
+      "excerptSha256": "7977e2435cf4dd1039fcb5289445c8a4fee42a2bf8f753148f4d812fca721bdc"
+    },
+    {
+      "type": "logic_compare",
+      "bundle": "crc_libs.a21338b6.js",
+      "utf16Offset": 819970,
+      "byteOffset": 819970,
+      "anchor": "EQ:function",
+      "excerptLength": 1000,
+      "excerptSha256": "90acee7fe808d929adbb025c95e60161cd227c82a1236e382f5b5d7095cb0fa9"
+    },
+    {
+      "type": "text_contain",
+      "bundle": "main.bfc86683.js",
+      "utf16Offset": 1633025,
+      "byteOffset": 1633025,
+      "anchor": "textContain,(function",
+      "excerptLength": 1000,
+      "excerptSha256": "b9d7f65a815efd94298e96d7c29f4cf49977749cf7fb24a8b30980b24c8e1b3c"
+    },
+    {
+      "type": "String.toLowerCase",
+      "bundle": "main.bfc86683.js",
+      "utf16Offset": 2972283,
+      "byteOffset": 2972283,
+      "anchor": "\"String.toLowerCase\":function",
+      "excerptLength": 1000,
+      "excerptSha256": "1aa07faa47ab0347b261ab3022c3451e6d0b8fb6f031453ff1ab23e9e8247b00"
+    },
+    {
+      "type": "String.toUpperCase",
+      "bundle": "main.bfc86683.js",
+      "utf16Offset": 2972394,
+      "byteOffset": 2972394,
+      "anchor": "\"String.toUpperCase\":function",
+      "excerptLength": 1000,
+      "excerptSha256": "77e2e0e4dac8d16d795ee4a67e8690165c0f0b7d3b7973b4f415c4559317d9fa"
+    }
+  ],
+  "ok": true
+}
