@@ -39,3 +39,30 @@
 
 KN 扫描使用显式栈；深层 `next` 链只在产生诊断时拼接完整 JSON Pointer，避免逐节点复制全路径。
 回归覆盖 10000 层链，不使用墙钟性能断言。
+
+## 复验与结果记录
+
+在待审 worktree 中运行全部仓库检查，不以旧报告或部分成功输出替代本轮结果：
+
+```sh
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test --all-targets --no-fail-fast
+npm run -s typecheck
+npm run -s test:tools
+```
+
+使用远端 Cargo 约定的 Windows worktree 时，上述 Cargo 命令均改经
+`bash E:/nekoc-wt/_cargo.sh <参数>` 执行；应从 Git Bash 调用，避免 Linux Bash
+把 `E:/...` 当作不存在的相对路径。重测试留在远端，串行同步同一 worktree。
+
+- 保留本轮源码基线、实际改动、完整日志及每个命令的最终退出码。SSH 退出 255、
+  等待超时或只有部分 `test result: ok` 均不算通过；失败和重试日志应分别保留。
+- 工具测试需要完整 Git 历史；固定语料统计还需要已有 `projects/` 的跟踪信息。
+  同步环境缺这些元数据时恢复测试环境，不改共享作品、测试断言或冻结的统计结果。
+- 对每条审查意见记录处理方式、验证证据和修订提交；不适用的检查应说明原因。
+  没有具体代码缺陷时无需为制造差异而修改分析规则，但仍需补齐本轮验证。
+- `tests/r4_lint.rs` 验证只读行为、诊断类别、原始位置、KN/K4 和 CLI 退出码。
+  全量工具测试覆盖仓库既有 TS 回归；它们不等同于新增官方编辑器差分证据。
+  若另行生成或修改交付的 `.bcmkn`，仍须对该作品运行
+  `node tools/editor-compat.mjs <作品.bcmkn>` 并取得 `ok: true`，不得以 lint 成功代替。
