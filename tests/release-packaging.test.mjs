@@ -13,7 +13,7 @@ test("release manifest includes only supported platforms and redistributable ass
   assert.ok(samples.includes("basic.ts"));
   assert.ok(samples.includes("stage_demo.nk.ts"));
   assert.ok(docs.includes("install.md"));
-  for (const file of ["runtime-source-map.mjs", "ts-r2-destructure.mjs"]) {
+  for (const file of ["diagnostics.mjs", "runtime-source-map.mjs", "ts-r2-destructure.mjs"]) {
     assert.ok(frontendFiles.includes(file), file);
   }
   for (const file of [...docs.map(n => `docs/${n}`), ...samples.map(n => `samples/${n}`), ...frontendFiles.map(n => `ts/${n}`)]) {

@@ -58,6 +58,79 @@ fn cli_error(project: &Value, dir: &Path) -> String {
     String::from_utf8(output.stderr).unwrap()
 }
 
+fn assert_runtime_suffix(error: &str, expected: &str) {
+    let mut lines = error.trim_end().lines();
+    let diagnostic = lines.next().unwrap();
+    assert!(diagnostic.ends_with(expected), "{error}");
+    if diagnostic.starts_with("错误：") {
+        assert!(lines.next().unwrap().starts_with("下一步："), "{error}");
+    }
+    assert!(lines.next().is_none(), "{error}");
+}
+
+#[test]
+fn class_member_origins_reach_runtime_cli_and_player_after_diagnostic_lowering() {
+    let dir = tempfile::tempdir().unwrap();
+    for (member, invoke, kind, call, message) in [
+        (
+            "bad() {\n    setStyle(99);\n  }",
+            "a.bad();",
+            "set_sprite_style",
+            "setStyle(99)",
+            "invalid costume",
+        ),
+        (
+            "constructor() { super();\n    setStyle(99);\n  }",
+            "console.log(a.x);",
+            "set_sprite_style",
+            "setStyle(99)",
+            "invalid costume",
+        ),
+        (
+            "bad(n = (\n    selectText(\"😀\", 1, 1)\n  )) { return n; }",
+            "console.log(a.bad());",
+            "text_select",
+            "selectText(\"😀\", 1, 1)",
+            "isolated UTF-16 surrogate",
+        ),
+    ] {
+        let library = format!(
+            "class Base {{ base = 0; }}\nclass A extends Base {{\n  x = 1;\n  {member}\n}}\nexport function helper() {{\n  const a = new A();\n  {invoke}\n}}\n"
+        );
+        std::fs::write(dir.path().join("lib.ts"), &library).unwrap();
+        let before = &library[..library.find(call).unwrap()];
+        let line = before.lines().count();
+        let column = before.rsplit('\n').next().unwrap().encode_utf16().count() + 1;
+        let expected = format!("lib.ts:{line}:{column}");
+        let project = compile(
+            dir.path(),
+            "import { helper } from './lib';\nonStart(() => { helper(); });",
+            default_template(),
+        );
+        let id = find_block(&project, kind)["id"].as_str().unwrap();
+        assert_eq!(
+            project["sourceMap"][id],
+            json!({"file":"lib.ts","line":line,"column":column})
+        );
+        let mut player = Player::load(Handshake::new(project.clone())).unwrap();
+        let error = (0..20)
+            .find_map(|_| player.frame(&FrameInput::default()).err())
+            .unwrap();
+        let wire: Value = serde_json::from_str(&error_message(&error)).unwrap();
+        for error in [
+            run_error(&project, true),
+            run_error(&project, false),
+            cli_error(&project, dir.path()),
+            wire["error"].as_str().unwrap().to_owned(),
+        ] {
+            assert!(error.contains(message), "{error}");
+            assert!(error.contains(&expected), "{error}");
+            assert_runtime_suffix(&error, &format!("{expected}] at block {id}"));
+            assert!(!error.contains(dir.path().to_str().unwrap()), "{error}");
+        }
+    }
+}
+
 #[test]
 fn reparsed_same_text_in_an_unused_function_is_not_a_runtime_origin() {
     let dir = tempfile::tempdir().unwrap();
@@ -139,7 +212,7 @@ fn user_error_markers_never_replace_runtime_cli_or_player_provenance() {
                 error.contains("[actor Sprite (nekoc-default-actor)"),
                 "{error}"
             );
-            assert!(error.trim_end().ends_with(&expected), "{error}");
+            assert_runtime_suffix(&error, &expected);
         }
     }
 }

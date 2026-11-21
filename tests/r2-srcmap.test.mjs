@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import path from "node:path";
 import ts from "typescript";
-import { compileFile } from "../ts/compile-ts.mjs";
+import { checkFile, compileFile } from "../ts/compile-ts.mjs";
 import { runtimeSourceLocation } from "../ts/runtime-source-map.mjs";
 
 function compile(source, imported) {
@@ -123,6 +123,46 @@ test("r2-srcmap player connection and notice retain the complete runtime diagnos
   feedback.notice(message);
   assert.equal(elements.get("#notice-text").textContent, message);
   assert.equal(elements.get("#notice").hidden, false);
+});
+
+test("r2-srcmap and r3 diagnostics share precise class origins without sharing path policy", () => {
+  for (const imported of [false, true]) for (const inherited of [false, true]) {
+    for (const item of [
+      { member: 'bad() {\n    setStyle(99);\n  }', invoke: 'a.bad();', type: 'set_sprite_style', call: 'setStyle(99)' },
+      { member: `constructor() {${inherited ? ' super();' : ''}\n    setStyle(99);\n  }`, invoke: 'console.log(a.x);', type: 'set_sprite_style', call: 'setStyle(99)' },
+      { member: 'bad(n = (\n    selectText("😀", 1, 1)\n  )) { return n; }', invoke: 'console.log(a.bad());', type: 'text_select', call: 'selectText("😀", 1, 1)' },
+    ]) {
+      const declaration = `${inherited ? 'class Base { base = 0; }\n' : ''}class A${inherited ? ' extends Base' : ''} {\n  x = 1;\n  ${item.member}\n}\n`;
+      const body = `${declaration}export function helper() {\n  const a = new A();\n  ${item.invoke}\n}\n`;
+      const entry = path.resolve('r2-srcmap.ts');
+      const library = path.resolve('r2-srcmap-lib.ts');
+      const main = imported ? 'import { helper } from "./r2-srcmap-lib";\nonStart(() => { helper(); });' : `${body}onStart(() => { helper(); });`;
+      const files = new Map([[entry, main], ...(imported ? [[library, body]] : [])]);
+      const host = { readFile: name => files.get(name) };
+      const source = imported ? body : main;
+      const before = source.slice(0, source.indexOf(item.call)).split('\n');
+      const expected = { file: imported ? 'r2-srcmap-lib.ts' : 'r2-srcmap.ts', line: before.length, column: before.at(-1).length + 1 };
+      const report = compileFile(entry, host);
+      const blocks = allBlocks(report).filter(b => b.type === item.type);
+      assert.ok(blocks.length);
+      for (const block of blocks) assert.deepEqual(report.sourceMap[block.id], expected, JSON.stringify({ imported, inherited, member: item.member }));
+
+      const broken = { readFile: name => files.get(name)?.replace(item.call, 'missingApi()') };
+      const result = checkFile(entry, { types: false, host: broken });
+      assert.equal(result.ok, false);
+      assert.equal(result.diagnostics.length, 1);
+      const [diagnostic] = result.diagnostics;
+      assert.equal(diagnostic.file.replaceAll('\\', '/'), (imported ? library : entry).replaceAll('\\', '/'));
+      assert.equal(diagnostic.line, expected.line);
+      assert.equal(diagnostic.column, expected.column);
+      assert.equal(diagnostic.snippet, source.replace(item.call, 'missingApi()').split('\n')[expected.line - 1]);
+      assert.ok(diagnostic.suggestion.length > 10);
+      assert.throws(() => compileFile(entry, broken), error => {
+        assert.deepEqual(error.diagnostics, result.diagnostics);
+        return true;
+      });
+    }
+  }
 });
 
 test("r2-srcmap persists entry-relative module identities across relocated native and virtual roots", () => {
