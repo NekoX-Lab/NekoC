@@ -26,6 +26,7 @@ test("r2-entry: README browser entry resolves to the built Pages player", async 
   t.after(() => fs.rm(fixture, { recursive: true, force: true }));
   await fs.mkdir(path.join(fixture, "tools"));
   await fs.copyFile(path.join(root, "tools/build-pages.mjs"), path.join(fixture, "tools/build-pages.mjs"));
+  await fs.copyFile(path.join(root, "tools/player-offline.mjs"), path.join(fixture, "tools/player-offline.mjs"));
   for (const directory of ["site", "web"]) {
     await fs.cp(path.join(root, directory), path.join(fixture, directory), { recursive: true });
   }

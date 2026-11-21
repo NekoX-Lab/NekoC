@@ -19,6 +19,8 @@ if(app){document.body.classList.add('app');document.querySelector('#settings').h
 const wasm=params.get('engine')==='wasm'||document.querySelector('meta[name=nekoc-engine]')?.content==='wasm';
 const bundled=globalThis.nekoPlayerExport;
 let backend,unsubscribeProgress;
+let offline=null;
+let offlineSource=null;
 
 const $=selector=>document.querySelector(selector);
 const canvas=$('#stage'),shell=$('#player-shell');
@@ -31,7 +33,7 @@ const audio=new ProjectAudio(notice,id=>input?.push({kind:'audio_done',id}));
 const settings={limit:60,budget:12,resolution:0,coalesce:0};
 const choices={limit:[0,30,60,120,240,480,1000,-1],budget:[2,4,8,12,16],resolution:[0,.5,1,2],coalesce:[0,1]};
 let statusMessage='selectProject';
-initI18n(()=>{syncControls();syncTitle();syncFullscreen();status(statusMessage);feedback.mode(backend?.kind??(bundled||wasm?'wasm':extension?null:'rust'));});
+initI18n(()=>{syncControls();syncTitle();syncFullscreen();status(statusMessage);offline?.refresh();feedback.mode(backend?.kind??(bundled||wasm?'wasm':extension?null:'rust'));});
 syncTitle();syncFullscreen();status(statusMessage);
 try{
   const saved=JSON.parse(localStorage.getItem('neko-play-settings-v2')||'{}');
@@ -66,6 +68,7 @@ function syncControls(){
   for(const id of ['frame-limit','budget','resolution','coalesce'])$(`#${id}`).disabled=busy||!!recorder;
   shell.classList.toggle('running',running);
   syncVirtualControls();
+  offline?.refresh();
 }
 function clearKeys(){input?.release();}
 function resetMeter(){updates=0;draws=0;sampleStart=performance.now();drawFps=0;updateFps=0;}
@@ -86,8 +89,21 @@ function fitStage(){
   $('#stage-box').style.width=`${Math.max(1,renderer.width*scale)}px`;
   $('#stage-box').style.height=`${Math.max(1,renderer.height*scale)}px`;
 }
-async function install(report){
+async function install(report,offlineAssets=null){
   await closeRuntime();project=report.project;playable=false;lastFrame=null;totalUpdates=0;
+  offlineSource=project;
+  if(offlineAssets){
+    // Reimport the untouched work before substituting local media; do not edit
+    // K4 source provenance or persist a running VM's mutable state.
+    project={...project};
+    for(const [kind,container,table]of [['image','styles','stylesDict'],['audio','audios','audiosDict'],['video','videos','videosDict']]){
+      const resources={...project[container]?.[table]};
+      for(const [id,url]of Object.entries(offlineAssets[kind]||{}))if(resources[id]&&typeof url==='string'&&url.startsWith(`data:${kind}/`)){
+        resources[id]={...resources[id],url,...(resources[id].cdn_url?{cdn_url:url}:{})};
+      }
+      project[container]={...project[container],[table]:resources};
+    }
+  }
   $('#timer').hidden=true;feedback.reset(report);
   syncTitle();
   await renderer.load(project,({completed,total})=>feedback.progress(t('loadingAssets'),completed,total));renderer.render();fitStage();
@@ -104,6 +120,22 @@ async function install(report){
     notice(issues.length?issues.slice(0,4).map(issue=>`${issue.message}${issue.affected_scripts>1?t('affected',{count:issue.affected_scripts}):''}`).join('\n'):report.runtime_error||t('unsupported'));
     status('cannotRun');
   }
+}
+// Static deployments opt in explicitly. Local /api/project and extension
+// imports must never enter persistent browser storage.
+if(!extension&&!bundled&&wasm&&document.querySelector('meta[name=nekoc-offline]')?.content==='enabled'){
+  void import('./offline.js').then(async({setupOffline})=>{
+    offline=await setupOffline({getProject:()=>busy||recorder?null:offlineSource,isBusy:()=>busy||!!recorder,
+      openProject:async({project,assets})=>{
+        if(busy||recorder)throw Error(t('actionFailed'));
+        let failed=false;
+        await action(async()=>{
+          try{pause('importing');await install(await api('import-player',project),assets);}
+          catch(error){failed=true;throw error;}
+        });
+        if(failed)throw Error('offlineSaveFailed');
+      },onError:notice});
+  }).catch(()=>{/* Cache/worker denial must not prevent online playback. */});
 }
 async function launch(){
   if(!playable)return;
@@ -255,7 +287,7 @@ $('#record').onclick=()=>action(async()=>{
     recorder.interrupt();epoch++;pause('recordingInterrupted');notice(error.message);
   };
   try{
-    const ready=await next.open(project,backend,{seed:'1'});
+    const ready=await next.open(offlineSource||project,backend,{seed:'1'});
     recorder=new ReproRecorder(ready.repro,await next.reproStatus(),input.queueStats);
     if(!next.ready)throw Error(t('recordingDisconnected'));
   }catch(error){next.close();connection=null;throw error;}
