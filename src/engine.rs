@@ -50,6 +50,9 @@ mod kn_services;
 mod kn_text;
 mod kn_warp;
 mod legacy_costume;
+#[cfg(test)]
+#[path = "../tests/r4-memory/internal.rs"]
+mod r4_memory_tests;
 pub use kn_panel::{GlobalAnimationRequest, PanelNotice};
 mod clone_index;
 mod parameter_pool;
@@ -7956,6 +7959,12 @@ impl Engine {
         self.clone_index.remove(sprite.origin, index);
         sprite.alive = false;
         sprite.variables.clear();
+        // Reusable slots must not retain a deleted clone's potentially large
+        // unfinished contour, rendered text or speech bubble until reuse. K4
+        // reaches this boundary only after its deferred disposal has completed.
+        sprite.fill_path = None;
+        sprite.text = None;
+        sprite.dialog = None;
         sprite.visible = false;
         self.removed.push(sprite.id.clone());
         if self
