@@ -2,7 +2,7 @@ import ts from "typescript";
 
 // Statement-level lowering keeps mutable lexical bindings in their original
 // scope; no lifted closure or reporter containing a statement block is needed.
-export function lowerTsSequences(sourceFile) {
+export function lowerTsSequences(sourceFile, { validateOnly = false } = {}) {
   const f = ts.factory;
   const names = new Set();
   const collect = node => { if (ts.isIdentifier(node)) names.add(node.text); ts.forEachChild(node, collect); };
@@ -11,6 +11,14 @@ export function lowerTsSequences(sourceFile) {
   const fresh = () => { let name; do { name = `__tsfeatSequence${next++}`; } while (names.has(name)); names.add(name); return f.createIdentifier(name); };
   const unwrap = node => { while (ts.isParenthesizedExpression(node)) node = node.expression; return node; };
   const special = node => ts.isBinaryExpression(node) && [ts.SyntaxKind.CommaToken, ts.SyntaxKind.EqualsToken].includes(node.operatorToken.kind);
+  const fail = (node, message) => {
+    const origin = ts.getOriginalNode(node);
+    const file = origin.getSourceFile?.() ?? sourceFile;
+    const p = file.getLineAndCharacterOfPosition(origin.getStart(file));
+    const error = new Error(message);
+    error.location = { file: file.fileName, line: p.line + 1, column: p.character + 1 };
+    throw error;
+  };
   const result = ts.transform(sourceFile, [context => {
     const declaration = (name, value) => f.createVariableStatement(undefined, f.createVariableDeclarationList([
       f.createVariableDeclaration(name, undefined, undefined, value),
@@ -19,7 +27,7 @@ export function lowerTsSequences(sourceFile) {
       const inner = unwrap(node);
       if ((ts.isPrefixUnaryExpression(inner) || ts.isPostfixUnaryExpression(inner))
         && [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(inner.operator)) {
-        throw new Error("Update values inside comma expressions are not supported; split the update into a separate statement before reading the value");
+        fail(inner, "Update values inside comma expressions are not supported; split the update into a separate statement before reading the value");
       }
       if (!special(inner)) return ts.visitEachChild(node, visit, context);
       if (inner.operatorToken.kind === ts.SyntaxKind.CommaToken) {
@@ -27,7 +35,7 @@ export function lowerTsSequences(sourceFile) {
         prefix.push(declaration(fresh(), left));
         return value(inner.right, prefix);
       }
-      if (!ts.isIdentifier(inner.left)) throw new Error("Assignment values require a simple variable target; split property/array assignments into separate statements");
+      if (!ts.isIdentifier(inner.left)) fail(inner, "Assignment values require a simple variable target; split property/array assignments into separate statements");
       const right = value(inner.right, prefix);
       const temp = fresh();
       prefix.push(declaration(temp, right));
@@ -86,12 +94,15 @@ export function lowerTsSequences(sourceFile) {
         forHeader(node.incrementor), ts.visitNode(node.statement, visit));
       // Do not hoist out of conditional operands/loop tests: doing so would
       // eagerly execute writes that JS may skip or evaluate on each iteration.
-      if (special(node) && node.operatorToken.kind === ts.SyntaxKind.CommaToken) throw new Error("Comma expressions here require conditional/repeated evaluation; split them into separate statements in the same branch or loop body");
+      if (special(node) && node.operatorToken.kind === ts.SyntaxKind.CommaToken) fail(node, "Comma expressions here require conditional/repeated evaluation; split them into separate statements in the same branch or loop body");
       return ts.visitEachChild(node, visit, context);
     };
     return root => ts.visitNode(root, visit);
   }]);
   try {
+    // Run the identical context checks on the user's tree before nullable/class
+    // passes reparse generated text. Do not print or reparent that dry run.
+    if (validateOnly) return sourceFile;
     const output = result.transformed[0];
     const printer = ts.createPrinter();
     const fix = node => { if (node.pos < 0 || ts.getOriginalNode(node) !== node) node.getText = () => printer.printNode(ts.EmitHint.Unspecified, node, output); ts.forEachChild(node, fix); };

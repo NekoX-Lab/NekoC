@@ -2,23 +2,25 @@
 // 4e64c70a848088a6506f8b4979545d085625fef8; see README.md).
 // Keys are stable 1-based indexes into the original two probe collections.
 const errors = {
+  15: "Logical assignment ||= / &&= is not supported",
   28: "Functions cannot be stored or returned as runtime values",
   30: "Rest parameters",
   53: "for...in enumerates property keys",
   105: "Dynamic toFixed is not supported: scaled rounding does not reproduce J",
   110: "Cannot determine JavaScript + / += semantics for any, union or non-primitive operands",
   136: "Regular expressions are not supported",
+  157: "Array spread is not supported",
   162: "Array index is statically out of bounds",
   183: "Reading a null/undefined variable at runtime is not supported",
   185: "Unsupported expression call: Date.now",
   186: "instanceof requires a statically known class identifier",
   187: "Unsupported binary expression operator",
   188: "delete is not supported",
-  190: "Cannot determine JavaScript + / += semantics for any, union or non-primitive operands",
+  190: "BigInt literals are not supported",
   197: "Cannot determine JavaScript + / += semantics for any, union or non-primitive operands",
   199: "Namespaces containing runtime values",
   204: "async / await are not supported",
-  205: "Generator functions are not supported: gen",
+  205: "Generator functions are not supported: calling a generator creates an iterator",
   207: "Functions cannot be stored or returned as runtime values",
 };
 const diffs = {};

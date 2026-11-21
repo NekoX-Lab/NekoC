@@ -10,7 +10,7 @@ export const targets = [
   "x86_64-apple-darwin", "aarch64-apple-darwin",
 ];
 export const docs = [
-  "install.md", "compiler-only.md", "syntax.md", "ts-support-audit.md", "api.md", "self-api.md",
+  "install.md", "compiler-only.md", "syntax.md", "js-support.md", "ts-support-audit.md", "api.md", "self-api.md",
   "operators.md", "web-studio.md", "cli-run.md", "pack.md", "extensions.md",
   "kitten-n-compatibility.md", "kitten4.md", "kitten4-block-coverage.md",
   "kn-block-coverage.md", "player-sdk.md", "ts-diagnostics.md",
@@ -69,6 +69,7 @@ export async function checksums(directory) {
 // package it loads at runtime: no bundler, no npm install for users.
 export const frontendFiles = ["compile-ts.mjs", "diagnostics.mjs", "compile-target.mjs", "bitwise.mjs", "control-flow.mjs", "control-expressions.mjs", "js-equality.mjs", "share-objects.mjs", "class-metadata.mjs", "test-ts.mjs", "kitten-n.mjs", "portable-path.mjs", "tsstr-types.mjs", "nullable-reads.mjs", "tsstr-numeric.mjs", "tsfeat-values.mjs", "tsfeat-sequences.mjs", "ts-r2-destructure.mjs", "tsfeat-lowering.mjs", "tsfeat-methods.mjs", "tsfeat-classes.mjs", "tsfeat-class-inherit.mjs", "tsfeat-nullable.mjs", "nil-intrinsics.mjs", "tsmap.mjs", "tsmap-types.mjs", "nekoc.d.ts"];
 const typescriptFiles = ["package.json", "LICENSE.txt", "ThirdPartyNoticeText.txt", "lib/typescript.js"];
+frontendFiles.push("js-support.mjs");
 
 async function copyFrontend(copy) {
   for (const file of frontendFiles) await copy(`ts/${file}`, `frontend/${file}`);

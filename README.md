@@ -132,6 +132,7 @@ node tools/editor-compat.mjs dist-demo.bcmkn
 
 - **[llms.txt](llms.txt)**：给 AI 用的精简说明：语法子集、舞台声明、API 和 check/build/run 迭代流程。在仓库里改代码的智能体另见 **[AGENTS.md](AGENTS.md)**。
 - **[支持的 TypeScript 写法](docs/syntax.md)**：所有支持的语法结构。
+- **[JS / TS 支持契约](docs/js-support.md)**：原生语法、标准库边界、可编译替代示例与已知差异。
 - **[TS 写法支持情况（实测）](docs/ts-support-audit.md)**：逐条编译运行核对过的支持范围、限制和写法建议。
 - **[API 参考](docs/api.md)**：事件、变量、列表、运动、外观、特效、画笔、克隆、侦测等全部函数。
 - **[Self API](docs/self-api.md)**：角色回调里的 API（`self.move()`、`self.say()` 等）。

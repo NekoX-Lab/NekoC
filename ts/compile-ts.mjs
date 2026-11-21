@@ -17,7 +17,7 @@ import { compileTarget, checkTargetBlock } from "./compile-target.mjs";
 import { lowerTsValues } from "./tsfeat-values.mjs";
 import { lowerTsSequences } from "./tsfeat-sequences.mjs";
 import { lowerTsDestructuring } from "./ts-r2-destructure.mjs";
-import { lowerTsFeatures } from "./tsfeat-lowering.mjs";
+import { lowerTsFeatures, staticFunctionBindings } from "./tsfeat-lowering.mjs";
 import { lowerTsMethods } from "./tsfeat-methods.mjs";
 import { lowerTsClasses } from "./tsfeat-classes.mjs";
 import { lowerTsNullable } from "./tsfeat-nullable.mjs";
@@ -27,6 +27,7 @@ import { classFunctionNames, classNodeOrigins, classSourceOrigins, markClassHelp
 import { bitwiseAssignments, bitwisePlan, bitwiseTokens } from "./bitwise.mjs";
 import { enrichDiagnostic, formatDiagnostic } from "./diagnostics.mjs";
 export { formatDiagnostic } from "./diagnostics.mjs";
+import { unsupportedMessage, validateUnsupportedSyntax } from "./js-support.mjs";
 
 /** A compile error. `location` is { file, line, column } (1-based) when known. */
 export class CompileError extends Error {
@@ -94,6 +95,7 @@ function rejectAsyncSyntax(node) {
 function lowerFrontendFeatures(sourceFile, sourceIdentity) {
   try {
     rejectAsyncSyntax(sourceFile);
+    validateUnsupportedSyntax(sourceFile, (node, message) => fail(message, nodeLocation(node)));
     // Validate raw entry/module identifiers before lexical renaming or helper
     // registration can hide a collision with the compiler's bitwise procedures.
     const validateRawSyntax = node => {
@@ -110,6 +112,9 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity) {
       ts.forEachChild(node, validateRawSyntax);
     };
     validateRawSyntax(sourceFile);
+    // Sequence errors must refer to the user's AST, not reparsed class/nullable
+    // helpers whose virtual lines and columns do not exist in the input.
+    lowerTsSequences(sourceFile, { validateOnly: true });
     // Generated names use the entry-relative module identity, never the machine
     // path. Keep SourceFile.fileName intact for resolution and diagnostics.
     const destructured = lowerTsDestructuring(sourceFile, sourceIdentity);
@@ -238,6 +243,7 @@ class WorkspaceCompiler {
     this.objectArrayFactories = new Map();
     this.objectCallbackBodies = new Map();
     this.objectTypeOrigins = new WeakMap();
+    this.unsupportedModuleStatements = [];
   }
 
   compile(sourceFile) {
@@ -293,6 +299,9 @@ class WorkspaceCompiler {
       }
     };
     for (const call of replacementCalls) validateReplacement(call);
+    for (const statement of this.unsupportedModuleStatements) {
+      this.unsupported(statement, "Imported modules cannot execute top-level values or side effects; only exported functions are supported in imported modules; move initialization into an exported function and call it explicitly from the entry file");
+    }
     // Callback bodies are copied into generated helper ASTs below. Validate
     // user additions before copying so an any/union type cannot lose its type
     // information and accidentally fall back to numeric helper lowering.
@@ -530,8 +539,33 @@ class WorkspaceCompiler {
         ts.ScriptKind.TS,
       );
       rejectParseDiagnostics(moduleSourceFile);
+      const originalModule = moduleSourceFile;
       moduleSourceFile = lowerFrontendFeatures(moduleSourceFile,
         path.relative(path.dirname(this.entryPath), resolvedPath).replaceAll("\\", "/"));
+      const staticBindings = staticFunctionBindings.get(moduleSourceFile);
+      // Modules only register functions; never silently omit initialization.
+      for (const statement of originalModule.statements) {
+        if (this.isTypeOnlyStatement(statement) || ts.isImportDeclaration(statement)
+          || this.isInlineFunctionDefinition(statement)) continue;
+        if (ts.isVariableStatement(statement) && statement.declarationList.declarations.every(declaration => {
+          if (!ts.isIdentifier(declaration.name) || !staticBindings?.has(declaration.name.text)) return false;
+          // Resolving the final binding as a function does not prove its original
+          // initialization is erasable: sequence lowering may have extracted a
+          // call/write from (effect(), fn). Only transparent wrappers around a
+          // function literal or a resolved const alias require no execution.
+          let initializer = declaration.initializer;
+          while (initializer && (ts.isParenthesizedExpression(initializer) || ts.isAsExpression(initializer)
+            || ts.isTypeAssertionExpression(initializer) || ts.isNonNullExpression(initializer)
+            || ts.isSatisfiesExpression(initializer))) initializer = initializer.expression;
+          return !!initializer && (ts.isArrowFunction(initializer) || ts.isFunctionExpression(initializer)
+            || ts.isIdentifier(initializer) && !!(statement.declarationList.flags & ts.NodeFlags.Const));
+        })) continue;
+        // Instance class factories are registered as module-private functions.
+        // Static initialization would need source-ordered module execution.
+        if (ts.isClassDeclaration(statement) && !statement.members.some(member =>
+          member.modifiers?.some(modifier => modifier.kind === ts.SyntaxKind.StaticKeyword))) continue;
+        this.unsupportedModuleStatements.push(statement);
+      }
       this.replacementSourceFiles.set(resolvedPath, frontendOriginals.get(moduleSourceFile) ?? moduleSourceFile);
       this.objectSourceFiles.push(moduleSourceFile);
       this.typeSourceFiles.set(resolvedPath, ts.getOriginalNode(moduleSourceFile));
@@ -588,6 +622,11 @@ class WorkspaceCompiler {
     const clause = statement.importClause;
     if (!clause || clause.name || !clause.namedBindings || !ts.isNamedImports(clause.namedBindings)) {
       this.unsupported(statement, "Only named imports are supported");
+    }
+    for (const element of clause.namedBindings.elements) {
+      if (!element.isTypeOnly && element.propertyName && element.propertyName.text !== element.name.text) {
+        this.unsupported(element, "Import aliases are not supported: the compiler registers functions by their exported name; use the same name in the import and write a local wrapper when an alias is needed");
+      }
     }
     return clause.namedBindings.elements
       .filter((element) => !element.isTypeOnly)
@@ -3100,6 +3139,9 @@ class WorkspaceCompiler {
   }
 
   compileAssignmentExpression(expression, parentId) {
+    if (expression.operatorToken.kind === ts.SyntaxKind.QuestionQuestionEqualsToken) {
+      this.unsupported(expression.operatorToken, "Unlowered ??= is not supported: only explicitly nullable bindings have nullish assignment lowering; use a T | null | undefined annotation, or an explicit if before assignment");
+    }
     if (ts.isPropertyAccessExpression(expression.left) && this.isArrayExpression(expression.left.expression)) {
       if (expression.left.name.text !== "length" || expression.operatorToken.kind !== ts.SyntaxKind.EqualsToken
         || constantNumber(expression.right) !== 0) {
@@ -6945,7 +6987,7 @@ class WorkspaceCompiler {
   }
 
   unsupported(node, message) {
-    fail(message, nodeLocation(node) ?? nodeLocation(this.currentStatementNode) ?? nodeLocation(this.sourceFile));
+    fail(unsupportedMessage(node, message), nodeLocation(node) ?? nodeLocation(this.currentStatementNode) ?? nodeLocation(this.sourceFile));
   }
 }
 
@@ -7478,6 +7520,9 @@ function inlineFunctionName(statement) {
 function callbackBody(argument, compiler) {
   if (!argument || !ts.isArrowFunction(argument) || !ts.isBlock(argument.body)) {
     compiler.unsupported(argument, "Expected a block arrow callback");
+  }
+  for (const parameter of argument.parameters) {
+    if (parameter.initializer) compiler.unsupported(parameter, "Event/DSL callback default parameters are not supported: callbacks do not evaluate parameter initializers; move initialization into the callback body");
   }
   return Array.from(argument.body.statements);
 }

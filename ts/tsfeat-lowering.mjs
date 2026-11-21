@@ -1,5 +1,10 @@
 import ts from "typescript";
 
+// Top-level bindings actually resolved by this pass, including immutable
+// aliases. Module initialization checks must not reimplement that resolution
+// with a narrower syntactic test on the unnormalized source.
+export const staticFunctionBindings = new WeakMap();
+
 /**
  * Lower statically bound TS functions to the frontend's top-level function subset.
  * No runtime library, filesystem, or changes to array methods/types/control flow.
@@ -585,5 +590,11 @@ export function lowerTsFeatures(sourceFile, sourceIdentity = sourceFile.fileName
   };
   fixText(output);
   ts.setParentRecursive(output, true);
+  staticFunctionBindings.set(output, new Set(sourceFile.statements
+    .filter(ts.isVariableStatement)
+    .flatMap(statement => Array.from(statement.declarationList.declarations))
+    .filter(declaration => topVariable(declaration) && ts.isIdentifier(declaration.name)
+      && functions.has(symbol(declaration.name)))
+    .map(declaration => declaration.name.text)));
   return output;
 }

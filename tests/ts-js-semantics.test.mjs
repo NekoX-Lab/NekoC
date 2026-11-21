@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { originalCases, allCases, nodeExpected, prepareCases } from "./ts-js-semantics/prepare.mjs";
 
 test("245 synthetic TS/JS probes have explicit, actionable baseline statuses", () => {
@@ -14,6 +15,17 @@ test("245 synthetic TS/JS probes have explicit, actionable baseline statuses", (
       if (typeof c.node === "string") assert.equal(nodeExpected(c), c.node, c.id);
     }
   }
+});
+
+test("merged original corpus classification agrees with its documented counts", () => {
+  const counts = originalCases.reduce((result, c) => { result[c.status]++; return result; },
+    { match: 0, "compile-error": 0, "known-diff": 0 });
+  const readme = readFileSync(new URL("./ts-js-semantics/README.md", import.meta.url), "utf8");
+  const documented = /contains (\d+) matches, (\d+) compile errors, and (\d+) known/.exec(readme);
+  assert.ok(documented);
+  assert.deepEqual(documented.slice(1).map(Number), [counts.match, counts["compile-error"], counts["known-diff"]]);
+  for (const id of ["core-006", "core-179"]) assert.equal(originalCases.find(c => c.id === id).status, "match");
+  assert.equal(originalCases.find(c => c.id === "core-162").status, "compile-error");
 });
 
 test("Node oracle registers onStart before dispatch instead of reporting a missing host", () => {

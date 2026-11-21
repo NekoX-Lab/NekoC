@@ -2,6 +2,10 @@
 
 NekoC compiles a growing subset of TypeScript to Kitten N `.bcmkn` projects.
 
+For the current JS/TS support contract, tested alternatives and known semantic
+differences, see [JS / TS support](js-support.md). Compilation is not a promise
+of a complete JavaScript runtime.
+
 ## Supported Syntax
 
 ### Variable Declarations
@@ -346,7 +350,9 @@ class Player {
 }
 ```
 
-Class declarations are accepted but instances and method calls are not supported.
+Top-level named classes, constructors, initialized fields and instance methods
+are supported, including the restricted inheritance/static/accessor subset.
+See [classes](ts-classes.md) for initialization and type boundaries.
 
 ### Template Literals
 
@@ -437,7 +443,9 @@ Promise/microtask ordering.
 void expr;
 ```
 
-Stripped to just `expr`.
+Only `void 0` is supported as an undefined literal. Other void expressions are
+rejected; evaluate effects as separate statements and explicitly type any
+undefined result. See [nullable values](ts-nullable.md).
 
 ### Delete Operator
 
@@ -499,7 +507,8 @@ exemptions and cannot bypass bounded repeat/padding checks.
 const arr = [...otherArr];
 ```
 
-Spread is stripped to the inner expression.
+Array/call spread is rejected, not stripped. Use `slice()` for a shallow array
+copy, `concat()` for arrays, or explicit arguments/for-of loops.
 
 ### RegExp Literals
 
@@ -507,7 +516,7 @@ Spread is stripped to the inner expression.
 const pattern = /hello/;
 ```
 
-Compiled as text string.
+Rejected. Use string searches, `includes`, `indexOf` or `split` instead.
 
 ### BigInt Literals
 
@@ -515,7 +524,8 @@ Compiled as text string.
 const big = 123n;
 ```
 
-Compiled as number.
+Rejected: target number arithmetic cannot preserve arbitrary-precision integers.
+Use numbers within the safe integer range, or store large integers as text.
 
 ### Tagged Template Literals
 
@@ -523,11 +533,14 @@ Compiled as number.
 tag`template`;
 ```
 
-Tag is stripped, template is compiled normally.
+Rejected: dropping the tag would lose invocation and side effects. Use an
+ordinary function call with explicit string arguments instead.
 
 ### Instanceof / In Operators
 
-Not supported (Kitten N has no objects); they are compile errors.
+`in` is not supported; use fixed property access or an explicit validity flag.
+`instanceof` is supported only for statically resolved class references in the
+restricted class lowering; see [classes](ts-classes.md).
 
 ## Control Flow Compilation
 
