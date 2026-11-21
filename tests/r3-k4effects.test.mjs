@@ -67,7 +67,7 @@ test('r3-k4effects: enabled-only deltas invalidate the renderer and clear remove
 test('r3-k4effects: paired real VM pixels remove the neutral-filter failure', async () => {
   const evidence = await read('docs/r3-k4effects-pixels.json');
   // Keep the capture's original hash. The helper first proves that current
-  // differs from its approved K4 renderer only in the unused KN pen shader.
+  // matches an approved renderer outside the unused KN pen shader.
   const renderer = hash(await mainlineK4Renderer());
   for (const [name, pair] of Object.entries(evidence.cases)) {
     assert.equal(pair.baseline.rendererLfSha256, 'eb5f51230e59c5fc695cd489e173282803d568d3b0b3eb54b623692679e028a3');

@@ -122,6 +122,7 @@ const BATCH_VERTEX = TEXTURE_VERTEX.replace(
 const BATCH_FRAGMENT = TEXTURE_FRAGMENT.replace('uniform vec4 tint;','flat in vec4 tint;');
 const TEXTURE_BATCH_SIZE = 1024;
 const STAMP_CACHE_BYTES = 8 * 1024 * 1024;
+const SPRITE_TEXT_CACHE_BYTES = 16 * 1024 * 1024;
 
 // Original screen-space resampling passes. K4 filters rasterize the transformed
 // actor first: cells remain aligned to the filter rectangle, even on rotation.
@@ -224,6 +225,7 @@ export class StageRenderer {
     this.textCache = new Map(); this.textCanvas = document.createElement('canvas');
     this.stampCache = new Map();this.stampCandidates = new Set();this.stats.stampTextureBytes=0;this.stats.stampUploads=0;
     this.stats.textTextureBytes=0; this.stats.textUploads=0; this.stats.textStamps=0;
+    this.stats.spriteTextBytes=0;
     this.generation = 0; this.lost = false;
     this.videos=new Map();this.mediaPaused=false;
     this.transitionClock=()=>performance.now();
@@ -251,6 +253,7 @@ export class StageRenderer {
     this.images.clear();
     for(const item of this.textCache.values())gl.deleteTexture(item.texture);
     for(const item of this.spriteTexts?.values()||[])gl.deleteTexture(item.texture);this.spriteTexts?.clear();
+    this.stats.spriteTextBytes=0;
     this.textCache.clear();this.stats.textTextureBytes=0;
     for(const item of this.stampCache.values())gl.deleteTexture(item.texture);
     this.stampCache.clear();this.stampCandidates.clear();this.stats.stampTextureBytes=0;
@@ -508,7 +511,6 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
   // present=false only draws pen deltas into the persistent FBO and marks the stage
   // dirty; the caller composites once per display frame with render().
   apply(frame, lines, present = true) {
-    this.k4PenLines=lines;
     this.applyVideos(frame.videos);
     if(typeof frame.video_above_pen==='boolean'&&frame.video_above_pen!==this.videoAbovePen){this.videoAbovePen=frame.video_above_pen;this.dirty=true;}
     this.changed = false;
@@ -553,6 +555,7 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     const hasDrawing=frame.clear||frame.reset||lines.length||stamps.length||frame.sprites.length||layerChanged||frame.order||frame.removed?.length;
     const query=hasDrawing&&this.gpuTimer&&this.gpuQueries.length<4?gl.createQuery():null;
     if(query)gl.beginQuery(this.gpuTimer.TIME_ELAPSED_EXT,query);
+    this.k4PenLines=lines;
     try {
     gl.bindFramebuffer(gl.FRAMEBUFFER,this.framebuffer); gl.viewport(0,0,this.canvas.width,this.canvas.height);
     if (frame.clear) { gl.clearColor(0,0,0,0); gl.clear(gl.COLOR_BUFFER_BIT); }
@@ -588,7 +591,13 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     this.changed = changed || !!frame.clear || lines.length>0 || stamps.length>0;
     this.dirty ||= this.changed;
     if(present)this.render(false);
-    } finally {if(query){gl.endQuery(this.gpuTimer.TIME_ELAPSED_EXT);this.gpuQueries.push(query);}}
+    } finally {
+      // K4's CPU rasterizer only needs this frame while applying its deltas.
+      // A subarray may otherwise pin the entire binary frame until the next
+      // update (or forever after pause/error), including on the KN GL path.
+      this.k4PenLines=null;
+      if(query){gl.endQuery(this.gpuTimer.TIME_ELAPSED_EXT);this.gpuQueries.push(query);}
+    }
     this.stats.submitMs = performance.now() - started;
   }
 
@@ -677,6 +686,15 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     ctx.font=font;const lineHeight=Math.ceil(size*1.25);
     const width=Math.max(1,Math.ceil(Math.max(...lines.map(line=>ctx.measureText(line).width)))),height=Math.max(1,lineHeight*lines.length);
     const limit=gl.getParameter(gl.MAX_TEXTURE_SIZE);
+    // Each cached look owns an RGBA Canvas, RGBA GPU texture, alpha mask and
+    // its UTF-16 key. Entry count alone lets changing large clone labels keep
+    // gigabytes alive. Like the K4 filter pool, allow one oversized look so
+    // cache policy never changes visible text or picking geometry.
+    const bytes=Math.min(width,limit)*Math.min(height,limit)*9+key.length*2;
+    while(this.spriteTexts.size&&(this.spriteTexts.size>=256||(this.stats.spriteTextBytes||0)+bytes>SPRITE_TEXT_CACHE_BYTES)){
+      const [oldKey,old]=this.spriteTexts.entries().next().value;
+      this.flushTextureBatch();gl.deleteTexture(old.texture);this.spriteTexts.delete(oldKey);this.stats.spriteTextBytes-=old.bytes;
+    }
     canvas.width=Math.min(width,limit);canvas.height=Math.min(height,limit);
     ctx.font=font;ctx.textBaseline='middle';ctx.textAlign='center';ctx.fillStyle=look.color||'#000000';
     lines.forEach((line,i)=>ctx.fillText(line,canvas.width/2,lineHeight*(i+.5)));
@@ -685,9 +703,9 @@ void main(){vec2 p=uv*extent+origin;vec2 d=p-center;float r=length(d);if(r<radiu
     gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,canvas);
     const rgba=ctx.getImageData(0,0,canvas.width,canvas.height).data,alpha=new Uint8Array(canvas.width*canvas.height);
     for(let i=0;i<alpha.length;i++)alpha[i]=rgba[i*4+3];
-    item={texture,source:canvas,width:canvas.width,height:canvas.height,alpha};
+    item={texture,source:canvas,width:canvas.width,height:canvas.height,alpha,bytes};
     this.spriteTexts.set(key,item);
-    if(this.spriteTexts.size>256){const [oldKey,old]=this.spriteTexts.entries().next().value;this.flushTextureBatch();gl.deleteTexture(old.texture);this.spriteTexts.delete(oldKey);}
+    this.stats.spriteTextBytes=(this.stats.spriteTextBytes||0)+bytes;
     return item;
   }
   spriteImage(a){return a.text?this.spriteTextImage(a.text):this.images.get(a.style);}
