@@ -87,9 +87,12 @@ class Element {
   setAttribute(name,value){this.attributes[name]=String(value);}
   getAttribute(name){return this.attributes[name];}
   get firstChild(){return this.children[0];}
+  get firstElementChild(){return this.children[0];}
+  addEventListener(name,handler){this[`on${name}`]=handler;}
   remove(){this.parentElement.children=this.parentElement.children.filter(child=>child!==this);}
   matches(selector){return selector.startsWith('.')?this.classList.contains(selector.slice(1)):selector==='[data-block]'?this.dataset.block!==undefined:selector==='[data-tab]'?!!this.dataset.tab:selector===this.tagName.toLowerCase();}
   querySelectorAll(selector){return this.children.flatMap(child=>[...(child.matches(selector)?[child]:[]),...child.querySelectorAll(selector)]);}
+  querySelector(selector){return selector.startsWith(':scope > ')?this.children.find(child=>child.matches(selector.slice(9)))||null:this.querySelectorAll(selector)[0]||null;}
   focus(){this.ownerDocument.focused=this;}
   scrollIntoView(){this.scrolled=true;}
   click(){if(!this.disabled)return this.onclick?.();}
@@ -97,10 +100,11 @@ class Element {
 function documentFixture(){
   const document={createElement:tag=>new Element(tag,document),createTextNode:value=>{const node=new Element('#text',document);node.textContent=value;return node;},ids:new Map()};
   document.body=document.createElement('body');
+  document.documentElement=document.createElement('html');
   const html=fs.readFileSync(new URL('../web/index.html',import.meta.url),'utf8');
   for(const [,tag,id]of html.matchAll(/<([a-z]+)[^>]* id="([^"]+)"/g)){const node=document.createElement(tag);node.id=id;document.ids.set(id,node);document.body.append(node);}
   document.querySelector=selector=>document.ids.get(selector.slice(1))||null;document.querySelectorAll=selector=>document.body.querySelectorAll(selector);
-  for(const tab of ['blocks','json']){const button=document.createElement('button');button.dataset.tab=tab;document.body.append(button);}
+  for(const tab of ['blocks','json']){const button=document.ids.get(`${tab}-tab`);button.dataset.tab=tab;}
   document.ids.get('json-panel').hidden=true;document.ids.get('search').value='';return document;
 }
 function viewFixture(state){
@@ -135,6 +139,7 @@ async function appFixture(){
   class Renderer{constructor(){this.stats={};}async load(){}pauseMedia(){}}
   const noop=()=>{};
   const sandbox={document,console,HealthReportState,HealthReportView,healthLocation,resolveHealthTarget,healthBlockPath,
+    URLSearchParams,location:{search:'',href:'http://localhost/'},CSS:{escape:value=>String(value)},
     StageRenderer:Renderer,ProjectAudio:class{stop(){}},StageInput:class{reset(){}},StageOverlay:class{},
     performance:{now:()=>0},window:{addEventListener:noop},requestAnimationFrame:noop,setTimeout:noop,clearTimeout:noop,crypto:globalThis.crypto,
     Blob,URL:class extends URL{static createObjectURL(blob){downloads.push(blob);return 'blob:report';}static revokeObjectURL(){}},
@@ -142,7 +147,8 @@ async function appFixture(){
       if(path==='/api/health-report'){const pending=deferred();refreshes.push(pending);return {ok:true,json:()=>pending.promise};}
       return {ok:true,json:async()=>path==='/api/import'?importResult(value):projectFixture()};}};
   const source=fs.readFileSync(new URL('../web/app.js',import.meta.url),'utf8').split(LF).filter(line=>!line.startsWith('import ')).join(LF);
-  const app=await vm.runInNewContext(`(async()=>{${source}${LF}return {navigateHealthItem,loadProject,downloadHealthReport,markRunning:()=>{started=true;running=true;},getState:()=>({project,owner,selected,dirty,undo,redo,health,started,running})};})()`,sandbox);
+  const translations=fs.readFileSync(new URL('../web/i18n.js',import.meta.url),'utf8').replace(/^export /gm,'');
+  const app=await vm.runInNewContext(`(async()=>{${translations}${LF}${source}${LF}return {navigateHealthItem,loadProject,downloadHealthReport,markRunning:()=>{started=true;running=true;},getState:()=>({project,owner,selected,dirty,undo,redo,health,started,running})};})()`,sandbox);
   return {app,document,calls,downloads,refreshes};
 }
 
@@ -170,6 +176,29 @@ test('Studio edits expire reports, download keeps Rust bytes, and recheck preser
   const fresh=report({project_name:'改名',text:`Rust 最新摘要${CRLF}`});refreshes[0].resolve(fresh);assert.equal(await task,true);
   const current=app.getState();assert.equal(JSON.stringify(current.project),snapshot);assert.equal(current.dirty,true);assert.equal(current.undo.length,1);assert.equal(current.started,false);
   app.downloadHealthReport();assert.equal(await downloads.at(-1).text(),fresh.text);
+});
+
+test('report navigation updates accessible tabs without editing a JSON draft or project',async()=>{
+  const {app,document}=await appFixture(),source=document.ids.get('json-tab'),blocks=document.ids.get('blocks-tab');
+  source.click();document.ids.get('json-source').value='unapplied draft';
+  assert.equal(source.getAttribute('aria-selected'),'true');assert.equal(source.tabIndex,0);
+  const before=JSON.stringify(app.getState().project);app.navigateHealthItem(item());
+  assert.equal(blocks.getAttribute('aria-selected'),'true');assert.equal(blocks.tabIndex,0);
+  assert.equal(source.getAttribute('aria-selected'),'false');assert.equal(source.tabIndex,-1);
+  assert.equal(document.ids.get('json-panel').hidden,true);assert.equal(document.ids.get('json-source').value,'unapplied draft');
+  assert.equal(JSON.stringify(app.getState().project),before);assert.equal(app.getState().dirty,false);
+});
+
+test('health invalidation keeps field controls and keyboard selection buttons alive',async()=>{
+  const {app,document}=await appFixture();app.navigateHealthItem(item());
+  const root=document.ids.get('blocks'),statement=root.querySelectorAll('[data-block]').find(node=>node.dataset.block==='root');
+  const title=statement.querySelector(':scope > .block-label'),field=root.querySelectorAll('input')[0];
+  title.onclick({stopPropagation(){}});assert.equal(title.getAttribute('aria-pressed'),'true');
+  assert.equal(root.querySelectorAll('input')[0],field);assert.equal(document.ids.get('health-location').hidden,true);
+  field.value='7';field.onchange();
+  assert.equal(app.getState().project.actors.actorsDict.a2.nekoBlockJsonList[0].inputs.VALUE.inputs.A.fields.NUM,7);
+  assert.equal(root.querySelectorAll('input')[0],field);assert.equal(statement.querySelector(':scope > .block-label'),title);
+  assert.equal(app.getState().health.stale,true);assert.equal(app.getState().undo.length,1);
 });
 
 test('Studio new imports reject an older recheck result',async()=>{

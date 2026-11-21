@@ -13,9 +13,10 @@ test('r3-a11y: Studio and player keyboard, locale and contrast',{
 },async t=>{
   const socket=createServer();socket.listen(0,'127.0.0.1');await once(socket,'listening');
   const port=socket.address().port;await new Promise(resolve=>socket.close(resolve));
-  const child=spawn(process.env.NEKOC_WEB_BIN||(process.platform==='win32'?'target/debug/web.exe':'target/debug/web'),['tests/fixtures/kitten4/visual-stamp.bcm','--port',String(port)],{stdio:['ignore','pipe','pipe']});
-  let output='',spawnError,browser;child.stdout.on('data',data=>output+=data);child.stderr.on('data',data=>output+=data);child.on('error',error=>spawnError=error);
-  const origin=`http://127.0.0.1:${port}`;
+  // An SSH-forwarded freshly built backend uses the same assertions and assets.
+  const child=process.env.NEKOC_A11Y_ORIGIN?null:spawn(process.env.NEKOC_WEB_BIN||(process.platform==='win32'?'target/debug/web.exe':'target/debug/web'),['tests/fixtures/kitten4/visual-stamp.bcm','--port',String(port)],{stdio:['ignore','pipe','pipe']});
+  let output='',spawnError,browser;child?.stdout.on('data',data=>output+=data);child?.stderr.on('data',data=>output+=data);child?.on('error',error=>spawnError=error);
+  const origin=process.env.NEKOC_A11Y_ORIGIN||`http://127.0.0.1:${port}`;
   const focused=locator=>locator.evaluate(el=>el===document.activeElement);
   const contrast=async(page,selectors)=>{
     const results=await page.evaluate(selectors=>{
@@ -32,7 +33,7 @@ test('r3-a11y: Studio and player keyboard, locale and contrast',{
   };
   try{
     for(let i=0;;i++){
-      if(spawnError)throw spawnError;if(child.exitCode!==null||i>=200)throw Error(`Backend failed: ${output}`);
+      if(spawnError)throw spawnError;if((child&&child.exitCode!==null)||i>=200)throw Error(`Backend failed: ${output}`);
       try{if((await fetch(`${origin}/api/project`)).ok)break;}catch{}
       await delay(50);
     }
@@ -227,6 +228,6 @@ test('r3-a11y: Studio and player keyboard, locale and contrast',{
     });
     assert.deepEqual(errors,[]);await context.close();
   }finally{
-    await browser?.close();if(child.exitCode===null&&!spawnError){child.kill();await once(child,'exit');}
+    await browser?.close();if(child&&child.exitCode===null&&!spawnError){child.kill();await once(child,'exit');}
   }
 });

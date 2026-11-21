@@ -134,10 +134,15 @@ fn limitation(block: &Value, kitten4: bool) -> Option<(&'static str, &'static st
         };
     }
     match kind {
+        "bcm_translator_text_execution_block" if block["disabled"] == true => Some((
+            "approximate",
+            "已禁用的旧文本执行占位在语句链中被跳过，继续执行 next；不执行 mutation 描述、旧输入或嵌套语句，不代表原指令已还原或真实翻译服务可用。",
+            "src/engine.rs::Compiler::chain 禁用占位分支；docs/kn-r3-translator-evidence.md；未实际运行本作品",
+        )),
         "bcm_translator_text_execution_block" => Some((
             "unsupported",
-            "仅保留文本占位积木及 mutation；默认 VM 没有此类型的执行实现，不能据描述文字还原原指令。disabled 标记不构成执行支持证明。",
-            "src/engine.rs::Compiler::chain 未分派此类型；本地编译回归 tests/r2_health.rs；官方行为未验证",
+            "仅保留未禁用的文本占位积木及 mutation；默认 VM 没有此类型的执行实现，不能据描述文字还原原指令。",
+            "src/engine.rs::Compiler::chain 拒绝未禁用执行占位；本地编译回归 tests/r2_health.rs；官方行为未验证",
         )),
         "open_hide_camera" | "open_close_webcam" => {
             if block["fields"]["camera_status"] == "turn_off" {

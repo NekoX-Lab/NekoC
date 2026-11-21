@@ -110,9 +110,9 @@ fn translation_is_an_explicit_degradation_not_a_working_service() {
 fn legacy_translator_placeholders_are_all_located_including_after_first_error() {
     let report = health(project(
         json!([{"id":"hat","type":"on_running_group_activated","next":{
-        "id":"placeholder-one","type":"bcm_translator_text_execution_block","disabled":true,
+        "id":"placeholder-one","type":"bcm_translator_text_execution_block","disabled":false,
         "mutation":"<mutation>测试占位描述</mutation>",
-        "next":{"id":"placeholder-two","type":"bcm_translator_text_execution_block","disabled":true}}}]),
+        "next":{"id":"placeholder-two","type":"bcm_translator_text_execution_block"}}}]),
     ));
     for id in ["placeholder-one", "placeholder-two"] {
         assert!(items(&report).iter().any(|item| item["block"] == id
@@ -120,6 +120,33 @@ fn legacy_translator_placeholders_are_all_located_including_after_first_error() 
             && item["code"] == "known_limitation"));
     }
     assert_eq!(report["summary"]["executable"], 0);
+}
+
+#[test]
+fn disabled_legacy_execution_placeholders_are_skips_not_restored_instructions() {
+    let report = health(project(
+        json!([{"id":"hat","type":"on_running_group_activated",
+        "next":{"id":"disabled-placeholder","parent_id":"hat","type":"bcm_translator_text_execution_block",
+            "disabled":true,"mutation":"<mutation>不是可执行指令</mutation>",
+            "inputs":{"obsolete":{"id":"stale-input","parent_id":"disabled-placeholder","type":"future_reporter"}},
+            "statements":{"obsolete":{"id":"stale-body","parent_id":"disabled-placeholder","type":"future_command"}}}}]),
+    ));
+    let issue = items(&report)
+        .iter()
+        .find(|item| item["block"] == "disabled-placeholder" && item["code"] == "known_limitation")
+        .unwrap();
+    assert_eq!(issue["category"], "approximate");
+    assert_eq!(issue["code"], "known_limitation");
+    assert!(issue["impact"].as_str().unwrap().contains("跳过"));
+    assert_eq!(report["summary"]["executable"], 1);
+    assert_eq!(report["summary"]["unsupported"], 0);
+    for id in ["stale-input", "stale-body"] {
+        assert!(
+            items(&report)
+                .iter()
+                .any(|item| item["block"] == id && item["category"] == "unverified")
+        );
+    }
 }
 
 #[test]

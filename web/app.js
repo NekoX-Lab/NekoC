@@ -117,7 +117,7 @@ function renderEntities(){
     for(const [id,value]of Object.entries(dict)){
       const button=make('button',`entity ${owner===id?'active':''}`),thumb=make('span','thumb');
       const style=project.styles?.stylesDict?.[value.currentStyleId];if(style?.url){const img=make('img');img.src=style.url;img.alt='';thumb.append(img);}else thumb.textContent=scene?'▧':'◉';
-      const name=make('span','',value.screenName||value.name||id);name.append(make('span','sub',kind==='procedure'?'PROCEDURE':t(scene?'scene':'sprite')));button.setAttribute('aria-pressed',String(owner===id));button.dataset.owner=id;button.append(thumb,name);
+      const name=make('span','',value.screenName||value.name||id);name.append(make('span','sub',t(kind==='procedure'?'procedure':scene?'scene':'sprite')));button.setAttribute('aria-pressed',String(owner===id));button.dataset.owner=id;button.append(thumb,name);
       button.onclick=()=>{
         healthTarget=null;
         if(!started&&kind!=='procedure'){const sceneId=scene?id:Object.entries(project.scenes.scenesDict).find(([,s])=>s.actorIds?.includes(id))?.[0];
@@ -127,8 +127,8 @@ function renderEntities(){
     }
   }
 }
-function editInput(value,onChange,type='text'){
-  const input=make('input');input.value=value;input.type=type;input.disabled=started||isProcedure();
+function editInput(value,onChange,type='text',readOnly=false){
+  const input=make('input');input.value=value;input.type=type;input.disabled=started||readOnly;
   input.onclick=e=>e.stopPropagation();input.onchange=()=>transaction(()=>onChange(type==='number'?Number(input.value):input.value),{render:false});return input;
 }
 function expressionText(b,depth=0){
@@ -151,11 +151,11 @@ function blockNode(block,depth=0,expanded=new Set()){
   const fields=make('div','fields');
   for(const [key,value]of Object.entries(block.fields||{})){
     if(typeof value==='object')continue;
-    const label=make('label','',fieldLabel(key));const input=editInput(value,v=>block.fields[key]=v,key==='color'?'color':typeof value==='number'?'number':'text');label.append(input);fields.append(label);
+    const label=make('label','',fieldLabel(key));const input=editInput(value,v=>block.fields[key]=v,key==='color'?'color':typeof value==='number'?'number':'text',isProcedure());label.append(input);fields.append(label);
   }
   for(const [key,value]of Object.entries(block.inputs||{})){
     if(['math_number','text'].includes(value.type)){
-      const f=value.type==='text'?'TEXT':'NUM',label=make('label','',fieldLabel(key)),input=editInput(value.fields?.[f]??'',v=>value.fields[f]=v,value.type==='text'?'text':'number');
+      const f=value.type==='text'?'TEXT':'NUM',label=make('label','',fieldLabel(key)),input=editInput(value.fields?.[f]??'',v=>value.fields[f]=v,value.type==='text'?'text':'number',isProcedure());
       label.dataset.block=value.id;label.tabIndex=-1;if(healthTarget?.resolvedOwner===owner&&healthTarget?.block===value.id)label.classList.add('health-block-target');
       if(value.type==='text')input.className='text-value';label.append(input);fields.append(label);
     }else{const label=make('div','expression-field',fieldLabel(key)),details=make('details','expression'),summary=make('summary','',expressionText(value));
@@ -177,11 +177,11 @@ function blockNode(block,depth=0,expanded=new Set()){
 }
 function renderChain(parent,block,depth,expanded){let n=0;while(block&&n++<5000){parent.append(blockNode(block,depth,expanded));block=block.next;}}
 function syncBlockSelection(){for(const node of document.querySelectorAll('[data-block]')){const active=node.dataset.block===selected;node.classList.toggle('selected',active);node.classList.remove('health-block-target');node.querySelector(':scope > .block-label')?.setAttribute('aria-pressed',String(active));}}
-function renderBlocks(){const root=$('#blocks'),expanded=new Set([...root.querySelectorAll('details[data-expression][open]')].map(details=>details.dataset.expression));root.replaceChildren();for(const block of entity()?.nekoBlockJsonList||[]){const stack=make('div','stack');renderChain(stack,block,0,expanded);root.append(stack);}if(!root.children.length)root.append(make('p','context-note',isProcedure()?'此自制积木尚无可显示的积木。':t('emptyBlocks')));}
+function renderBlocks(){const root=$('#blocks'),expanded=new Set([...root.querySelectorAll('details[data-expression][open]')].map(details=>details.dataset.expression));root.replaceChildren();for(const block of entity()?.nekoBlockJsonList||[]){const stack=make('div','stack');renderChain(stack,block,0,expanded);root.append(stack);}if(!root.children.length)root.append(make('p','context-note',t(isProcedure()?'procedureEmpty':'emptyBlocks')));}
 function renderProperties(){
   const root=$('#properties');root.replaceChildren();const a=entity();if(!a)return;
-  $('#actor-badge').textContent=isProcedure()?'PROCEDURE':project.scenes.scenesDict[owner]?'SCENE':'SPRITE';
-  if(isProcedure()){root.append(make('p','health-note','自制积木只读定位视图；可在项目源码中编辑。'));return;}
+  $('#actor-badge').textContent=t(isProcedure()?'procedure':project.scenes.scenesDict[owner]?'scene':'sprite');
+  if(isProcedure()){root.append(make('p','health-note',t('procedureReadOnly')));return;}
   const grid=make('div','property-grid');
   for(const [name,value,set]of [['X',a.position?.x??0,v=>{a.position??={};a.position.x=v;}],['Y',a.position?.y??0,v=>{a.position??={};a.position.y=v;}],[fieldLabel('size'),a.scale??100,v=>a.scale=v]]){
     const label=make('label','',name);label.append(editInput(value,v=>{set(v);void renderer.load(project).catch(e=>log(e.message,true));},'number'));grid.append(label);

@@ -45,7 +45,7 @@ Web 下载直接使用报告的 `text` 字段，与 CLI 文本一致。项目编
 - 已知限制是显式、非穷尽的清单；未列入清单的类型一律尚未验证，不根据名称前缀猜测支持。新增设备/服务后需要同步更新限制。
 - 摄像头、翻译、AI 和账户限制分别引用已有的 `docs/kn-panel-capture.md`、`docs/kn-panel-services.md`、`docs/kn-panel-ai.md`、`docs/kn-async-services.md`，这些文档包含历史官方源码/实测范围。本功能未重新核验最新官方播放器。
 - K4 占位分类依据适配器 `src/kitten4.rs::is_stub`；不是官方行为认证。其他 K4 语义保守列为未验证。
-- `bcm_translator_text_execution_block` 是保留 mutation 描述的旧版占位类型，区别于网络翻译 `translate` / `translate_result`；本地 VM 无此分派，单列不支持。即使原数据标记 `disabled` 也不认证为可执行。
+- `bcm_translator_text_execution_block` 是保留 mutation 描述的旧版占位类型，区别于网络翻译 `translate` / `translate_result`；未禁用时默认 VM 拒绝，单列不支持。主线对 `disabled:true` 的语句占位跳过旧输入和嵌套语句并继续 next，列为语义近似；这不是还原原指令、执行 mutation 描述或网络翻译成功的证明。整件作品的编译就绪与逐块语义仍是独立维度。
 - 未验证素材下载、真实播放、完整调度、设备权限、真实 AI/翻译后端、官方像素/音频结果；不使用第三方运行时作为官方行为证据。
 - 未编辑运行引擎、TS 前端或作品生成逻辑。本报告不会向导出的作品写入体检字段。
 

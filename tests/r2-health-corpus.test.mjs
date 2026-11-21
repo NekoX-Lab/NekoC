@@ -10,7 +10,7 @@ const corpus=process.env.NEKOC_HEALTH_CORPUS;
 const bin=path.resolve('target/debug',process.platform==='win32'?'nekoc.exe':'nekoc');
 for(const [id,type,category] of [
   [297168191,'open_hide_camera','unsupported'],
-  [303456318,'bcm_translator_text_execution_block','unsupported'],
+  [303456318,'bcm_translator_text_execution_block','approximate'],
 ])test(`r2-health: read-only corpus ${id} retains located ${type} diagnostics`,{skip:!corpus,timeout:180000},()=>{
   const input=path.join(corpus,`${id}.json`),before=fs.readFileSync(input);
   const result=spawnSync(bin,['check',input,'--report','--json'],{encoding:'utf8',maxBuffer:64*1024*1024,timeout:150000});
