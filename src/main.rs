@@ -416,7 +416,10 @@ fn run_check(
         }
     }
     if !report.ok {
-        if !json {
+        // Frontend diagnostics already end with their own `help:` line and
+        // must match `compile-ts.mjs --check` byte for byte; only add the
+        // generic next step when some diagnostic has no guidance of its own.
+        if !json && report.diagnostics.iter().any(|d| d.suggestion.is_empty()) {
             eprintln!("下一步：根据诊断中的文件、行和列修正问题，然后重新运行 nekoc check。");
         }
         return Err(cli_output::ReportedFailure.into());
