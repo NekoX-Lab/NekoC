@@ -49,6 +49,7 @@ pub struct GlobalAnimationRequest {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PanelNotice {
+    IgnoredKidsSteps,
     IgnoredCameraAlpha,
     CameraUnavailable,
     RecognitionLoginRequired,
@@ -57,6 +58,7 @@ pub enum PanelNotice {
     AiLoginRequired,
     AiMissingModel,
     AiInvalidIndex,
+    TranslationUnavailable,
 }
 
 #[derive(Default)]
@@ -221,6 +223,8 @@ impl Engine {
                 if matches!(text, Cell::Null | Cell::Undefined) {
                     self.value_error =
                         Some("KN translation text.toString cannot read null/undefined".into());
+                } else if !text.text().trim().is_empty() {
+                    self.push_kn_panel_notice(PanelNotice::TranslationUnavailable);
                 }
                 // Official blank text OR a caught HTTP transport failure gives
                 // empty text, NOT the original text (K4 has different semantics).
@@ -267,6 +271,9 @@ impl Engine {
                     !matches!(text, Cell::Null | Cell::Undefined),
                     "KN translation text.toString cannot read null/undefined"
                 );
+                if !text.text().trim().is_empty() {
+                    self.push_kn_panel_notice(PanelNotice::TranslationUnavailable);
+                }
                 // Offline request fails; the official error path releases the
                 // lock and does not open a translation dialog.
                 Ok(self.defer_kn_panel(index))
@@ -377,7 +384,7 @@ impl Engine {
         self.push_kn_panel_notice(notice);
     }
 
-    fn push_kn_panel_notice(&mut self, notice: PanelNotice) {
+    pub(super) fn push_kn_panel_notice(&mut self, notice: PanelNotice) {
         if !self.kn_panel.notices.contains(&notice) {
             self.kn_panel.notices.push(notice);
         }

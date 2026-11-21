@@ -113,6 +113,47 @@ fn microphone_has_explicit_unavailable_fallback() {
 }
 
 #[test]
+fn camera_ai_and_translation_share_deduplicated_notices_and_restart() {
+    use nekoc::engine::PanelNotice;
+    for jit in [false, true] {
+        let mut vm = Engine::new(program(vec![
+            json!({"type":"set_camera_alpha","inputs":{"camera_alpha":{"type":"math_number","fields":{"NUM":37.5}}}}),
+            json!({"type":"open_hide_camera","fields":{"camera_status":"turn_on"}}),
+            json!({"type":"open_close_webcam","fields":{"camera_status":"turn_on"}}),
+            json!({"type":"ai_chat_ask","inputs":{"text":text("offline")}}),
+            json!({"type":"ai_chat_ask","inputs":{"text":text("again")}}),
+            json!({"type":"translate","inputs":{"text":text("offline"),"language":text("en")}}),
+            log(
+                json!({"type":"translate_result","inputs":{"text":text("again"),"language":text("en")}}),
+            ),
+            json!({"type":"open_close_webcam","fields":{"camera_status":"turn_off"}}),
+            log(text("continued")),
+        ]));
+        if !jit {
+            vm.disable_jit();
+        }
+        vm.set_kn_offline_anonymous(true);
+        for _ in 0..2 {
+            vm.start();
+            assert!(tick(&mut vm).is_empty());
+            assert_eq!(vm.kn_camera_alpha(), 0.375);
+            let logs: Vec<_> = (0..30).flat_map(|_| tick(&mut vm)).collect();
+            assert_eq!(logs, ["", "continued"]);
+            assert_eq!(vm.kn_camera_alpha(), 0.6);
+            assert_eq!(
+                vm.take_kn_panel_notices(),
+                [
+                    PanelNotice::CameraUnavailable,
+                    PanelNotice::AiOffline,
+                    PanelNotice::TranslationUnavailable,
+                ]
+            );
+            assert!(vm.take_kn_panel_notices().is_empty());
+        }
+    }
+}
+
+#[test]
 fn ai_rejection_requires_opt_in_and_keeps_text_and_optional_index_effects() {
     let blocks = vec![
         json!({"type":"ai_chat_ask","inputs":{"text":put("ask")}}),
