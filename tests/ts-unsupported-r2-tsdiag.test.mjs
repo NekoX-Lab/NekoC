@@ -22,6 +22,10 @@ function diagnostic(source, files = new Map(), file = entry) {
   assert.equal(d.source, "compat");
   assert.notEqual(d.code, "NEKOC_INTERNAL");
   assert.ok(d.file && d.line > 0 && d.column > 0, JSON.stringify(d));
+  const original = files.get(path.resolve(d.file));
+  assert.equal(typeof original, "string");
+  assert.equal(d.snippet, original.split(/\r\n|[\n\r\u2028\u2029]/)[d.line - 1]);
+  assert.ok(d.suggestion.length > 10, JSON.stringify(d));
   assert.match(d.message, advice);
   assert.doesNotMatch(d.message, /Internal compiler error|TypeError|at offset/);
   assert.ok(formatDiagnostic(d).startsWith(`${d.file}:${d.line}:${d.column}: error `));
@@ -29,6 +33,7 @@ function diagnostic(source, files = new Map(), file = entry) {
     assert.ok(error instanceof CompileError);
     assert.equal(error.message, d.message);
     assert.deepEqual(error.location, { file: d.file, line: d.line, column: d.column });
+    assert.deepEqual(error.diagnostics, result.diagnostics);
     return true;
   });
   return d;

@@ -6,11 +6,11 @@ import { compileFile, checkFile } from "../ts/compile-ts.mjs";
 import { docs, frontendFiles } from "../tools/package-release.mjs";
 
 test("r2-tsdiag release retains main frontend modules and the support contract", () => {
-  for (const file of ["js-support.mjs", "ts-r2-destructure.mjs", "tsfeat-classes.mjs", "tsfeat-class-inherit.mjs", "share-objects.mjs"]) {
+  for (const file of ["diagnostics.mjs", "js-support.mjs", "ts-r2-destructure.mjs", "tsfeat-classes.mjs", "tsfeat-class-inherit.mjs", "share-objects.mjs"]) {
     assert.ok(frontendFiles.includes(file), file);
     assert.equal(frontendFiles.filter(name => name === file).length, 1, file);
   }
-  for (const file of ["compiler-only.md", "js-support.md"]) assert.ok(docs.includes(file), file);
+  for (const file of ["compiler-only.md", "js-support.md", "ts-diagnostics.md"]) assert.ok(docs.includes(file), file);
 });
 
 const document = fs.readFileSync(new URL("../docs/js-support.md", import.meta.url), "utf8");

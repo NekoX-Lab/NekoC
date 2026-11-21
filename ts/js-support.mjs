@@ -95,7 +95,7 @@ export function validateUnsupportedSyntax(sourceFile, reject) {
 // Keep the original reason stable for existing clients; only add a rewrite
 // hint where older backend diagnostics did not provide one.
 export function unsupportedMessage(node, message) {
-  if (/\b(?:alternative:|use |instead|rename|remove |pass |initialize |add |rewrite |split |convert |narrow |move |copy |return an array)/i.test(message)) return message;
+  if (/\b(?:alternative:|use |instead|rename|remove |replace |pass |initialize |add |rewrite |split |convert |narrow |move |copy |return an array)/i.test(message)) return message;
   let advice;
   if (/import|export|module/i.test(message)) advice = "export a named function from a relative .ts module and import it by the same name";
   else if (/parameter|argument/i.test(message)) advice = "pass explicit arguments matching the declared parameters; use a named parameter with a default instead of destructuring or rest";

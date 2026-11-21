@@ -215,6 +215,7 @@ test("r3: target rejections expose a source snippet and the supported rewrite", 
     assertLocated(d, file, source);
     assert.match(d.message, /Kitten 4/);
     assert.match(d.suggestion, /ordinary for/);
+    assert.doesNotMatch(d.message, /alternative:/i);
   });
 });
 
