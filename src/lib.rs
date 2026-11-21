@@ -23,6 +23,7 @@ pub mod kitten4;
 #[cfg(not(target_arch = "wasm32"))]
 pub mod kitten4_compiler;
 mod kn_actor_target;
+pub mod lint;
 pub mod optimizer;
 pub mod pack;
 pub mod player;
