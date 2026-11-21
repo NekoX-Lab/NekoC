@@ -42,6 +42,7 @@ mod kn_conversion;
 mod kn_hardware;
 mod kn_helpers;
 mod kn_local;
+mod kn_monitors;
 mod kn_objects;
 mod kn_panel;
 mod kn_services;
@@ -5260,6 +5261,9 @@ pub struct Frame {
     /// Visible variable/list monitors with current values.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub monitors: Vec<Monitor>,
+    /// Exact, untruncated rows of visible KN list monitors, keyed by variable id.
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub monitor_lists: BTreeMap<String, Vec<String>>,
     /// The question waiting for an answer (repeated every frame until answered).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ask: Option<AskRequest>,
@@ -9054,6 +9058,7 @@ impl Engine {
             stage_dialog: self.pending_stage_dialog().cloned(),
             image_stamps: std::mem::take(&mut self.image_stamps),
             monitors: self.monitor_values(),
+            monitor_lists: self.kn_monitor_lists(),
             cloud_ui: self.cloud_ui(),
             clear: std::mem::take(&mut self.clear),
             active: self.active_tasks(),

@@ -10,6 +10,36 @@ const STYLE = `
 .neko-monitor{display:flex;gap:8px;align-items:stretch;background:#f4f4f4;border:1px solid #cfcfcf;border-radius:6px;font-size:12px;color:#1a1a1a;overflow:hidden;max-width:46cqw}
 .neko-monitor b{font-weight:600;padding:4px 0 4px 8px}.neko-monitor span{background:#1a1a1a;color:#fff;padding:4px 8px;font-variant-numeric:tabular-nums;white-space:pre;max-height:30cqh;overflow:auto}
 .neko-monitor.list span{background:#fff;color:#1a1a1a;border-left:1px solid #cfcfcf}
+.neko-kn-monitor,.neko-kn-list-panel{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,"Noto Sans",sans-serif,"Apple Color Emoji","Segoe UI Emoji","Segoe UI Symbol","Noto Color Emoji";font-weight:400;line-height:1.5715;text-align:left;letter-spacing:normal}
+.neko-kn-monitor,.neko-kn-monitor *,.neko-kn-list-panel,.neko-kn-list-panel *{box-sizing:border-box}
+.neko-kn-monitor{position:absolute;display:inline-block;transform-origin:0 0;width:max-content;pointer-events:auto}
+.neko-kn-variable{display:flex;align-items:center;height:calc(64 * var(--neko-unit));padding:0 calc(8 * var(--neko-unit)) 0 calc(16 * var(--neko-unit));border:calc(1 * var(--neko-unit)) solid #fac8a6;border-radius:calc(16 * var(--neko-unit));background:#ffa161;box-shadow:0 calc(3 * var(--neko-unit)) 0 #0003}
+.neko-kn-name{display:flex;align-items:center;justify-content:center;min-width:calc(32 * var(--neko-unit));height:calc(24 * var(--neko-unit));font-size:calc(24 * var(--neko-unit));line-height:1;font-weight:500;color:#333;white-space:pre}
+.neko-kn-entity{color:#863802}.neko-kn-dot{display:inline-flex;justify-content:center;width:calc(20 * var(--neko-unit));font-size:calc(32 * var(--neko-unit));font-weight:800;color:#863802}
+.neko-kn-value{display:flex;align-items:center;justify-content:center;min-width:calc(56 * var(--neko-unit));height:calc(48 * var(--neko-unit));margin-left:calc(12 * var(--neko-unit));padding:0 calc(12 * var(--neko-unit));border:calc(2 * var(--neko-unit)) solid #f28926;border-radius:calc(12 * var(--neko-unit));background:#fff;color:#624026;font-size:calc(24 * var(--neko-unit));font-weight:500;line-height:1;white-space:pre}
+.neko-kn-text{font-size:calc(54 * var(--neko-unit));font-weight:800;line-height:1;color:#000;-webkit-text-stroke:calc(1.5 * var(--neko-unit)) #fff;text-shadow:calc(1 * var(--neko-unit)) calc(3 * var(--neko-unit)) 0 #0003;white-space:pre}
+.neko-kn-list-button{display:flex;align-items:center;justify-content:flex-start;gap:0;height:calc(64 * var(--neko-unit));padding:calc(6 * var(--neko-unit));border:0;border-radius:calc(32 * var(--neko-unit));background:#0003;font:inherit;cursor:pointer;transition:none}
+.neko-kn-list-button:hover:not(:disabled){background:#0003}
+.neko-kn-list-button .neko-kn-name{height:calc(52 * var(--neko-unit));min-width:calc(56 * var(--neko-unit));padding:0 calc(12 * var(--neko-unit));border-radius:calc(26 * var(--neko-unit));background:#ffcf29;color:#344265;font-size:calc(22 * var(--neko-unit));line-height:1.5715}
+.neko-kn-list-button .neko-kn-entity,.neko-kn-list-button .neko-kn-dot{color:#997a0f}
+.neko-kn-arrow{display:flex;align-items:center;justify-content:center;width:calc(40 * var(--neko-unit));height:100%;color:#fff}
+.neko-kn-arrow::after{content:"";width:calc(10 * var(--neko-unit));height:calc(10 * var(--neko-unit));border-right:calc(3 * var(--neko-unit)) solid;border-bottom:calc(3 * var(--neko-unit)) solid;transform:translateY(-25%) rotate(45deg)}
+.neko-kn-list-button[aria-expanded=true] .neko-kn-arrow{transform:rotate(180deg)}
+.neko-kn-list-panel{position:absolute;inset:0;pointer-events:none}
+.neko-kn-list-card{position:absolute;width:calc(308 * var(--neko-unit));height:calc(431 * var(--neko-unit));transform-origin:0 0;padding:0 calc(12 * var(--neko-unit));pointer-events:auto}
+/* Original CSS shell, not the official player's decorative SVG artwork. */
+.neko-kn-list-card::before{content:"";position:absolute;inset:calc(20 * var(--neko-unit)) 0 calc(6 * var(--neko-unit));border-radius:calc(24 * var(--neko-unit));background:#ffcf29;box-shadow:0 calc(6 * var(--neko-unit)) 0 #e4b500;z-index:-1}
+.neko-kn-list-title{height:calc(65 * var(--neko-unit));padding:calc(29 * var(--neko-unit)) 0 calc(9 * var(--neko-unit)) calc(8 * var(--neko-unit));color:#344265;font-size:calc(18 * var(--neko-unit));line-height:calc(27 * var(--neko-unit))}
+.neko-kn-list-title div{max-width:calc(152 * var(--neko-unit));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.neko-kn-list-scroll{height:calc(348 * var(--neko-unit));overflow:auto;background:#fff;border-radius:calc(12 * var(--neko-unit));overscroll-behavior:contain;outline-offset:calc(-2 * var(--neko-unit))}
+.neko-kn-list-rows{position:relative}.neko-kn-list-row{position:absolute;left:0;width:100%;height:calc(44 * var(--neko-unit));display:flex;font-weight:500}
+.neko-kn-list-index{display:flex;align-items:center;justify-content:center;width:calc(60 * var(--neko-unit));flex-shrink:0;border-right:calc(1 * var(--neko-unit)) solid #f5f8ff;color:#c0cae6;font-size:calc(18 * var(--neko-unit))}
+.neko-kn-list-value{flex:1;min-width:0;padding:calc(10 * var(--neko-unit)) calc(7 * var(--neko-unit)) calc(10 * var(--neko-unit)) calc(12 * var(--neko-unit));color:#51628c;font-size:calc(16 * var(--neko-unit));overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.neko-kn-list-panel button{position:absolute;pointer-events:auto;display:flex;align-items:center;justify-content:center;padding:0;border:0;background:#0008;color:#fff;cursor:pointer;font:calc(28 * var(--neko-unit))/1 sans-serif}
+.neko-kn-list-panel button:hover:not(:disabled){background:#0008}
+.neko-kn-list-close{width:calc(42 * var(--neko-unit));height:calc(42 * var(--neko-unit));border-radius:50%}
+.neko-kn-list-prev,.neko-kn-list-next{top:50%;transform:translateY(-50%);width:calc(42 * var(--neko-unit));height:calc(80 * var(--neko-unit));border-radius:calc(10 * var(--neko-unit))}
+.neko-kn-list-panel button[hidden]{display:none}
 .neko-ask{position:absolute;left:12px;right:12px;bottom:12px;pointer-events:auto;background:#fff;color:#1a1a1a;border:1px solid #cfcfcf;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 6px 24px #0003}
 .neko-ask p{margin:0;font-size:14px;white-space:pre-wrap}
 .neko-ask-row{display:flex;gap:8px}.neko-ask input{flex:1;min-width:0;font:inherit;font-size:14px;padding:8px 10px;border:1px solid #bdbdbd;border-radius:8px;outline:none;background:#fff;color:#1a1a1a;color-scheme:light}
@@ -49,6 +79,29 @@ export function knMonitorPosition(project, id) {
   return Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null;
 }
 
+// Official VariableContent / constants module 94521: saved scale * g6 (0.8),
+// top-left transform origin; offset is not consumed. See docs/kn-monitor-appearance.md.
+export function knMonitorAppearance(project, id) {
+  const saved = project?.variables?.variablesDict?.[id] || {};
+  const scale = Number(saved.scale);
+  const entity = project?.actors?.actorsDict?.[saved.currentEntityId]
+    || project?.scenes?.scenesDict?.[saved.currentEntityId];
+  return { position: knMonitorPosition(project, id), scale: (Number.isFinite(scale) && scale > 0 ? scale : 1) * .8,
+    style: saved.style === 'text' ? 'text' : 'default', entity: entity?.name || entity?.screenName || '', createTime: saved.createTime || 0 };
+}
+
+export function knListGeometry(width, height) {
+  // StageList fits a 308x431 card plus 100px navigation into 90% of the stage.
+  const scale = Math.max(0, Math.min((width * .9 - 100) / 308, (height * .9 - 60) / 431));
+  return { scale, left: (width - 308 * scale) / 2, top: height * .05 + (width > height ? 30 : 60),
+    closeTop: height * .05 + (width > height ? 20 : 50) };
+}
+
+function stopStageInput(element) {
+  for (const type of ['pointerdown','pointerup','mousedown','mouseup','touchstart','touchend','keydown','keyup','click','wheel'])
+    element.addEventListener(type, event => event.stopPropagation());
+}
+
 export class StageOverlay {
   constructor(box, renderer, onAnswer) {
     if (!document.getElementById('neko-overlay-style')) {
@@ -62,6 +115,8 @@ export class StageOverlay {
       const load = renderer.load;
       renderer.load = async (project, ...rest) => {
         this.project = project; this.previews.clear(); this.monitorKey = '';
+        this.closeKnList();
+        this.knMonitorRows.clear(); this.monitors.replaceChildren();
         const result = await load.call(renderer, project, ...rest);
         await Promise.all((renderer.kitten4 ? [...renderer.images.values()] : []).filter(image => image.src).map(async image => {
           const preview = new Image(); preview.alt = ''; preview.src = image.src;
@@ -75,6 +130,7 @@ export class StageOverlay {
     this.root.append(this.monitors); box.append(this.root);
     this.bubbles = new Map(); this.ask = null; this.askId = null; this.monitorKey = '';
     this.stageDialog = null; this.ranking = null;
+    this.knMonitorRows = new Map(); this.knListId = null; this.knListPanel = null;
     // Hit-test release coordinates, never a captured pointer/touch target.
     // StageInput uses this hook only for a gesture it already owns.
     renderer.choiceAt = (x,y) => this.choiceAt?.(x,y);
@@ -105,6 +161,7 @@ export class StageOverlay {
     const restore=this.root.contains(document.activeElement);
     for (const bubble of this.bubbles.values()) bubble.remove();
     this.bubbles.clear(); this.monitors.replaceChildren(); this.monitorKey = '';
+    this.knMonitorRows.clear(); this.closeKnList();
     this.renderer.cloudListViews?.clear();
     this.ask?.remove(); this.ask = null; this.askId = null; this.choiceAt = null;
     this.stageDialog?.remove(); this.stageDialog = null;
@@ -116,7 +173,10 @@ export class StageOverlay {
     const monitors = frame.monitors || [], key = JSON.stringify([monitors,frame.cloud_ui?.lists]);
     const placed = !this.renderer.kitten4 && monitors.some(m => knMonitorPosition(this.project, m.id));
     this.monitors.style.left = this.monitors.style.top = this.renderer.kitten4 || placed ? '0' : '';
-    if (key !== this.monitorKey) {
+    if (!this.renderer.kitten4) {
+      this.applyKnMonitors(frame);
+    } else if (key !== this.monitorKey) {
+      this.closeKnList(); this.knMonitorRows.clear();
       this.monitorKey = key;
       this.monitors.replaceChildren(...monitors.map(m => {
         const canvas = this.renderer.monitorCanvas?.(m,frame.cloud_ui); if (canvas) return canvas;
@@ -138,6 +198,115 @@ export class StageOverlay {
     }
     this.showStageDialog(frame.stage_dialog || null);
     this.showRanking(frame.cloud_ui?.ranking||null);
+  }
+  applyKnMonitors(frame) {
+    const monitors = frame.monitors || [];
+    if (!this.knMonitorRows.size) this.monitors.replaceChildren();
+    this.knFrame = frame;
+    this.monitors.style.left = this.monitors.style.top = '0';
+    const alive = new Set();
+    monitors.forEach((m, index) => {
+      alive.add(m.id);
+      const look = knMonitorAppearance(this.project, m.id);
+      const key = JSON.stringify([m.name, m.list, m.list ? null : m.value, look]);
+      let cached = this.knMonitorRows.get(m.id);
+      if (cached?.key !== key) {
+        const row = document.createElement('div'); row.className = 'neko-kn-monitor'; row.dataset.variable = m.id;
+        const at = look.position || { x: 20, y: 20 + index * 68 };
+        row.style.cssText = `left:calc(${at.x} * var(--neko-unit));top:calc(${at.y} * var(--neko-unit));transform:scale(${look.scale})`;
+        const body = document.createElement(m.list ? 'button' : 'div');
+        body.className = m.list ? 'neko-kn-list-button' : look.style === 'text' ? 'neko-kn-text' : 'neko-kn-variable';
+        if (m.list || look.style !== 'text') {
+          const name = document.createElement('div'); name.className = 'neko-kn-name';
+          if (look.entity) {
+            const entity = document.createElement('span'), dot = document.createElement('span');
+            entity.className = 'neko-kn-entity'; entity.textContent = look.entity;
+            dot.className = 'neko-kn-dot'; dot.textContent = '·'; name.append(entity, dot);
+          }
+          name.append(document.createTextNode(m.name)); body.append(name);
+        }
+        if (m.list) {
+          body.type = 'button'; body.setAttribute('aria-label', `查看列表 ${m.name}`);
+          const arrow = document.createElement('div'); arrow.className = 'neko-kn-arrow'; arrow.setAttribute('aria-hidden', 'true'); body.append(arrow);
+          body.onclick = () => { this.knListId = m.id; this.showKnList(); this.focusControl(this.knListPanel?.querySelector('button')); };
+        } else if (look.style === 'text') body.textContent = m.value;
+        else { const value = document.createElement('div'); value.className = 'neko-kn-value'; value.textContent = m.value; body.append(value); }
+        stopStageInput(row); row.append(body);
+        cached?.row.replaceWith(row); cached = { key, row }; this.knMonitorRows.set(m.id, cached);
+      }
+      if (this.monitors.children[index] !== cached.row) this.monitors.insertBefore(cached.row, this.monitors.children[index] || null);
+    });
+    for (const [id, cached] of this.knMonitorRows) if (!alive.has(id)) { cached.row.remove(); this.knMonitorRows.delete(id); }
+    this.showKnList();
+  }
+  closeKnList() {
+    const restore = this.knListPanel?.contains(document.activeElement);
+    this.knListPanel?.remove(); this.knListPanel = null; this.knListId = null;
+    for (const { row } of this.knMonitorRows?.values() || []) row.querySelector('button')?.setAttribute('aria-expanded', 'false');
+    if (restore) this.renderer.canvas?.focus({ preventScroll: true });
+  }
+  showKnList() {
+    const lists = (this.knFrame?.monitors || []).filter(m => m.list).sort((a, b) =>
+      knMonitorAppearance(this.project, a.id).createTime - knMonitorAppearance(this.project, b.id).createTime);
+    const index = lists.findIndex(m => m.id === this.knListId);
+    if (index < 0 || this.renderer.kitten4) { this.closeKnList(); return; }
+    for (const [id, { row }] of this.knMonitorRows) row.querySelector('button')?.setAttribute('aria-expanded', String(id === this.knListId));
+    if (!this.knListPanel) {
+      const panel = document.createElement('div'); panel.className = 'neko-kn-list-panel'; panel.setAttribute('role', 'dialog');
+      const card = document.createElement('div'); card.className = 'neko-kn-list-card';
+      const title = document.createElement('div'), label = document.createElement('div'); title.className = 'neko-kn-list-title'; title.append(label);
+      const scroll = document.createElement('div'), rows = document.createElement('div');
+      scroll.className = 'neko-kn-list-scroll'; scroll.tabIndex = 0; scroll.setAttribute('role', 'list');
+      rows.className = 'neko-kn-list-rows'; scroll.append(rows); card.append(title, scroll); panel.append(card);
+      const button = (cls, text, name, click) => { const b = document.createElement('button'); b.className = cls; b.type = 'button'; b.textContent = text; b.setAttribute('aria-label', name); b.onclick = click; panel.append(b); return b; };
+      button('neko-kn-list-close', '×', '关闭列表', () => this.closeKnList());
+      for (const [delta, cls, text, name] of [[-1,'prev','‹','上一个列表'],[1,'next','›','下一个列表']])
+        button(`neko-kn-list-${cls}`, text, name, () => {
+          const visible = (this.knFrame?.monitors || []).filter(m => m.list).sort((a, b) => knMonitorAppearance(this.project, a.id).createTime - knMonitorAppearance(this.project, b.id).createTime);
+          const next = visible[visible.findIndex(m => m.id === this.knListId) + delta];
+          if (next) { this.knListId = next.id; this.showKnList(); }
+        });
+      stopStageInput(panel); panel.addEventListener('keydown', event => { if (event.key === 'Escape') this.closeKnList(); });
+      scroll.addEventListener('scroll', () => this.renderKnListRows());
+      this.root.append(panel); this.knListPanel = panel;
+    }
+    const panel = this.knListPanel, m = lists[index], look = knMonitorAppearance(this.project, m.id);
+    const scroll = panel.querySelector('.neko-kn-list-scroll');
+    if (panel.dataset.variable !== m.id) { panel.dataset.variable = m.id; scroll.scrollTop = 0; }
+    const title = `${look.entity ? look.entity + ' · ' : ''}${m.name}`; panel.setAttribute('aria-label', title); scroll.setAttribute('aria-label', title);
+    panel.querySelector('.neko-kn-list-title div').textContent = title;
+    const g = knListGeometry(this.renderer.width, this.renderer.height), unit = 'var(--neko-unit)';
+    panel.querySelector('.neko-kn-list-card').style.cssText = `left:calc(${g.left} * ${unit});top:calc(${g.top} * ${unit});transform:scale(${g.scale})`;
+    panel.querySelector('.neko-kn-list-close').style.cssText = `left:calc(${g.left + 308 * g.scale - 42} * ${unit});top:calc(${g.closeTop} * ${unit})`;
+    for (const [cls, hidden, x] of [['prev', index === 0, g.left - 50], ['next', index === lists.length - 1, g.left + 308 * g.scale + 8]]) {
+      const b = panel.querySelector(`.neko-kn-list-${cls}`); b.hidden = hidden; b.style.left = `calc(${x} * ${unit})`;
+    }
+    // Do not split legacy newline summaries: [""] and ["a\nb"] lose their boundaries there.
+    this.knListItems = this.knFrame.monitor_lists?.[m.id] || [];
+    const rows = panel.querySelector('.neko-kn-list-rows'); rows.style.height = `calc(${this.knListItems.length * 44} * ${unit})`;
+    const rowHeight = 44 * this.root.clientWidth / this.renderer.width;
+    scroll.scrollTop = Math.min(scroll.scrollTop, Math.max(0, this.knListItems.length * rowHeight - scroll.clientHeight));
+    this.renderKnListRows();
+  }
+  renderKnListRows() {
+    if (!this.knListPanel) return;
+    const scroll = this.knListPanel.querySelector('.neko-kn-list-scroll'), rows = scroll.firstElementChild;
+    const rowHeight = 44 * this.root.clientWidth / this.renderer.width;
+    if (!(rowHeight > 0)) return;
+    const items = this.knListItems, start = Math.max(0, Math.floor(scroll.scrollTop / rowHeight) - 4);
+    const end = Math.min(items.length, start + Math.ceil(scroll.clientHeight / rowHeight) + 9);
+    const key = JSON.stringify([start, end, items.length, items.slice(start, end)]);
+    if (rows.dataset.key === key) return; rows.dataset.key = key;
+    const visible = [];
+    for (let i = start; i < end; i++) {
+      const row = document.createElement('div'); row.className = 'neko-kn-list-row'; row.style.top = `calc(${i * 44} * var(--neko-unit))`;
+      row.setAttribute('role', 'listitem'); row.setAttribute('aria-posinset', String(i + 1)); row.setAttribute('aria-setsize', String(items.length));
+      const index = document.createElement('span'), value = document.createElement('span');
+      index.className = 'neko-kn-list-index'; index.textContent = `${i + 1}.`;
+      value.className = 'neko-kn-list-value'; value.textContent = items[i]; value.title = items[i];
+      row.append(index, value); visible.push(row);
+    }
+    rows.replaceChildren(...visible);
   }
   showRanking(ranking) {
     if (ranking && this.ranking?.dataset.variable === ranking.variable) return;
