@@ -143,6 +143,33 @@ test('real Studio import health: pagination, read-only navigation, exact downloa
       assert.deepEqual(await editorProject(),before);assert.equal(await page.locator('#undo').isDisabled(),true);
     });
 
+    await t.test('empty selection and cleared focus leave new actions disconnected from ID-less hats',async()=>{
+      for(const clearFocus of [false,true]){
+        const p=ownedProject(),actor=p.actors.actorsDict['first-actor'];p.projectName=`空选择回归-${clearFocus}`;
+        actor.nekoBlockJsonList=[{type:'on_running_group_activated'}];p.actors.actorsDict['second-actor'].nekoBlockJsonList=[];p.procedures.proceduresDict={};
+        await api('import',p);await page.reload();await page.waitForFunction(name=>window.nekoImportReport?.project?.projectName===name,p.projectName);
+        if(clearFocus){await panel.locator('.health-entry').filter({hasText:'on_running_group_activated'}).first().click();await page.locator('#deselect').click();}
+        assert.equal(await page.locator('#blocks .selected').count(),0);
+        await page.locator('#palette button').filter({hasText:'移动步数'}).first().click();
+        const roots=(await editorProject()).actors.actorsDict['first-actor'].nekoBlockJsonList;
+        assert.equal(roots.length,2);assert.equal(roots[0].next,undefined);assert.equal(roots[1].type,'self_go_forward');
+        await page.locator('#run').click();await page.waitForFunction(()=>window.nekoDiagnostics()?.pipeline.completedFrames>0);await page.locator('#pause').click();
+        const sprite=await page.evaluate(()=>window.nekoDiagnostics().sprites.find(sprite=>sprite.id==='first-actor'));
+        assert.equal(sprite.x,0);assert.equal(sprite.y,0);
+        await page.locator('#stop').click();await page.waitForFunction(()=>!window.nekoDiagnostics().started);
+      }
+    });
+
+    await t.test('metadata path collisions never navigate to an innocent input',async()=>{
+      const p=ownedProject();p.projectName='未知属性路径碰撞';p.procedures.proceduresDict={};p.actors.actorsDict['second-actor'].nekoBlockJsonList=[];
+      p.actors.actorsDict['first-actor'].nekoBlockJsonList=[{id:'hat',type:'on_running_group_activated',inputs:{x:{id:'innocent',type:'math_number',parent_id:'hat',fields:{NUM:1}}},'inputs.x':{id:'metadata-reference',type:'get_screens',fields:{screen_id:'deleted-scene'}}}];
+      const imported=await api('import',p),issue=imported.health_report.items.find(item=>item.code==='invalid_structure'&&item.impact.includes('dangling_screen_reference'));
+      assert.equal(issue.block,null);assert.equal(issue.block_type,null);
+      await page.reload();await page.waitForFunction(()=>window.nekoImportReport?.project?.projectName==='未知属性路径碰撞');
+      assert.equal(await panel.locator('.health-entry').filter({hasText:'dangling_screen_reference'}).first().isDisabled(),true);
+      assert.equal(await page.locator('#blocks .health-block-target').count(),0);
+    });
+
     assert.deepEqual(errors,[]);await context.close();
   }finally{
     await browser?.close();if(child&&child.exitCode===null&&!spawnError){child.kill();await once(child,'exit');}

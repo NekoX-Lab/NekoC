@@ -226,3 +226,19 @@ test('located structural-error rows remain clickable with literal punctuation ID
   state.replace(report({items:[issue]}));const {root,navigated}=viewFixture(state);
   const row=root.querySelectorAll('.health-entry')[0];assert.equal(row.disabled,false);row.click();assert.equal(navigated[0],issue);
 });
+
+test('empty selection and cleared report focus never attach to roots with absent IDs',async()=>{
+  for(const id of [undefined,null,''])for(const clearFocus of [false,true]){
+    const {app,document}=await appFixture(),p=projectFixture();
+    p.actors.actorsDict.a2.nekoBlockJsonList=[{...(id===undefined?{}:{id}),type:'on_running_group_activated'}];
+    await app.loadProject(p);
+    // Explicitly choose this actor without selecting a block.
+    app.navigateHealthItem(item({block:null}));
+    if(clearFocus){app.navigateHealthItem(item({block:'missing-block'}));document.ids.get('deselect').click();}
+    assert.equal(app.getState().selected,'');
+    const action=document.ids.get('palette').querySelectorAll('button').find(button=>button.textContent.includes('移动步数'));
+    assert.equal(action.disabled,false);action.click();
+    const roots=app.getState().project.actors.actorsDict.a2.nekoBlockJsonList;
+    assert.equal(roots.length,2);assert.equal(roots[0].next,undefined);assert.equal(roots[1].type,'self_go_forward');
+  }
+});

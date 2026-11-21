@@ -71,6 +71,7 @@ function find(id,value=entity()?.nekoBlockJsonList){if(!value||typeof value!=='o
 // Only statements reached through root/next/statement sockets may accept an
 // appended action. A report focus (or a nested reporter click) is not one.
 function insertionTarget(id){
+  if(typeof id!=='string'||!id)return null;
   const pending=[...(entity()?.nekoBlockJsonList||[])];
   while(pending.length){const block=pending.pop();if(!block)continue;
     if(block.id===id)return block.is_output||block.is_shadow?null:block;

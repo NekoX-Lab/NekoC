@@ -14,7 +14,7 @@ const CATEGORIES: [(&str, &str); 5] = [
 struct Block<'a> {
     value: &'a Value,
     location: Value,
-    path: String,
+    pointer: String,
 }
 
 fn owner_location(project: &Value, kind: &str, id: &str, owner: &Value) -> Value {
@@ -55,7 +55,8 @@ fn blocks(project: &Value) -> Vec<Block<'_>> {
             .flatten()
         {
             let location = owner_location(project, kind, id, owner);
-            let owner_path = format!("${}.{id}.nekoBlockJsonList", path.replace('/', "."));
+            let token = id.replace('~', "~0").replace('/', "~1");
+            let owner_path = format!("{path}/{token}/nekoBlockJsonList");
             let mut pending: Vec<_> = owner["nekoBlockJsonList"]
                 .as_array()
                 .map(Vec::as_slice)
@@ -63,7 +64,7 @@ fn blocks(project: &Value) -> Vec<Block<'_>> {
                 .iter()
                 .enumerate()
                 .rev()
-                .map(|(index, block)| (block, format!("{owner_path}[{index}]")))
+                .map(|(index, block)| (block, format!("{owner_path}/{index}")))
                 .collect();
             while let Some((block, path)) = pending.pop() {
                 if block["type"].is_string() {
@@ -73,20 +74,18 @@ fn blocks(project: &Value) -> Vec<Block<'_>> {
                     blocks.push(Block {
                         value: block,
                         location,
-                        path: path.clone(),
+                        pointer: path.clone(),
                     });
                 }
                 if let Some(next) = block.get("next") {
-                    pending.push((next, format!("{path}.next")));
+                    pending.push((next, format!("{path}/next")));
                 }
                 for key in ["statements", "inputs"] {
                     if let Some(children) = block[key].as_object() {
-                        pending.extend(
-                            children
-                                .iter()
-                                .rev()
-                                .map(|(name, child)| (child, format!("{path}.{key}.{name}"))),
-                        );
+                        pending.extend(children.iter().rev().map(|(name, child)| {
+                            let token = name.replace('~', "~0").replace('/', "~1");
+                            (child, format!("{path}/{key}/{token}"))
+                        }));
                     }
                 }
             }
@@ -219,8 +218,11 @@ fn diagnostic_location<'a>(
             && [
                 format!("unsupported fast-VM block {kind} ({id})"),
                 format!("unsupported expression {kind} at block {id}"),
-                // self_dialog is the only source of this error template.
-                if matches!(kind, "self_dialog" | "self_dialog_wait") {
+                // These three kinds share the KN dialog error branch.
+                if matches!(
+                    kind,
+                    "self_dialog" | "self_dialog_wait" | "create_stage_dialog"
+                ) {
                     format!("unknown dialog type {dialog_type} at {id}")
                 } else {
                     String::new()
@@ -319,10 +321,11 @@ pub fn build_report(project: &Value, import: &Value) -> Value {
             })
             .map(|block| block.location.clone())
             .or_else(|| {
-                // The validator's legacy path is an opaque key, NOT code or a
-                // dot-split expression: owner/socket IDs can contain punctuation.
-                let path = issue["path"].as_str()?;
-                let mut matches = blocks.iter().filter(|block| block.path == path);
+                // Only match the validator's escaped JSON Pointer. Its legacy
+                // display path can collide with properties outside the block
+                // inventory (e.g. an unknown literal property named inputs.x).
+                let pointer = issue["json_pointer"].as_str()?;
+                let mut matches = blocks.iter().filter(|block| block.pointer == pointer);
                 let found = matches.next()?;
                 matches.next().is_none().then(|| found.location.clone())
             })

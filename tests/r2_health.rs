@@ -388,6 +388,10 @@ fn field_and_type_text_cannot_forge_a_precise_block_location() {
         ),
         (
             "hat",
+            json!({"id":"stage-dialog-failure","type":"create_stage_dialog","fields":{"type":"invalid"}}),
+        ),
+        (
+            "hat",
             json!({"id":"quote\"\\end","type":"future_command (\"hat\")"}),
         ),
     ] {
@@ -407,6 +411,75 @@ fn field_and_type_text_cannot_forge_a_precise_block_location() {
                 .any(|item| item["block"] == hat && item["category"] == "unverified")
         );
     }
+}
+
+#[test]
+fn screen_reference_pointers_do_not_alias_unknown_property_names() {
+    for (name, root) in [
+        (
+            "inputs.x",
+            json!({"id":"hat","type":"on_running_group_activated","inputs":{"x":{"id":"innocent","type":"math_number","parent_id":"hat","fields":{"NUM":1}}}}),
+        ),
+        (
+            "inputs.x.y",
+            json!({"id":"hat","type":"on_running_group_activated","inputs":{"x.y":{"id":"innocent","type":"math_number","parent_id":"hat","fields":{"NUM":1}}}}),
+        ),
+        (
+            "inputs.x[0]",
+            json!({"id":"hat","type":"on_running_group_activated","inputs":{"x[0]":{"id":"innocent","type":"math_number","parent_id":"hat","fields":{"NUM":1}}}}),
+        ),
+        (
+            "inputs.x/~",
+            json!({"id":"hat","type":"on_running_group_activated","inputs":{"x/~":{"id":"innocent","type":"math_number","parent_id":"hat","fields":{"NUM":1}}}}),
+        ),
+    ] {
+        let mut root = root;
+        root[name] = json!({"id":"metadata-reference","type":"get_screens","fields":{"screen_id":"deleted-scene"}});
+        let p = project(json!([root]));
+        let validation = nekoc::validate::build_report(&p).unwrap();
+        let issue = validation["issues"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|issue| issue["kind"] == "dangling_screen_reference")
+            .unwrap();
+        let pointer = issue["json_pointer"].as_str().unwrap();
+        assert_eq!(p.pointer(pointer).unwrap()["id"], "metadata-reference");
+        let report = health(p);
+        let issue = items(&report)
+            .iter()
+            .find(|issue| {
+                issue["code"] == "invalid_structure"
+                    && issue["impact"]
+                        .as_str()
+                        .unwrap()
+                        .contains("dangling_screen_reference")
+            })
+            .unwrap();
+        assert!(issue["block"].is_null(), "{name}: {issue}");
+        assert!(issue["block_type"].is_null());
+        assert!(
+            items(&report)
+                .iter()
+                .any(|issue| issue["block"] == "innocent" && issue["category"] == "unverified")
+        );
+    }
+    // An actual array and an array-looking literal property have distinct pointers.
+    let mut p = project(json!([]));
+    p["metadata"] = json!([{"type":"get_screens","fields":{"screen_id":"deleted-scene"}}]);
+    p["metadata[0]"] = json!({"type":"get_screens","fields":{"screen_id":"deleted-scene"}});
+    let validation = nekoc::validate::build_report(&p).unwrap();
+    let pointers: std::collections::BTreeSet<_> = validation["issues"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|issue| issue["kind"] == "dangling_screen_reference")
+        .map(|issue| issue["json_pointer"].as_str().unwrap())
+        .collect();
+    assert_eq!(
+        pointers,
+        std::collections::BTreeSet::from(["/metadata/0", "/metadata[0]"])
+    );
 }
 
 #[test]

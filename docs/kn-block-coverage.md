@@ -171,7 +171,7 @@
 | 45 | `controls_while` | 有执行路径／未完整验证 | 已注册／本次面板未列出 | `src/engine.rs:4877` | T16, T23, T47, T48 | 官方注册/JS 转换已验证；NekoC 前测循环有回归，KN 原生播放调度差分未验证 |
 | 46 | `convert_type` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:2425`<br>`src/engine.rs:2930` | T9, T10, T24, T40, T45, T51 | 常见类型/空值/列表对象的官方0.27.4主路径配对，见 docs/kn-partial2-timers.md；未验证边界：callable原型、Symbol、稀疏数组、孤立UTF-16及错误UI |
 | 47 | `coordinate_of_sprite` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3022`<br>`src/engine.rs:3032` | T10, T29, T38, T41, T51 | 有路径；完整语义未验证 |
-| 48 | `create_stage_dialog` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4289`<br>`src/engine.rs:4297` | T51 | 有路径；完整语义未验证 |
+| 48 | `create_stage_dialog` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4289`<br>`src/engine.rs:4297` | T51, T55 | 有路径；完整语义未验证 |
 | 49 | `delete_list_item` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4669` | T10, T44, T51, T56, T57 | 有路径；完整语义未验证 |
 | 50 | `dispose_clone` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:4556` | T1, T10, T50, T51 | 有路径；完整语义未验证 |
 | 51 | `distance_to` | 有执行路径／未完整验证 | 普通面板配置／默认未隐藏 | `src/engine.rs:3076`<br>`src/engine.rs:3085` | T29, T38, T51 | 有路径；完整语义未验证 |
