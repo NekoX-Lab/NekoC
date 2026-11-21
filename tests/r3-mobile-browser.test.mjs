@@ -121,9 +121,13 @@ test('r3-mobile phone/tablet production player', {skip:!process.env.NEKOC_R3_MOB
         for(const keyboardHeld of [false,true]){
           await page.locator('#virtual-toggle').focus();await page.keyboard.press('Tab');
           assert.equal(await page.locator('[data-key="38"]').evaluate(el=>el===document.activeElement),true);
+          // CDP coordinates do not auto-scroll like locator.tap(). The locale
+          // picker can put lower pad rows below the tablet portrait viewport.
+          await page.locator('#virtual-controls').scrollIntoViewIfNeeded();
           await clear();
           if(keyboardHeld){await page.keyboard.down('Space');await keySeen('38',true);}
           const finger={...await center('[data-key="37"]'),id:1},canvasFinger={...await center('#stage'),id:2};
+          assert.ok([finger,canvasFinger].every(point=>point.x>=0&&point.x<portrait.width&&point.y>=0&&point.y<portrait.height),'both trusted touches must land inside the viewport');
           await touch('touchStart',[finger]);await keySeen('37',true);
           await touch('touchStart',[finger,canvasFinger]);
           await page.waitForFunction(()=>window.mobileFrames.some(f=>f.events?.some(e=>e.state==='mouse_down')));
@@ -172,8 +176,10 @@ test('r3-mobile phone/tablet production player', {skip:!process.env.NEKOC_R3_MOB
         await page.waitForFunction(()=>window.nekoPlayDiagnostics().recording&&window.nekoPlayDiagnostics().totalUpdates>=2);
         for(const selector of ['#import','#stop','#restart','#frame-limit','#budget','#resolution','#coalesce'])assert.equal(await page.locator(selector).isDisabled(),true,selector);
         assert.equal(await page.locator('#virtual-toggle').isEnabled(),true);
-        await page.locator('#stage').scrollIntoViewIfNeeded();await clear();
+        await page.locator('#stage').scrollIntoViewIfNeeded();
+        await page.locator('#virtual-controls').scrollIntoViewIfNeeded();await clear();
         const recordedFinger={...await center('[data-key="37"]'),id:1},recordedStage={...await center('#stage'),id:2};
+        assert.ok([recordedFinger,recordedStage].every(point=>point.x>=0&&point.x<portrait.width&&point.y>=0&&point.y<portrait.height),'recorded trusted touches must land inside the viewport');
         await touch('touchStart',[recordedFinger]);await keySeen('37',true);
         await touch('touchStart',[recordedFinger,recordedStage]);
         await page.waitForFunction(()=>window.mobileFrames.some(f=>f.pressed?.includes('37')&&f.events?.some(e=>e.state==='mouse_down')));

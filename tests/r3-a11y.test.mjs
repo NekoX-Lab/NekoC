@@ -1,0 +1,108 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {cp,mkdir,mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
+import {spawnSync} from 'node:child_process';
+import os from 'node:os';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {runInNewContext} from 'node:vm';
+import {messages,normalizeLanguage,translate} from '../web/i18n.js';
+import {PlayerFeedback} from '../web/player-feedback.js';
+
+test('r3-a11y: UI messages have both locales and matching interpolation fields',()=>{
+  const fields=text=>[...text.matchAll(/\{(\w+)\}/g)].map(match=>match[1]).sort();
+  for(const [key,pair]of Object.entries(messages)){
+    assert.equal(pair.length,2,key);
+    for(const text of pair)assert.ok(typeof text==='string'&&text.length,key);
+    assert.deepEqual(fields(pair[0]),fields(pair[1]),key);
+  }
+  assert.equal(normalizeLanguage('en-US'),'en');assert.equal(normalizeLanguage('zh'),'zh-CN');assert.equal(normalizeLanguage('invalid'),null);
+  assert.equal(translate('fileFailed','en',{name:'<b>.bcm',error:'bad'}),'Cannot read project “<b>.bcm”: bad');
+  assert.equal(translate('ready','unknown'),'就绪');
+});
+
+test('r3-a11y: declared HTML translations exist and deployment includes the catalog',async()=>{
+  for(const file of ['index.html','play.html']){
+    const html=await readFile(new URL(`../web/${file}`,import.meta.url),'utf8');
+    for(const [,key]of html.matchAll(/data-i18n(?:-aria-label|-title|-placeholder)?="([^"]+)"/g))assert.ok(messages[key],`${file}: ${key}`);
+  }
+  for(const file of ['app.js','play.js','player-feedback.js']){
+    const source=await readFile(new URL(`../web/${file}`,import.meta.url),'utf8');
+    for(const [,key]of source.matchAll(/\bt\('([^']+)'/g))assert.ok(messages[key],`${file}: ${key}`);
+  }
+  for(const file of ['tools/build-pages.mjs','tools/build-extension.mjs']){
+    const source=await readFile(new URL(`../${file}`,import.meta.url),'utf8');
+    for(const module of ['i18n.js','repro.js','input.js','player-feedback.js'])assert.ok(source.includes(`'${module}'`),`${file}: ${module}`);
+  }
+});
+
+test('r3-a11y: merged mobile player keeps unique IDs and off-stage accessible errors',async()=>{
+  const html=await readFile(new URL('../web/play.html',import.meta.url),'utf8');
+  const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(match=>match[1]);
+  assert.equal(new Set(ids).size,ids.length,'conflict resolution must not duplicate IDs');
+  for(const id of ['stop','runtime-mode','record','virtual-toggle','virtual-controls','language','coverage-dialog'])assert.ok(ids.includes(id),id);
+  const viewport=html.slice(html.indexOf('<section id="viewport"'),html.indexOf('</section>'));
+  assert.ok(!viewport.includes('id="notice"'),'runtime errors must remain outside the stage');
+  assert.match(html,/<span id="notice-text" tabindex="0"[^>]*data-i18n-aria-label="noticeDetails"/);
+  assert.match(html,/id="coverage"[^>]*aria-controls="coverage-dialog"/);
+  for(const code of [38,37,40,39,32,13,90,88])assert.match(html,new RegExp(`data-key="${code}"[^>]*data-i18n-aria-label="[^"]+"[^>]*aria-pressed="false"`));
+});
+
+test('r3-a11y: extension build ships bilingual, recorder and touch dependencies together',async t=>{
+  const root=fileURLToPath(new URL('../',import.meta.url)),fixture=await mkdtemp(path.join(os.tmpdir(),'nekoc-r3-a11y-extension-'));
+  t.after(()=>rm(fixture,{recursive:true,force:true}));
+  for(const folder of ['web','extension'])await cp(path.join(root,folder),path.join(fixture,folder),{recursive:true});
+  await mkdir(path.join(fixture,'tools'));
+  await cp(path.join(root,'tools/build-extension.mjs'),path.join(fixture,'tools/build-extension.mjs'));
+  const wasm=path.join(fixture,'packages/nekoc/dist/web');await mkdir(wasm,{recursive:true});
+  // Test copying and HTML rewriting only, not execution or VM compatibility.
+  for(const file of ['nekoc_wasm.js','nekoc_wasm_bg.wasm'])await writeFile(path.join(wasm,file),'packaging fixture');
+  const output=path.join(fixture,'output');
+  const result=spawnSync(process.execPath,['tools/build-extension.mjs',output],{cwd:fixture,encoding:'utf8'});
+  assert.ifError(result.error);assert.equal(result.status,0,result.stdout+result.stderr);
+  for(const file of ['i18n.js','repro.js','input.js','play.js','play.css','player-feedback.js']){
+    assert.equal(await readFile(path.join(output,file),'utf8'),await readFile(path.join(root,'web',file),'utf8'),`extension dependency: ${file}`);
+  }
+  const html=await readFile(path.join(output,'play.html'),'utf8');
+  assert.ok(!html.includes('src="/'));assert.ok(!html.includes('href="/'));
+  assert.match(html,/<script type="module" src="\.\/play\.js"/);
+});
+
+test('r3-a11y: report Tab wraps both ways, but other keys keep native behavior',()=>{
+  const elements=new Map(),root={activeElement:null,querySelector(selector){
+    if(!elements.has(selector))elements.set(selector,{focus(){root.activeElement=this;}});
+    return elements.get(selector);
+  }};
+  new PlayerFeedback(root);
+  const keydown=root.querySelector('#coverage-dialog').onkeydown;
+  let prevented=0;
+  const event={key:'Tab',shiftKey:false,preventDefault(){prevented++;}};
+  root.activeElement=root.querySelector('#report-close');keydown(event);
+  assert.equal(root.activeElement,root.querySelector('#report-content'));assert.equal(prevented,1);
+  keydown({...event,shiftKey:true});
+  assert.equal(root.activeElement,root.querySelector('#report-close'));assert.equal(prevented,2);
+  keydown({...event,key:'Escape'});assert.equal(prevented,2);
+  root.activeElement=root.querySelector('#report-download');keydown(event);assert.equal(prevented,2);
+});
+
+test('r3-a11y: field commits update history and summaries without replacing controls',async()=>{
+  const source=await readFile(new URL('../web/app.js',import.meta.url),'utf8');
+  const undoButton={},redoButton={},summary={},project={value:1};
+  const context={project,started:false,undo:[],redo:['old redo'],dirtyCount:0,renders:0,notices:0,
+    make:()=>({}),markDirty(){context.dirtyCount++;},renderEditor(){context.renders++;},notify(){context.notices++;},t:key=>key,
+    $:selector=>selector==='#undo'?undoButton:redoButton,
+    document:{querySelectorAll:()=>[{dataset:{expression:'expr'},firstElementChild:summary}]},
+    find:()=>project,expressionText:value=>String(value.value),
+  };
+  const transaction=source.slice(source.indexOf('function transaction('),source.indexOf('function find('));
+  const editInput=source.slice(source.indexOf('function editInput('),source.indexOf('function expressionText('));
+  const api=runInNewContext(`${transaction}\n${editInput}\n({transaction,editInput})`,context);
+  const input=api.editInput(1,value=>project.value=value,'number');
+  input.value='45';input.onchange();
+  assert.equal(project.value,45);assert.equal(context.dirtyCount,1);assert.equal(context.renders,0);
+  assert.equal(context.undo[0],'{"value":1}');assert.equal(context.redo.length,0);
+  assert.equal(undoButton.disabled,false);assert.equal(redoButton.disabled,true);assert.equal(summary.textContent,'45');
+  input.onchange();assert.equal(context.undo.length,1,'unchanged values do not add history');
+  context.started=true;input.value='99';input.onchange();assert.equal(project.value,45);assert.equal(context.notices,1);
+  context.started=false;api.transaction(()=>{project.value=46;});assert.equal(context.renders,1,'structural transactions still rebuild the editor');
+});

@@ -540,6 +540,10 @@ fn serve_with_cloud(initial: Json, port: u16, cloud: CloudSession) -> Result<()>
                     "text/javascript",
                     include_bytes!("../../web/play.js").as_slice(),
                 )),
+                "/i18n.js" => Some((
+                    "text/javascript",
+                    include_bytes!("../../web/i18n.js").as_slice(),
+                )),
                 "/player-feedback.js" => Some((
                     "text/javascript",
                     include_bytes!("../../web/player-feedback.js").as_slice(),

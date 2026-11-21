@@ -1,77 +1,78 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="color-scheme" content="dark"><title>Neko · 纯播放器</title><link rel="stylesheet" href="/play.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta name="color-scheme" content="dark"><title data-i18n="playerTitle">Neko · 纯播放器</title><link rel="stylesheet" href="/play.css"></head>
 <body>
 <main id="player-shell">
   <header class="tile brand-tile">
     <span class="mark" aria-hidden="true">n</span>
-    <div class="identity"><span class="eyebrow">NEKO 播放器</span><h1 id="project-name">纯播放器</h1></div>
+    <div class="identity"><span class="eyebrow" data-i18n="playerBrand">NEKO 播放器</span><h1 id="project-name">纯播放器</h1></div>
+    <label class="language-control"><span data-i18n="language">界面语言</span><select id="language"><option value="zh-CN" lang="zh-CN">中文</option><option value="en" lang="en">English</option></select></label>
     <button id="import" class="primary"><span aria-hidden="true">＋</span> 导入作品</button>
     <input id="file" type="file" accept=".bcmkn,.bcm,.json" hidden>
   </header>
 
-  <section id="viewport" class="tile" aria-label="游玩区域">
-    <div id="stage-box"><canvas id="stage" tabindex="0" aria-label="游戏舞台，可触摸或使用键盘游玩"></canvas><div id="timer" hidden></div></div>
-    <div id="welcome" class="welcome"><span class="eyebrow">READY WHEN YOU ARE</span><h2>把作品带到大屏幕。</h2><p>导入 .bcmkn / .bcm，或直接拖到这里</p></div>
-    <div id="drop-hint" aria-hidden="true"><span>松开，开始游玩</span><small>.bcmkn / .bcm</small></div>
+  <section id="viewport" class="tile" aria-label="游玩区域" data-i18n-aria-label="playArea">
+    <div id="stage-box"><canvas id="stage" tabindex="0" aria-label="游戏舞台，可触摸或聚焦后使用键盘游玩；Tab 可移出舞台" data-i18n-aria-label="gameStage"></canvas><div id="timer" hidden></div></div>
+    <div id="welcome" class="welcome"><span class="eyebrow">READY WHEN YOU ARE</span><h2 data-i18n="welcome">把作品带到大屏幕。</h2><p data-i18n="dropHint">导入 .bcmkn / .bcm，或直接拖到这里</p></div>
+    <div id="drop-hint" aria-hidden="true"><span data-i18n="dropNow">松开，开始游玩</span><small>.bcmkn / .bcm</small></div>
     <div id="loading" role="status" hidden><label id="load-label" for="load-progress">正在读取作品…</label><progress id="load-progress" max="1"></progress></div>
   </section>
 
-  <section class="tile fps-tile" title="每秒实际收到并有画面变化的更新；包含作品分步绘制，不等于完整作品帧数。">
-    <span class="eyebrow"><span class="live-dot"></span>绘制 FPS</span>
+  <section class="tile fps-tile" title="每秒实际收到并有画面变化的更新；包含作品分步绘制，不等于完整作品帧数。" data-i18n-title="fpsHint">
+    <span class="eyebrow"><span class="live-dot" aria-hidden="true"></span><span data-i18n="drawFps">绘制 FPS</span></span>
     <strong id="fps">—</strong>
-    <span class="hint">更新 <b id="update-fps">—</b></span>
+    <span class="hint"><span data-i18n="updateRate">更新</span> <b id="update-fps">—</b></span>
   </section>
 
   <section class="tile controls-tile">
-    <div class="play-controls"><button id="toggle" class="primary" disabled>▶ 开始游玩</button><button id="stop" disabled title="结束运行；再次开始将从头运行">■ 停止</button><button id="restart" disabled title="从头开始">↻ 重玩</button><button id="fullscreen" title="全屏游玩" aria-label="全屏游玩">⛶ <span>全屏</span></button></div>
+    <div class="play-controls"><button id="toggle" class="primary" disabled>▶ 开始游玩</button><button id="stop" disabled title="结束运行；再次开始将从头运行" data-i18n-title="stopPlayHint" data-i18n="stopPlay">■ 停止</button><button id="restart" disabled title="从头开始" data-i18n-title="restartHint" data-i18n="restart">↻ 重玩</button><button id="fullscreen" title="全屏游玩" aria-label="全屏游玩" aria-pressed="false">⛶ <span>全屏</span></button></div>
     <span id="runtime-mode" role="status">运行模式：正在连接…</span>
-    <span class="keyboard-hint">需要 WebGL 2；浏览器内运行重作品会占用较多内存，请等待加载完成后开始。</span>
+    <span class="keyboard-hint" data-i18n="webglHint">需要 WebGL 2；浏览器内运行重作品会占用较多内存，请等待加载完成后开始。</span>
     <button id="virtual-toggle" aria-expanded="false" aria-controls="virtual-controls">显示虚拟按键</button>
-    <div id="virtual-controls" hidden role="group" aria-label="虚拟游戏按键">
-      <div class="direction-pad" role="group" aria-label="方向键">
-        <button data-key="38" aria-label="向上" aria-pressed="false">↑</button>
-        <button data-key="37" aria-label="向左" aria-pressed="false">←</button>
-        <button data-key="40" aria-label="向下" aria-pressed="false">↓</button>
-        <button data-key="39" aria-label="向右" aria-pressed="false">→</button>
+    <div id="virtual-controls" hidden role="group" aria-label="虚拟游戏按键" data-i18n-aria-label="virtualControls">
+      <div class="direction-pad" role="group" aria-label="方向键" data-i18n-aria-label="directionKeys">
+        <button data-key="38" aria-label="向上" data-i18n-aria-label="keyUp" aria-pressed="false">↑</button>
+        <button data-key="37" aria-label="向左" data-i18n-aria-label="keyLeft" aria-pressed="false">←</button>
+        <button data-key="40" aria-label="向下" data-i18n-aria-label="keyDown" aria-pressed="false">↓</button>
+        <button data-key="39" aria-label="向右" data-i18n-aria-label="keyRight" aria-pressed="false">→</button>
       </div>
-      <div class="action-pad" role="group" aria-label="操作键">
-        <button data-key="32" aria-label="空格键" aria-pressed="false">空格</button>
-        <button data-key="13" aria-label="回车键" aria-pressed="false">回车</button>
-        <button data-key="90" aria-label="Z 键" aria-pressed="false">Z</button>
-        <button data-key="88" aria-label="X 键" aria-pressed="false">X</button>
+      <div class="action-pad" role="group" aria-label="操作键" data-i18n-aria-label="actionKeys">
+        <button data-key="32" aria-label="空格键" data-i18n-aria-label="keySpace" data-i18n="space" aria-pressed="false">空格</button>
+        <button data-key="13" aria-label="回车键" data-i18n-aria-label="keyEnter" data-i18n="enter" aria-pressed="false">回车</button>
+        <button data-key="90" aria-label="Z 键" data-i18n-aria-label="keyZ" aria-pressed="false">Z</button>
+        <button data-key="88" aria-label="X 键" data-i18n-aria-label="keyX" aria-pressed="false">X</button>
       </div>
     </div>
     <span id="status" role="status">选择作品，开始游玩</span>
-    <span class="keyboard-hint">触摸画面，或用键盘 / 虚拟按键游玩</span>
+    <span class="keyboard-hint" data-i18n="keyboardHint">触摸画面，或聚焦舞台使用键盘 / 虚拟按键游玩；Tab 可移出舞台</span>
     <button id="record" disabled aria-pressed="false" aria-describedby="record-help">● 录制复现（从头开始）</button>
-    <small id="record-help">固定种子、60 Hz；停止后导出键鼠 JSON。音频完成、真实时间、云服务、外部设备及素材感知不保证复现；包不含作品或账户信息。</small>
-    <button id="coverage" disabled aria-haspopup="dialog">兼容性 / coverage 报告</button>
+    <small id="record-help" data-i18n="recordHelp">固定种子、60 Hz；停止后导出键鼠 JSON。音频完成、真实时间、云服务、外部设备及素材感知不保证复现；包不含作品或账户信息。</small>
+    <button id="coverage" disabled aria-haspopup="dialog" aria-controls="coverage-dialog" data-i18n="report">兼容性 / coverage 报告</button>
   </section>
 
-  <section class="tile timings-tile" aria-label="性能数据">
+  <section class="tile timings-tile" aria-label="性能数据" data-i18n-aria-label="timings">
     <div><span>VM</span><b id="vm-time">—</b></div>
     <div><span>GPU</span><b id="gpu-time">—</b></div>
-    <div><span>往返</span><b id="roundtrip">—</b></div>
-    <div><span>画布</span><b id="render-size">—</b></div>
+    <div><span data-i18n="roundtrip">往返</span><b id="roundtrip">—</b></div>
+    <div><span data-i18n="canvas">画布</span><b id="render-size">—</b></div>
   </section>
 
   <section class="tile settings-tile">
-    <button id="settings-toggle" class="settings-head" aria-expanded="true" aria-controls="settings"><span>性能设置</span><span class="chevron" aria-hidden="true">⌄</span></button>
-    <div id="settings" class="settings" aria-label="性能控制">
-      <div class="setting"><label for="frame-limit">更新上限</label><select id="frame-limit"><option value="30">30 / 秒 · 省电</option><option value="60" selected>60 / 秒 · 均衡</option><option value="120">120 / 秒 · 高刷新</option><option value="0">跟随屏幕</option><option value="240">240 / 秒</option><option value="480">480 / 秒</option><option value="1000">1000 / 秒</option><option value="-1">不限 · 算完就下一轮</option></select><small>限制运行更新频率，可高于屏幕刷新率。按帧计数的作品逻辑会随之变快。</small></div>
-      <div class="setting"><label for="budget">执行预算</label><select id="budget"><option value="2">2 ms · 低占用</option><option value="4">4 ms · 均衡</option><option value="8">8 ms</option><option value="12" selected>12 ms · 高性能</option><option value="16">16 ms · 最大吞吐</option></select><small>每次运行更新的 CPU 软预算；没算完会立即接着算。</small></div>
-      <div class="setting"><label for="resolution">渲染精度</label><select id="resolution"><option value="0" selected>跟随显示 · 最清晰</option><option value="0.5">0.5× · 省电</option><option value="1">1× · 原始分辨率</option><option value="2">2× · 精细</option></select><small>实时切换，保留当前游戏进度与画笔图层。</small></div>
-      <div class="setting"><label for="coalesce">合并无画面更新</label><select id="coalesce"><option value="0" selected>关闭 · 官方节奏</option><option value="1">开启 · 实验</option></select><small>一次更新内连续执行没有画面变化的轮次（时间不前进）。分步绘制的作品更流畅，但只改变量的循环会跑得更快。</small></div>
+    <button id="settings-toggle" class="settings-head" aria-expanded="true" aria-controls="settings"><span data-i18n="settings">性能设置</span><span class="chevron" aria-hidden="true">⌄</span></button>
+    <div id="settings" class="settings" role="group" aria-label="性能控制" data-i18n-aria-label="performanceControls">
+      <div class="setting"><label for="frame-limit" data-i18n="frameLimit">更新上限</label><select id="frame-limit" aria-describedby="limit-hint"><option value="30" data-i18n="limit30">30 / 秒 · 省电</option><option value="60" selected data-i18n="limit60">60 / 秒 · 均衡</option><option value="120" data-i18n="limit120">120 / 秒 · 高刷新</option><option value="0" data-i18n="limit0">跟随屏幕</option><option value="240" data-i18n="limit240">240 / 秒</option><option value="480" data-i18n="limit480">480 / 秒</option><option value="1000" data-i18n="limit1000">1000 / 秒</option><option value="-1" data-i18n="unlimited">不限 · 算完就下一轮</option></select><small id="limit-hint" data-i18n="limitHint">限制运行更新频率，可高于屏幕刷新率。按帧计数的作品逻辑会随之变快。</small></div>
+      <div class="setting"><label for="budget" data-i18n="budget">执行预算</label><select id="budget" aria-describedby="budget-hint"><option value="2" data-i18n="budget2">2 ms · 低占用</option><option value="4" data-i18n="budget4">4 ms · 均衡</option><option value="8">8 ms</option><option value="12" selected data-i18n="budget12">12 ms · 高性能</option><option value="16" data-i18n="budget16">16 ms · 最大吞吐</option></select><small id="budget-hint" data-i18n="budgetHint">每次运行更新的 CPU 软预算；没算完会立即接着算。</small></div>
+      <div class="setting"><label for="resolution" data-i18n="resolution">渲染精度</label><select id="resolution" aria-describedby="resolution-hint"><option value="0" selected data-i18n="resolution0">跟随显示 · 最清晰</option><option value="0.5" data-i18n="resolutionHalf">0.5× · 省电</option><option value="1" data-i18n="resolution1">1× · 原始分辨率</option><option value="2" data-i18n="resolution2">2× · 精细</option></select><small id="resolution-hint" data-i18n="resolutionHint">实时切换，保留当前游戏进度与画笔图层。</small></div>
+      <div class="setting"><label for="coalesce" data-i18n="coalesce">合并无画面更新</label><select id="coalesce" aria-describedby="coalesce-hint"><option value="0" selected data-i18n="coalesceOff">关闭 · 默认节奏</option><option value="1" data-i18n="coalesceOn">开启 · 实验</option></select><small id="coalesce-hint" data-i18n="coalesceHint">一次更新内连续执行没有画面变化的轮次（时间不前进）。分步绘制的作品更流畅，但只改变量的循环会跑得更快。</small></div>
     </div>
   </section>
-  <div id="notice" role="alert" hidden><span id="notice-text" tabindex="0" aria-label="播放器提示与错误详情"></span><button id="dismiss" aria-label="关闭提示">×</button></div>
+  <div id="notice" role="alert" hidden><span id="notice-text" tabindex="0" aria-label="播放器提示与错误详情" data-i18n-aria-label="noticeDetails"></span><button id="dismiss" aria-label="关闭提示" data-i18n-aria-label="dismiss">×</button></div>
 <dialog id="coverage-dialog" aria-labelledby="report-title">
-  <h2 id="report-title">兼容性 / coverage 报告</h2>
-  <p>以下是当前作品的导入静态诊断和素材失败记录，不代表运行 coverage 或官方一致性。</p>
-  <p>完整运行覆盖率：在本地终端执行 <code>cargo run -- coverage "作品路径" --frames 60 --seed 1</code>。仅对可信作品运行；结果不保证所有输入均兼容。</p>
-  <pre id="report-content" tabindex="0" aria-label="导入诊断 JSON"></pre>
-  <div class="report-actions"><button id="report-download">下载诊断 JSON</button><button id="report-close" autofocus>关闭报告</button></div>
+  <h2 id="report-title" data-i18n="report">兼容性 / coverage 报告</h2>
+  <p data-i18n="reportHint">以下是当前作品的导入静态诊断和素材失败记录，不代表运行 coverage 或官方一致性。</p>
+  <p><span data-i18n="coverageCommand">完整运行覆盖率：在本地终端执行</span> <code>cargo run -- coverage "project.bcmkn" --frames 60 --seed 1</code>。<span data-i18n="coverageTrust">仅对可信作品运行；结果不保证所有输入均兼容。</span></p>
+  <pre id="report-content" tabindex="0" aria-label="导入诊断 JSON" data-i18n-aria-label="reportJson"></pre>
+  <div class="report-actions"><button id="report-download" data-i18n="downloadReport">下载诊断 JSON</button><button id="report-close" autofocus data-i18n="closeReport">关闭报告</button></div>
 </dialog>
 </main>
 <script type="module" src="/play.js"></script>

@@ -1,6 +1,6 @@
 /* Neko Studio — flat bento layout: solid tiles on a tinted canvas, no shadows. */
 :root{
-  --canvas:#ececec;--tile:#fff;--tile-2:#f6f6f6;--ink:#1a1a1a;--ink-2:#4a4a4a;--muted:#838383;--line:#e3e3e3;
+  --canvas:#ececec;--tile:#fff;--tile-2:#f6f6f6;--ink:#1a1a1a;--ink-2:#4a4a4a;--muted:#606060;--line:#e3e3e3;
   --accent:#1a1a1a;--accent-ink:#fff;--accent-soft:#e8e8e8;--warn:#b5482f;--radius:18px;--radius-sm:10px;--gap:12px;
   font-family:Inter,"Segoe UI","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--canvas);font-synthesis:none;
 }
@@ -10,7 +10,8 @@ button,input,textarea,select{font:inherit;color:inherit}
 button{cursor:pointer;border:0;background:none;font-size:13px;border-radius:var(--radius-sm);transition:background .12s,color .12s}
 button:disabled{opacity:.4;cursor:default}
 input,textarea{outline:none}
-input:focus-visible,textarea:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+[hidden]{display:none!important}
 h1,h2,p{margin:0}
 h2{font-size:14px;font-weight:650;letter-spacing:-.1px}
 i{display:inline-block}
@@ -34,7 +35,9 @@ i{display:inline-block}
 .project-title{display:flex;align-items:center;gap:10px;background:var(--tile-2);border-radius:var(--radius-sm);padding:6px 12px}
 .project-title input{border:0;background:none;width:220px;font-size:14px;font-weight:600}
 .project-title>span{color:var(--muted);font-size:12px;white-space:nowrap}
-.top-actions{margin-left:auto;display:flex;align-items:center;gap:8px}
+.top-actions{margin-left:auto;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.language-control{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--ink-2)}
+.language-control select{background:var(--tile-2);border:1px solid var(--muted);border-radius:6px;padding:5px;min-height:30px}
 .engine-chip{font-size:12px;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:6px 11px;display:flex;align-items:center;gap:7px;margin-right:6px;font-weight:600}
 .engine-chip i,.status-dot{width:7px;height:7px;border-radius:50%;background:var(--accent)}
 
@@ -58,8 +61,8 @@ main.bento{flex:1;display:grid;grid-template-columns:270px minmax(360px,1fr) 460
 .block-library{flex:1;min-height:0;overflow:auto}
 .search{width:100%;border:0;background:var(--tile-2);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px}
 .category-pills{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
-.category-pills span{font-size:12px;color:var(--ink-2);padding:6px 11px;border-radius:999px;background:var(--tile-2);cursor:pointer}
-.category-pills span.chosen{background:var(--ink);color:#fff}
+.category-pills button{font-size:12px;color:var(--ink-2);padding:6px 11px;border-radius:999px;background:var(--tile-2);cursor:pointer}
+.category-pills button.chosen{background:var(--ink);color:#fff}
 .palette-block{display:block;width:100%;text-align:left;padding:10px 12px;margin:6px 0;background:var(--tile-2);border-left:4px solid var(--accent);font-size:13px;color:var(--ink-2);border-radius:8px}
 .palette-block:hover:not(:disabled){background:var(--accent-soft)}
 
@@ -83,7 +86,7 @@ main.bento{flex:1;display:grid;grid-template-columns:270px minmax(360px,1fr) 460
 .block{width:max-content;min-width:215px;padding:11px 14px;background:var(--bg,#dcebfb);border-radius:10px;position:relative;margin-top:3px;font-size:13px;color:var(--ink,#1f4f82);cursor:pointer;border-left:4px solid var(--border,#9cc3ef)}
 .block.selected{outline:2px solid var(--accent);outline-offset:2px;z-index:2}
 .block.hat{border-radius:16px 16px 10px 10px;padding-top:14px;min-width:250px}
-.block .block-label{display:flex;align-items:center;gap:10px;font-weight:600}
+.block .block-label{display:flex;align-items:center;gap:10px;font-weight:600;color:inherit;text-align:left;padding:2px;border-radius:3px}
 .block .symbol{opacity:.7;font-size:14px}
 .block .fields{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
 .block input{width:56px;max-width:160px;border:0;border-radius:6px;background:#ffffffd9;color:inherit;padding:5px 7px;font-size:12px;text-align:center}
@@ -91,7 +94,7 @@ main.bento{flex:1;display:grid;grid-template-columns:270px minmax(360px,1fr) 460
 .block label{font-size:11px;display:flex;align-items:center;gap:6px}
 .block details summary{cursor:pointer;background:#ffffff9e;border-radius:6px;padding:4px 8px;font-size:12px}
 .branch{margin:10px 0 0 8px;padding:4px 0 8px 12px;border-left:3px solid #ffffffb0;min-height:30px}
-.branch-label{font:600 10px ui-monospace,Consolas,monospace;letter-spacing:.6px;opacity:.55}
+.branch-label{font:600 10px ui-monospace,Consolas,monospace;letter-spacing:.6px}
 .workspace-footer{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;color:var(--muted);font:12px ui-monospace,Consolas,monospace}
 .workspace-footer>span{display:flex;align-items:center;gap:8px}
 #json-panel{padding:0 12px 12px;flex:1;min-height:0}
@@ -105,6 +108,7 @@ main.bento{flex:1;display:grid;grid-template-columns:270px minmax(360px,1fr) 460
 .stage-heading>span{font:12px ui-monospace,Consolas,monospace;color:var(--muted)}
 .stage-wrap{position:relative;background:var(--tile-2);border-radius:14px;overflow:hidden;border:1px solid var(--line)}
 .stage-wrap canvas{display:block;width:100%;aspect-ratio:900/562;outline:none}
+.stage-wrap canvas:focus-visible{outline:3px solid var(--accent);outline-offset:-3px}
 .stage-badge{position:absolute;bottom:8px;right:10px;font:600 10px ui-monospace,Consolas,monospace;color:var(--muted);background:#ffffffc0;border-radius:999px;padding:3px 8px;pointer-events:none}
 .transport{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:12px}
 .transport>div{display:flex;gap:8px;align-items:center}
@@ -117,7 +121,7 @@ main.bento{flex:1;display:grid;grid-template-columns:270px minmax(360px,1fr) 460
 .metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .metrics>div{display:flex;flex-direction:column;gap:4px;background:var(--tile-2);border-radius:12px;padding:12px}
 .metrics>div:first-child{background:var(--accent-soft)}
-.metrics label{font-size:12px;color:var(--ink-2)}
+.metrics>div>span{font-size:12px;color:var(--ink-2)}
 .metrics strong{font-size:28px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-1px;color:var(--ink)}
 .metrics small{font:11px ui-monospace,Consolas,monospace;color:var(--muted)}
 #chart{display:block;width:100%;height:46px;margin-top:10px}

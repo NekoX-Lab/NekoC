@@ -55,6 +55,10 @@ test("r2-entry: README browser entry resolves to the built Pages player", async 
   assert.equal(new URL(iframe, base).pathname, url.pathname);
   const relative = decodeURIComponent(url.pathname.slice(base.pathname.length));
   const player = await fs.readFile(path.join(output, relative), "utf8");
-  assert.match(player, /<title>Neko · 纯播放器<\/title>/);
+  assert.match(player, /<title data-i18n="playerTitle">Neko · 纯播放器<\/title>/);
   assert.match(player, /<meta name="nekoc-engine" content="wasm">/);
+  for (const file of ["i18n.js", "repro.js", "input.js", "player-feedback.js"]) {
+    assert.equal(await fs.readFile(path.join(output, "play", file), "utf8"),
+      await fs.readFile(path.join(root, "web", file), "utf8"), `player dependency: ${file}`);
+  }
 });

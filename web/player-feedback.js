@@ -1,11 +1,21 @@
+import {t} from './i18n.js';
 // Player-only feedback. Untrusted text never enters HTML; omit the full project from reports.
 export class PlayerFeedback {
   constructor(root=document){
     this.root=root;this.messages=[];this.report=null;this.resourceErrors=[];
     this.$=selector=>root.querySelector(selector);
-    this.$('#dismiss').onclick=()=>{this.$('#notice').hidden=true;};
+    this.$('#dismiss').onclick=()=>{
+      const focused=this.$('#dismiss')===this.root.activeElement;this.$('#notice').hidden=true;
+      if(focused)this.$('#import').focus();
+    };
     this.$('#coverage').onclick=()=>this.openReport();
     this.$('#report-close').onclick=()=>this.$('#coverage-dialog').close();
+    this.$('#coverage-dialog').onkeydown=event=>{
+      if(event.key!=='Tab')return;
+      const first=this.$('#report-content'),last=this.$('#report-close');
+      if(event.shiftKey&&this.root.activeElement===first){event.preventDefault();last.focus();}
+      else if(!event.shiftKey&&this.root.activeElement===last){event.preventDefault();first.focus();}
+    };
     this.$('#report-download').onclick=()=>{
       const url=URL.createObjectURL(new Blob([this.reportText()],{type:'application/json'}));
       const link=document.createElement('a');link.href=url;link.download='neko-player-diagnostics.json';link.click();
@@ -23,8 +33,8 @@ export class PlayerFeedback {
     this.$('#coverage').disabled=false;
   }
   resourceError(message){if(!this.resourceErrors.includes(message))this.resourceErrors.push(message);this.notice(message);}
-  runtimeError(error){this.notice(`运行错误：${typeof error==='string'?error:error?.message||String(error)}\n运行已停止。可点击「开始游玩」重试，或重新导入作品。`);}
-  mode(kind){this.$('#runtime-mode').textContent=`运行模式：${kind==='wasm'?'WASM · 浏览器内运行':kind==='rust'?'本机 VM':'正在连接…'}`;}
+  runtimeError(error){this.notice(t('runtimeError',{error:typeof error==='string'?error:error?.message||String(error)}));}
+  mode(kind){this.$('#runtime-mode').textContent=t(kind==='wasm'?'runtimeWasm':kind==='rust'?'runtimeRust':'runtimeConnecting');}
   progress(label,completed=null,total=null){
     this.$('#loading').hidden=false;this.$('#viewport').setAttribute('aria-busy','true');
     const meter=this.$('#load-progress');
@@ -33,7 +43,7 @@ export class PlayerFeedback {
   }
   finish(){this.$('#loading').hidden=true;this.$('#viewport').setAttribute('aria-busy','false');}
   reportText(){
-    return JSON.stringify({kind:'nekoc-player-import-diagnostics-v1',scope:'导入静态诊断，未执行 coverage 帧采样',...this.report,resource_errors:this.resourceErrors},null,2);
+    return JSON.stringify({kind:'nekoc-player-import-diagnostics-v1',scope:t('reportScope'),...this.report,resource_errors:this.resourceErrors},null,2);
   }
   openReport(){
     this.$('#report-content').textContent=this.reportText();this.$('#coverage-dialog').showModal();
