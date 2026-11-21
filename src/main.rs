@@ -94,6 +94,11 @@ enum Command {
         #[arg(long)]
         template: Option<PathBuf>,
     },
+    /// 静态检查作品常见问题；警告不改变退出码，不修改作品
+    Lint {
+        /// 输入作品路径（.bcmkn / .bcm / JSON）
+        input: PathBuf,
+    },
     /// 将 TS/JS（含 .nk.ts）编译为 .bcmkn；无需提供模板
     Build {
         /// 输入源文件；舞台和角色由 stage()/screen()/sprite() 声明
@@ -619,6 +624,25 @@ fn execute(cli: Cli, explicit_cloud: bool) -> Result<()> {
             no_types,
             template,
         } => run_check(&input, json, !no_types, template.as_deref(), &target)?,
+        Command::Lint { input } => {
+            let project = nekoc::project::load_project(&input)?;
+            let report = nekoc::lint::build_report(&project.value)?;
+            if json {
+                cli_output::success("lint", serde_json::to_value(&report)?)?;
+            } else {
+                for diagnostic in &report.diagnostics {
+                    println!(
+                        "{}:{}: {diagnostic}",
+                        input.display(),
+                        diagnostic.location.path
+                    );
+                }
+                println!(
+                    "检查完成：{} 条警告（静态建议，不代表作品无法运行）",
+                    report.diagnostics.len()
+                );
+            }
+        }
         Command::Build {
             input,
             out,
