@@ -16,7 +16,7 @@ function crc32(bytes) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-for (const name of ["movement-collision", "menu-scenes", "list-inventory"]) {
+for (const name of ["movement-collision", "menu-scenes", "list-inventory", "menu-scenes-quest", "list-inventory-select"]) {
   test(`r2 template ${name}: standalone compilation and intact embedded PNGs`, () => {
     const input = new URL(`../samples/templates/${name}.nk.ts`, import.meta.url);
     const source = fs.readFileSync(input, "utf8");
