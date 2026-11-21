@@ -79,7 +79,7 @@ function rejectParseDiagnostics(sourceFile) {
 
 const ASYNC_UNSUPPORTED = "async / await are not supported: Promise and microtask semantics are not implemented; alternative: remove async/await and use ordinary functions for synchronous code, wait(seconds) for cooperative delays, or an explicit event state machine for asynchronous sequencing";
 
-function rejectAsyncSyntax(node) {
+function rejectAsyncSyntax(node, scopes = new WeakMap()) {
   // Inspect the original AST, including unused functions and callback bodies,
   // before lowering can inline, rewrite or discard them. AsyncKeyword here is
   // a modifier, not an identifier named `async` or text inside a string.
@@ -89,7 +89,113 @@ function rejectAsyncSyntax(node) {
   if (ts.isForOfStatement(node) && node.awaitModifier) {
     fail(ASYNC_UNSUPPORTED, nodeLocation(node.awaitModifier));
   }
-  ts.forEachChild(node, rejectAsyncSyntax);
+  // Callback synthesis copies the body into an ordinary function, which would
+  // execute a generator eagerly instead of returning an unconsumed iterator.
+  if (ts.isFunctionLike(node) && node.asteriskToken) {
+    fail(`Generator functions are not supported${node.name ? `: ${node.name.getText()}` : " (including callbacks)"}; calling a generator returns an iterator without executing its body; alternative: use an ordinary callback or an explicit event state machine`, nodeLocation(node.asteriskToken));
+  }
+  // Types and property names do not execute Promise APIs. Inspect runtime
+  // references before unused functions/imports can disappear during lowering.
+  if (ts.isTypeNode(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isTypeParameterDeclaration(node)
+    || ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) return;
+  const isBound = (name, start) => {
+    for (let scope = start.parent; scope; scope = scope.parent) {
+      if (!(ts.isSourceFile(scope) || ts.isFunctionLike(scope) || ts.isBlock(scope)
+        || ts.isCaseBlock(scope) || ts.isCatchClause(scope) || ts.isForStatement(scope)
+        || ts.isForOfStatement(scope) || ts.isForInStatement(scope))) continue;
+      if (!scopes.has(scope)) {
+        const names = new Set();
+        const bind = name => {
+          if (!name) return;
+          if (ts.isIdentifier(name)) names.add(name.text);
+          else if (ts.isArrayBindingPattern(name) || ts.isObjectBindingPattern(name)) {
+            for (const element of name.elements) if (ts.isBindingElement(element)) bind(element.name);
+          }
+        };
+        if (ts.isFunctionLike(scope)) {
+          scope.parameters.forEach(parameter => bind(parameter.name));
+          if (ts.isFunctionExpression(scope)) bind(scope.name);
+        }
+        if (ts.isCatchClause(scope)) bind(scope.variableDeclaration?.name);
+        const statements = ts.isCaseBlock(scope) ? scope.clauses.flatMap(clause => [...clause.statements]) : scope.statements ?? [];
+        for (const statement of statements) {
+          if (ts.isVariableStatement(statement)) statement.declarationList.declarations.forEach(declaration => bind(declaration.name));
+          else if (ts.isFunctionDeclaration(statement) || ts.isClassDeclaration(statement) || ts.isEnumDeclaration(statement)) bind(statement.name);
+        }
+        if ((ts.isForStatement(scope) || ts.isForOfStatement(scope) || ts.isForInStatement(scope))
+          && scope.initializer && ts.isVariableDeclarationList(scope.initializer)) {
+          scope.initializer.declarations.forEach(declaration => bind(declaration.name));
+        }
+        // var is visible throughout the function body, but not in its default
+        // parameter environment. Cache it on the body block, not the function.
+        if (ts.isSourceFile(scope) || ts.isBlock(scope) && ts.isFunctionLike(scope.parent) && scope.parent.body === scope) {
+          const collectVar = child => {
+            if (ts.isFunctionLike(child)) return;
+            if (ts.isVariableDeclarationList(child) && !(child.flags & ts.NodeFlags.BlockScoped)) {
+              child.declarations.forEach(declaration => bind(declaration.name));
+            }
+            ts.forEachChild(child, collectVar);
+          };
+          ts.forEachChild(scope, collectVar);
+        }
+        if (ts.isSourceFile(scope)) for (const statement of scope.statements) {
+          if (!ts.isImportDeclaration(statement)) continue;
+          const clause = statement.importClause;
+          if (clause?.isTypeOnly) continue;
+          if (clause?.name) names.add(clause.name.text);
+          const bindings = clause?.namedBindings;
+          if (bindings && ts.isNamespaceImport(bindings)) names.add(bindings.name.text);
+          else for (const binding of bindings?.elements ?? []) if (!binding.isTypeOnly) names.add(binding.name.text);
+        }
+        scopes.set(scope, names);
+      }
+      if (scopes.get(scope).has(name)) return true;
+    }
+    return false;
+  };
+  const unsupported = name => fail(`${name} is not supported: Promise and microtask semantics are not implemented; use ordinary synchronous functions, wait(seconds), or an explicit event state machine instead`, nodeLocation(node));
+  const unwrapped = expression => {
+    while (expression && (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression)
+      || ts.isTypeAssertionExpression(expression) || ts.isNonNullExpression(expression)
+      || ts.isSatisfiesExpression(expression))) expression = expression.expression;
+    return expression;
+  };
+  if ((ts.isVariableDeclaration(node) || ts.isParameter(node)) && ts.isObjectBindingPattern(node.name)) {
+    const initializer = unwrapped(node.initializer);
+    if (initializer && ts.isIdentifier(initializer) && initializer.text === "globalThis" && !isBound("globalThis", node)) {
+      for (const element of node.name.elements) {
+        const property = element.propertyName ?? element.name;
+        const key = ts.isComputedPropertyName(property) ? unwrapped(property.expression) : property;
+        if ((ts.isIdentifier(key) && !ts.isComputedPropertyName(property) || ts.isStringLiteralLike(key))
+          && ["Promise", "queueMicrotask"].includes(key.text)) {
+          fail(`${key.text} is not supported: Promise and microtask semantics are not implemented; alternative: do not destructure asynchronous APIs from globalThis; use ordinary synchronous functions or an explicit event state machine`, nodeLocation(property));
+        }
+      }
+    }
+  }
+  if (ts.isCallExpression(node)) {
+    const target = unwrapped(node.expression);
+    if (target !== node.expression && ts.isIdentifier(target)
+      && ["setTimeout", "setInterval"].includes(target.text) && !isBound(target.text, node)) {
+      fail(`Timer calls require a direct ${target.text}(...) call; alternative: remove parentheses or type wrappers around the timer name`, nodeLocation(node.expression));
+    }
+  }
+  const parent = node.parent;
+  const nameOnly = parent && (
+    (ts.isLabeledStatement(parent) || ts.isBreakStatement(parent) || ts.isContinueStatement(parent)) && parent.label === node
+    || (ts.isEnumMember(parent) || ts.isEnumDeclaration(parent) || ts.isClassDeclaration(parent)
+      || ts.isMethodDeclaration(parent) || ts.isPropertyDeclaration(parent) || ts.isFunctionExpression(parent)
+      || ts.isGetAccessorDeclaration(parent) || ts.isSetAccessorDeclaration(parent)) && parent.name === node
+    || ts.isBindingElement(parent) && (parent.name === node || parent.propertyName === node));
+  if (ts.isIdentifier(node) && ["Promise", "queueMicrotask"].includes(node.text)
+    && !nameOnly && isRuntimeReference(node, parent) && !isBound(node.text, node)) unsupported(node.text);
+  if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node)) {
+    const key = ts.isPropertyAccessExpression(node) ? node.name.text
+      : ts.isStringLiteral(node.argumentExpression) ? node.argumentExpression.text : null;
+    if (["Promise", "queueMicrotask"].includes(key) && ts.isIdentifier(node.expression)
+      && node.expression.text === "globalThis" && !isBound("globalThis", node)) unsupported(key);
+  }
+  ts.forEachChild(node, child => rejectAsyncSyntax(child, scopes));
 }
 
 function lowerFrontendFeatures(sourceFile, sourceIdentity) {
@@ -248,6 +354,51 @@ class WorkspaceCompiler {
 
   compile(sourceFile) {
     this.loadImports(sourceFile, this.entryPath);
+    // KN native loops yield between iterations, unlike a Node synchronous
+    // task. Without a run-to-return scheduler, a timer may observe intermediate
+    // state or fire before a later cancellation. Check original user syntax
+    // across the import graph, not the timer worker's synthesized wait loop.
+    // Conservatively include unused functions and loops before scheduling; no
+    // timer-liveness or interprocedural atomicity proof is claimed here.
+    let hasTimer = false;
+    const timerLoops = [];
+    const timerForEach = [];
+    const collectTimerLoops = node => {
+      if (ts.isTypeNode(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) return;
+      if (ts.isCallExpression(node) && ["setTimeout", "setInterval"].includes(calleeName(node.expression))) hasTimer = true;
+      if (ts.isForStatement(node) || ts.isForOfStatement(node) || ts.isForInStatement(node)
+        || ts.isWhileStatement(node) || ts.isDoStatement(node)) timerLoops.push(node);
+      // Array and Map/Set forEach are statement helpers, whose generated loops
+      // yield too. Scan user calls, including nested/unused/imported functions,
+      // rather than only the loops still visible before helper synthesis.
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+        && node.expression.name.text === "forEach") timerForEach.push(node);
+      ts.forEachChild(node, collectTimerLoops);
+    };
+    for (const file of this.replacementSourceFiles.values()) collectTimerLoops(file);
+    this.hasTimers = hasTimer;
+    if (hasTimer && timerLoops.length) {
+      this.unsupported(timerLoops[0], "Timers cannot be combined with native TypeScript loops in the same import graph: Kitten loops implicitly yield and may run callbacks before synchronous code returns or cancels a timer; alternative: use an explicit cooperative event state machine, or remove timers from this program");
+    }
+    if (hasTimer && timerForEach.length) {
+      // Use independent parsed nodes: a second checker on shared nodes can
+      // retain symbols from another Program and break imported timer objects.
+      const rawFiles = new Map([...this.replacementSourceFiles].map(([name, file]) =>
+        [name, ts.createSourceFile(file.fileName, file.text, ts.ScriptTarget.Latest, true)]));
+      const rawTypes = createExpressionTypes(rawFiles,
+        this.host.readFile(DECLARATIONS) ?? defaultHost.readFile(DECLARATIONS) ?? "", path,
+        name => defaultHost.readFile(name) ?? this.host.readFile(name));
+      const arrays = new Set();
+      const key = node => `${node.getSourceFile().fileName}:${node.pos}`;
+      const collect = node => {
+        if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)
+          && node.expression.name.text === "forEach" && rawTypes.array(node.expression.expression)) arrays.add(key(node));
+        ts.forEachChild(node, collect);
+      };
+      for (const file of rawFiles.values()) collect(file);
+      const collectionCall = timerForEach.find(call => !arrays.has(key(call)));
+      if (collectionCall) this.unsupported(collectionCall, "Timers cannot be combined with forEach calls on Map/Set or unknown receivers in the same import graph: collection helpers implicitly yield and may run callbacks before synchronous code returns or cancels a timer; alternative: use an explicit cooperative event state machine, or remove timers from this program");
+    }
     this.expressionType = createExpressionTypes(this.typeSourceFiles,
       this.host.readFile(DECLARATIONS) ?? defaultHost.readFile(DECLARATIONS) ?? "", path,
       // TypeScript's own lib files come from the installed package when one
@@ -1136,6 +1287,58 @@ class WorkspaceCompiler {
   // Recursion and non-inlineable shapes require procedures independently of
   // the budget. Resolve those first, then plan acyclic callees before callers.
   planFunctionProcedures() {
+    if (this.hasTimers) {
+      // Only array statement helpers need this boundary. Reporter helpers run
+      // without suspension already; explicit waits must remain cooperative.
+      // Analyze the fully registered helper/callback graph, including imports,
+      // rather than treating every ordinary JS call as a wait or silently
+      // making an opaque/custom procedure atomic. Recursion is unproven.
+      const states = new Map();
+      const active = new Set();
+      const merge = (a, b) => a === "yield" || b === "yield" ? "yield"
+        : a === "unknown" || b === "unknown" ? "unknown" : "sync";
+      const analyzeFunction = name => {
+        if (states.has(name)) return states.get(name);
+        if (active.has(name)) return "unknown";
+        const fn = this.inlineFunctions.get(name);
+        if (!fn) return "unknown";
+        active.add(name);
+        const state = analyze(fn.body);
+        active.delete(name);
+        states.set(name, state);
+        return state;
+      };
+      const analyze = node => {
+        if (ts.isFunctionLike(node)) return "sync";
+        let state = "sync";
+        let inlineControl = false;
+        if (ts.isCallExpression(node)) {
+          const helper = this.helperCalls.get(node);
+          const name = helper?.name ?? calleeName(node.expression);
+          const last = name?.split(".").at(-1);
+          // Match compileStatementCall: declared/imported functions shadow
+          // ambient APIs, including names such as say, think and wait.
+          if (this.inlineFunctions.has(name)) state = analyzeFunction(name);
+          else if (["wait", "waitUntil", "ask", "askChoice", "broadcastAndWait", "tellAndWait", "syncTell",
+            "glideTo", "glideChangeX", "glideChangeY", "say", "think", "stageDialog",
+            "playAudioAndWait", "fadeVisibility", "appearWith"].includes(last)) state = "yield";
+          else if (["warp", "repeatTimes", "repeatUntil", "forRange", "ifThen", "ifElse"].includes(name)) inlineControl = true;
+          else if (name === "console.log" || name?.startsWith("Math.")
+            || ["Number", "String", "Boolean", "clearTimeout", "clearInterval"].includes(name)) state = "sync";
+          else state = "unknown";
+        }
+        ts.forEachChild(node, child => {
+          state = merge(state, analyze(inlineControl && ts.isFunctionLike(child) ? child.body : child));
+        });
+        return state;
+      };
+      for (const [name, fn] of this.inlineFunctions) if (/^__forEach\d+$/.test(name)) {
+        const state = analyzeFunction(name);
+        fn.atomicForEach = state === "sync";
+        if (state === "unknown") this.unsupported(this.helperSourceOrigins.get(name)?.call ?? fn.body,
+          "Timers cannot be combined with forEach calls whose callbacks are not proven synchronous: opaque or recursive calls may implicitly yield; alternative: use an explicit cooperative event state machine, or remove timers from this program");
+      }
+    }
     const calls = new Map();
     for (const [name, fn] of this.inlineFunctions) {
       const called = new Set();
@@ -1338,7 +1541,7 @@ class WorkspaceCompiler {
         firstChild = this.compileReturn(fn.body, defId);
       }
       if (firstChild) {
-        if (fn.name.startsWith("__nekocObjectNew") || fn.name.startsWith("__nekocBit_")) {
+        if (fn.atomicForEach || fn.name.startsWith("__nekocObjectNew") || fn.name.startsWith("__nekocBit_")) {
           const atomic = this.addBlock({ type: "warp", parent_id: defId });
           this.connectInput(atomic, firstChild, "DO", "statement");
           firstChild = atomic;
@@ -1563,6 +1766,9 @@ class WorkspaceCompiler {
           this.unsupported(node, "Timers expect an inline callback and optional delay in milliseconds");
         }
         if (callback.parameters.length) this.unsupported(callback, "Timer callbacks cannot have parameters");
+        if (node.arguments[1] && this.expressionType?.(node.arguments[1]) !== "number") {
+          this.unsupported(node.arguments[1], "Timer delay must be a number in milliseconds; omit the optional delay instead of passing undefined, and convert other values explicitly with Number(value)");
+        }
         for (let outer = node.parent; outer; outer = outer.parent) {
           if (ts.isCallExpression(outer) && calleeName(outer.expression) === "sprite") {
             this.unsupported(node, "Timers inside sprite workspaces are not supported yet; schedule them in the root workspace");
@@ -1603,12 +1809,19 @@ class WorkspaceCompiler {
           : ts.factory.createBlock([ts.factory.createExpressionStatement(callback.body)]));
         parts.push(`function __timerCallback${n}() ${body}
         function ${name}(__timerMs${n}) {
-          const ${token} = {active: true, delay: Math.max(0, __timerMs${n}) / 1000};
+          // Match Node's numeric delay bounds before converting to KN seconds.
+          // The range test also excludes NaN and both infinities.
+          let __timerDelay${n} = 1;
+          if (__timerMs${n} >= 1 && __timerMs${n} <= 2147483647) {
+            __timerDelay${n} = Math.trunc(__timerMs${n});
+          }
+          const ${token} = {active: true, delay: __timerDelay${n} / 1000};
           broadcast(${JSON.stringify(message)}, ${token}); return ${token};
         }
         function ${worker}(__timerArg${n}) {
           while (__timerArg${n}.active) {
-            wait(__timerArg${n}.delay);
+            // Compiler-owned scheduling must not call a user's wait function.
+            self.wait(__timerArg${n}.delay);
             if (!__timerArg${n}.active) return;
             ${calleeName(node.expression) === "setTimeout" ? `__timerArg${n}.active = false;` : ""}
             __timerCallback${n}();
@@ -1673,7 +1886,9 @@ class WorkspaceCompiler {
       if (!this.inlineFunctions.has(name)) parts.push(SHARED_HELPERS[name].source);
     }
     if (!parts.length) return;
-    const helperFile = ts.createSourceFile("__nekoc_helpers.ts", parts.join("\n"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
+    // A shared filename makes the multi-file checker overwrite an imported
+    // module's helper tree with the entry's timer helpers (or vice versa).
+    const helperFile = ts.createSourceFile(`__nekoc_helpers_${this.objectSourceFiles.indexOf(sourceFile)}.ts`, parts.join("\n"), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
     for (const statement of helperFile.statements) {
       const original = this.objectCallbackBodies.get(statement.name?.text);
       if (original) {
