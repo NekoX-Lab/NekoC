@@ -15,7 +15,7 @@ const f = ts.factory;
  * Throws an Error with CompileError-compatible name/code/location properties.
  * The integration layer can wrap it in its own CompileError if required.
  */
-export function lowerTsMethods(sourceFile, declarations = "", { validateRegexOnly = false, sourceIdentity = sourceFile.fileName } = {}) {
+export function lowerTsMethods(sourceFile, sourceIdentity = sourceFile.fileName, { declarations = "", validateRegexOnly = false } = {}) {
   const originalFile = sourceFile;
   // Binding a SourceFile caches checker symbols on it. Do not hand those caches
   // to the independent checker in the following lexical-lowering pass.

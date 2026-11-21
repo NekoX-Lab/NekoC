@@ -241,18 +241,19 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity, declarations) {
     // Sequence errors must refer to the user's AST, not reparsed class/nullable
     // helpers whose virtual lines and columns do not exist in the input.
     lowerTsSequences(sourceFile, { validateOnly: true });
-    // Validate before nullable lowering erases null/undefined type arguments.
-    if (hasRegexTest) lowerTsMethods(sourceFile, declarations, { validateRegexOnly: true, sourceIdentity });
     // Generated names use the entry-relative module identity, never the machine
     // path. Keep SourceFile.fileName intact for resolution and diagnostics.
     const destructured = lowerTsDestructuring(sourceFile, sourceIdentity);
+    // Collections supply typed helpers for Map.get and its undefined result.
+    // Check those facts before nullable lowering erases null/undefined types.
     const collections = lowerTsCollections(destructured, sourceIdentity);
+    if (hasRegexTest) lowerTsMethods(collections, sourceIdentity, { declarations, validateRegexOnly: true });
     const nullable = lowerTsNullable(collections, sourceIdentity);
     const classes = lowerTsClasses(nullable, sourceIdentity);
     const names = new Set(classes === sourceFile ? [] : classes.statements
       .filter(node => ts.isFunctionDeclaration(node) && node.name?.text.startsWith("__nekocClass_"))
       .map(node => node.name.text));
-    const lowered = lowerTsFeatures(lowerTsSequences(lowerTsValues(lowerTsMethods(classes, declarations, { sourceIdentity }))), sourceIdentity);
+    const lowered = lowerTsFeatures(lowerTsSequences(lowerTsValues(lowerTsMethods(classes, sourceIdentity, { declarations }))), sourceIdentity);
     if (names.size) {
       const file = ts.getOriginalNode(lowered);
       markClassHelpers(file, names);

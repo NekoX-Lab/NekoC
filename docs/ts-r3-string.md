@@ -24,6 +24,8 @@ String 数值索引、字符串数组元素及 for-of 的字符串元素；公�
 getVar<string> 等泛型 DSL 读取共享现有 API 声明，未注解的 any 不放行。
 splitText 仍返回 unknown[]，其元素需要显式转换。原始参数还会在可空类型
 降级之前验证，避免 string | null 泛型实参被擦除后误放行。
+该预检在集合降级之后执行，保留 Map.get 的 string | undefined 类型事实；
+字符串 fallback 或显式排除 undefined 后可匹配，未缩窄的结果仍拒绝。
 这些类型事实不放宽原操作的边界（例如动态 toFixed 仍不支持）。仅内存库中的
 内建声明受信任，用户同名声明仍触发遮蔽检查，用户方法按实际返回类型判断。
 无需读取宿主标准库，compile/check 的类型检查开关不影响这项能力。正则参数

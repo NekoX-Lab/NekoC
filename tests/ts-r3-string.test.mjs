@@ -179,7 +179,7 @@ test("r3 strings: shared ambient facts do not trust user producers or erase null
     'function value(): unknown { return 1; } console.log(/a/.test(value()));',
     'function value(): string | number { return 1; } console.log(/a/.test(value()));',
   ]) {
-    assert.throws(() => lowerTsMethods(ts.createSourceFile("r3-string.ts", source, ts.ScriptTarget.Latest, true), fs.readFileSync("ts/nekoc.d.ts", "utf8")), /statically string/, source);
+    assert.throws(() => lowerTsMethods(ts.createSourceFile("r3-string.ts", source, ts.ScriptTarget.Latest, true), "r3-string.ts", { declarations: fs.readFileSync("ts/nekoc.d.ts", "utf8") }), /statically string/, source);
     assert.throws(() => compile(source), /statically string|may be null or undefined/, source);
     for (const types of [false, true]) assert.equal(checkFile("r3-string.ts", { types, host: host(source) }).ok, false, source);
   }
@@ -193,6 +193,43 @@ test("r3 strings: shared ambient facts do not trust user producers or erase null
     for (const types of [false, true]) {
       const checked = checkFile("r3-string.ts", { types, host: host(source) });
       assert.ok(checked.diagnostics.some(d => /shadowed/.test(d.message)), JSON.stringify(checked));
+    }
+  }
+});
+
+test("r3 strings: Map string results compose after fallback or narrowing in every check mode", () => {
+  const sources = [
+    'const m = new Map<string, string>(); m.set("a", "a"); console.log(/a/.test(m.get("a") ?? ""));',
+    'const m = new Map<string, string>(); m.set("a", "a"); const s = m.get("a"); if (s !== undefined) console.log(/a/.test(s));',
+    'const m = new Map<string, string>(); console.log(/^$/.test(m.get("missing") ?? ""));',
+    'let calls = 0; function key(): string { calls++; return "a"; } const m = new Map<string, string>(); m.set("a", "a"); console.log(/a/.test(m.get(key()) ?? ""), calls);',
+  ];
+  for (const source of sources) {
+    compile(source);
+    const memory = { readFile: name => name === path.resolve("r3-string.ts") ? source : undefined };
+    compileFile("r3-string.ts", memory);
+    assert.equal(checkFile("r3-string.ts", { types: false, host: memory }).ok, true, source);
+    for (const types of [false, true]) {
+      const checked = checkFile("r3-string.ts", { types, host: host(source) });
+      assert.equal(checked.ok, true, JSON.stringify({ source, types, checked }));
+    }
+    assertJsLogs(source);
+  }
+});
+
+test("r3 strings: collection-aware regex prevalidation still rejects undefined and nullable inputs", () => {
+  for (const source of [
+    'const m = new Map<string, string>(); m.set("a", "a"); console.log(/a/.test(m.get("a")));',
+    'const m = new Map<string, string>(); const s = m.get("a"); console.log(/a/.test(s));',
+    'const m = new Map<string, number>(); m.set("a", 1); console.log(/1/.test(m.get("a") ?? 0));',
+    'const m = new Map<string, string>(); m.set("a", "a"); console.log(/a/.test(getVar<string | null>("text")));',
+  ]) {
+    const message = /statically string|may be null or undefined/;
+    assert.throws(() => compile(source), message, source);
+    for (const types of [false, true]) {
+      const checked = checkFile("r3-string.ts", { types, host: host(source) });
+      assert.equal(checked.ok, false, source);
+      assert.ok(checked.diagnostics.some(d => message.test(d.message)), JSON.stringify(checked));
     }
   }
 });
