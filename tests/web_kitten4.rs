@@ -11,6 +11,32 @@ struct Studio {
     port: u16,
 }
 
+#[test]
+fn health_report_refresh_is_read_only_and_matches_import() {
+    let studio = Studio::start("samples/native-studio.bcmkn");
+    let original = studio.project();
+    let mut snapshot = original.clone();
+    snapshot["projectName"] = json!("体检副本");
+    let report = studio.json("POST", "/api/health-report", &snapshot, 200);
+    assert_eq!(report["schema_version"], 1);
+    assert_eq!(report["project_name"], "体检副本");
+    assert_eq!(
+        studio.project(),
+        original,
+        "refresh must not replace the active project"
+    );
+    let imported = studio.json("POST", "/api/import", &snapshot, 200);
+    assert_eq!(imported["health_report"], report);
+    assert_eq!(
+        studio.request("GET", "/health-report.js", &Value::Null).0,
+        200
+    );
+    let text = report["text"].as_str().unwrap();
+    for category in ["能保留导出", "能执行", "语义近似", "尚未验证", "不支持"] {
+        assert!(text.contains(category));
+    }
+}
+
 impl Drop for Studio {
     fn drop(&mut self) {
         let _ = self.process.kill();

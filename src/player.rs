@@ -52,6 +52,7 @@ pub fn import(value: Json) -> Result<(Json, Json)> {
         "bcmkn"
     });
     report["editor_format"] = json!("bcmkn-json");
+    report["health_report"] = crate::health::build_report(&value, &report);
     Ok((value, Json::new(report)))
 }
 

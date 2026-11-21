@@ -223,8 +223,8 @@ fn collect_screen_reference_issues(
     scene_ids: &BTreeSet<String>,
     issues: &mut Vec<Value>,
 ) {
-    let mut pending = vec![(value, path.to_owned())];
-    while let Some((value, path)) = pending.pop() {
+    let mut pending = vec![(value, path.to_owned(), String::new())];
+    while let Some((value, path, pointer)) = pending.pop() {
         match value {
             Value::Object(object) => {
                 if object.get("type").and_then(Value::as_str) == Some("get_screens")
@@ -237,18 +237,28 @@ fn collect_screen_reference_issues(
                     issues.push(json!({
                         "kind": "dangling_screen_reference",
                         "path": path,
+                        "json_pointer": pointer,
                         "screen_id": screen_id,
                     }));
                 }
                 for (key, child) in object {
                     if key != "_nekocKitten4" {
-                        pending.push((child, format!("{path}.{key}")));
+                        let token = key.replace('~', "~0").replace('/', "~1");
+                        pending.push((
+                            child,
+                            format!("{path}.{key}"),
+                            format!("{pointer}/{token}"),
+                        ));
                     }
                 }
             }
             Value::Array(items) => {
                 for (index, child) in items.iter().enumerate() {
-                    pending.push((child, format!("{path}[{index}]")));
+                    pending.push((
+                        child,
+                        format!("{path}[{index}]"),
+                        format!("{pointer}/{index}"),
+                    ));
                 }
             }
             _ => {}
