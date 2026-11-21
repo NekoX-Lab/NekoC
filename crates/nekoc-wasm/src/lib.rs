@@ -4,7 +4,7 @@ use nekoc::{bcmkn_compiler, check, json, player, validate as structure};
 use wasm_bindgen::prelude::*;
 
 fn error(error: impl std::fmt::Display) -> JsValue {
-    JsValue::from_str(&error.to_string())
+    JsValue::from_str(&format!("{error:#}"))
 }
 
 fn to_text(value: &impl serde::Serialize) -> Result<String, JsValue> {

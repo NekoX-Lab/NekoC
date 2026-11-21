@@ -50,6 +50,60 @@ test("memory files, relative imports and standard-library type checking", () => 
   player.free(); // idempotent wrapper disposal
 });
 
+test("sourceMap module identities match across relocated WASM memory roots", () => {
+  const artifacts = [];
+  for (const root of ["/workspace/alice", "/机器 B/deeper/project"]) {
+    const entry = `${root}/src/main.ts`;
+    const { bcmkn } = compile(entry, { files: {
+      [entry]: 'import { left } from "../left/util";\nimport { right } from "../right/util";\nonStart(() => { left(); right(); setStyle(99); });',
+      [`${root}/left/util.ts`]: 'export function left() {\n  setStyle(97);\n}',
+      [`${root}/right/util.ts`]: 'export function right() {\n\n  setStyle(98);\n}',
+    } });
+    assert.deepEqual([...new Set(Object.values(bcmkn.sourceMap).map(l => l.file))].sort(),
+      ["../left/util.ts", "../right/util.ts", "main.ts"]);
+    assert.ok(Object.values(bcmkn.sourceMap).some(l => l.file === "../left/util.ts" && l.line === 2 && l.column === 3));
+    assert.ok(Object.values(bcmkn.sourceMap).some(l => l.file === "../right/util.ts" && l.line === 3 && l.column === 3));
+    artifacts.push(bcmkn);
+  }
+  assert.deepEqual(artifacts[0], artifacts[1]);
+});
+
+test("packaged class origins preserve runtime identities and r3 diagnostic JSON", () => {
+  const artifacts = [];
+  const library = 'class Base { base = 0; }\nclass A extends Base {\n  x = 1;\n  bad(n = (\n    selectText("😀", 1, 1)\n  )) { return n; }\n}\nexport function helper() {\n  const a = new A();\n  console.log(a.bad());\n}';
+  for (const root of ["/workspace/alice", "/机器 B/deeper/project"]) {
+    const entry = `${root}/main.ts`, lib = `${root}/lib.ts`;
+    const files = { [entry]: 'import { helper } from "./lib";\nonStart(() => { helper(); });', [lib]: library };
+    const { bcmkn } = compile(entry, { files });
+    const locations = [];
+    const visit = value => {
+      if (!value || typeof value !== "object") return;
+      if (value.type === "text_select") locations.push(bcmkn.sourceMap[value.id]);
+      Object.values(value).forEach(visit);
+    };
+    visit(bcmkn);
+    assert.ok(locations.length);
+    for (const location of locations) assert.deepEqual(location, { file: "lib.ts", line: 5, column: 5 });
+    artifacts.push(bcmkn);
+    const broken = { ...files, [lib]: library.replace('selectText("😀", 1, 1)', 'missingApi()') };
+    const result = check(entry, { files: broken, types: false });
+    assert.equal(result.ok, false);
+    assert.equal(result.diagnostics.length, 1);
+    const [diagnostic] = result.diagnostics;
+    assert.deepEqual(Object.keys(diagnostic).sort(), ["severity", "source", "code", "message", "file", "line", "column", "snippet", "suggestion"].sort());
+    assert.equal(diagnostic.file, lib);
+    assert.equal(diagnostic.line, 5);
+    assert.equal(diagnostic.column, 5);
+    assert.equal(diagnostic.snippet, '    missingApi()');
+    assert.ok(diagnostic.suggestion.length > 10);
+    assert.throws(() => compile(entry, { files: broken }), error => {
+      assert.deepEqual(error.diagnostics, result.diagnostics);
+      return true;
+    });
+  }
+  assert.deepEqual(artifacts[0], artifacts[1]);
+});
+
 test("share-player objects compile and execute through the packaged memory frontend", () => {
   const source = fs.readFileSync(path.join(root, "tests/fixtures/ts-share-objects.ts"), "utf8");
   const { bcmkn } = compile("/objects.ts", { files: { "/objects.ts": source } });
@@ -99,6 +153,8 @@ for (const name of ["variables", "custom_procedures", "control_flow"]) {
     const input = `samples/${name}.ts`;
     const source = fs.readFileSync(path.join(root, input), "utf8");
     const { bcmkn } = compile(`/${input}`, { files: { [`/${input}`]: source } });
+    assert.ok(Object.keys(bcmkn.sourceMap).length > 0);
+    assert.deepEqual([...new Set(Object.values(bcmkn.sourceMap).map(l => l.file))], [`${name}.ts`]);
     const nativeOutput = path.join(outputDir, `${name}.native.bcmkn`);
     const wasmOutput = path.join(outputDir, `${name}.wasm.bcmkn`);
     fs.writeFileSync(wasmOutput, JSON.stringify(bcmkn));

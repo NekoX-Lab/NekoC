@@ -55,6 +55,8 @@ fn native_check_preserves_frontend_diagnostics_and_text() {
                 .output()
                 .unwrap();
             assert_eq!(native_text.status.code(), Some(1));
+            assert_eq!(js_text.status.code(), Some(1));
+            assert!(native_text.stdout.is_empty());
             assert_eq!(native_text.stderr, js_text.stderr);
         }
     }

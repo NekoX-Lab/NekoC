@@ -110,3 +110,64 @@ onStart(() => { console.log(left(2), right(4)); });
     }
     assert_same(&artifacts[0], &artifacts[1]);
 }
+
+#[test]
+fn runtime_source_maps_are_portable_and_keep_distinct_import_origins() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut artifacts = Vec::new();
+    for directory in ["alice/project", "机器 B/deeper/project"] {
+        let root = dir.path().join(directory);
+        for child in ["src", "left", "right"] {
+            fs::create_dir_all(root.join(child)).unwrap();
+        }
+        fs::write(root.join("src/main.ts"), "import { left } from '../left/util';\nimport { right } from '../right/util';\nonStart(() => { left(); right(); setStyle(99); });").unwrap();
+        fs::write(
+            root.join("left/util.ts"),
+            "export function left() {\n  setStyle(97);\n}",
+        )
+        .unwrap();
+        fs::write(
+            root.join("right/util.ts"),
+            "export function right() {\n\n  setStyle(98);\n}",
+        )
+        .unwrap();
+        for optimized in [false, true] {
+            let output = root.join("result.bcmkn");
+            let bytes = build(&root, &root.join("src/main.ts"), &output, optimized);
+            let project: Value = serde_json::from_slice(&bytes).unwrap();
+            let locations = project["sourceMap"].as_object().unwrap();
+            let files: std::collections::BTreeSet<_> = locations
+                .values()
+                .map(|l| l["file"].as_str().unwrap())
+                .collect();
+            assert_eq!(
+                files,
+                ["../left/util.ts", "../right/util.ts", "main.ts"].into()
+            );
+            assert!(
+                locations.values().any(
+                    |l| l == &serde_json::json!({"file":"../left/util.ts","line":2,"column":3})
+                )
+            );
+            assert!(
+                locations
+                    .values()
+                    .any(|l| l
+                        == &serde_json::json!({"file":"../right/util.ts","line":3,"column":3}))
+            );
+            let run = Command::cargo_bin("nekoc")
+                .unwrap()
+                .args(["run", "--ticks", "2"])
+                .arg(&output)
+                .output()
+                .unwrap();
+            assert!(!run.status.success());
+            let error = String::from_utf8(run.stderr).unwrap();
+            assert!(error.contains("../left/util.ts:2:3] at block "), "{error}");
+            assert!(!error.contains(root.to_str().unwrap()), "{error}");
+            artifacts.push(bytes);
+        }
+    }
+    assert_same(&artifacts[0], &artifacts[2]);
+    assert_same(&artifacts[1], &artifacts[3]);
+}

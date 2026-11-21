@@ -28,6 +28,7 @@ import { bitwiseAssignments, bitwisePlan, bitwiseTokens } from "./bitwise.mjs";
 import { enrichDiagnostic, formatDiagnostic } from "./diagnostics.mjs";
 export { formatDiagnostic } from "./diagnostics.mjs";
 import { unsupportedMessage, validateUnsupportedSyntax } from "./js-support.mjs";
+import { runtimeSourceLocation } from "./runtime-source-map.mjs";
 
 /** A compile error. `location` is { file, line, column } (1-based) when known. */
 export class CompileError extends Error {
@@ -284,6 +285,11 @@ function lowerFrontendFeatures(sourceFile, sourceIdentity, declarations) {
 
 // Global flag the implicit start script sets once top-level initialization ran.
 const STARTUP_READY = "__nekoc_ready";
+
+// Both lowering names and persisted runtime locations use this portable identity.
+function sourceIdentity(entryPath, fileName) {
+  return path.relative(path.dirname(path.resolve(entryPath)), path.resolve(fileName)).replaceAll("\\", "/");
+}
 
 // Boolean-only output checks from the official 0.27.4 block definitions
 // (main.8ccf2442.js). These are socket shapes, not TypeScript return types:
@@ -715,7 +721,7 @@ class WorkspaceCompiler {
       rejectParseDiagnostics(moduleSourceFile);
       const originalModule = moduleSourceFile;
       moduleSourceFile = lowerFrontendFeatures(moduleSourceFile,
-        path.relative(path.dirname(this.entryPath), resolvedPath).replaceAll("\\", "/"),
+        sourceIdentity(this.entryPath, resolvedPath),
         this.host.readFile(DECLARATIONS) ?? defaultHost.readFile(DECLARATIONS) ?? "");
       const staticBindings = staticFunctionBindings.get(moduleSourceFile);
       // Modules only register functions; never silently omit initialization.
@@ -3987,7 +3993,7 @@ class WorkspaceCompiler {
 
     if (statement.elseStatement) {
       const firstElseChild = ts.isIfStatement(statement.elseStatement)
-        ? this.compileNativeIfStatement(statement.elseStatement, id)
+        ? this.compileStatement(statement.elseStatement, id)
         : this.compileStatementList(this.statementBodyStatements(statement.elseStatement), id);
       if (firstElseChild) {
         this.connectInput(id, firstElseChild, "ELSE", "statement");
@@ -4723,9 +4729,17 @@ class WorkspaceCompiler {
   }
 
   compileExpression(expression, parentId) {
-    const id = this.compileExpressionUnfolded(expression, parentId);
-    this.foldPureNumber(id);
-    return id;
+    // Assign provenance at block creation, not to the returned id: inline
+    // expansion can return a block owned by another expression or source file.
+    const savedSource = this.currentStatementNode;
+    this.currentStatementNode = expression;
+    try {
+      const id = this.compileExpressionUnfolded(expression, parentId);
+      this.foldPureNumber(id);
+      return id;
+    } finally {
+      this.currentStatementNode = savedSource;
+    }
   }
 
   // Fold after inline expansion, so imported wrappers and local bindings work
@@ -7171,17 +7185,18 @@ class WorkspaceCompiler {
     this.blocks[id] = { id, ...block };
     const node = sourceNode || this.currentStatementNode;
     if (node) blockSourceNodes.set(this.blocks[id], node);
-    if (node && this.sourceFile && node.pos >= 0 && node.getSourceFile?.() === this.sourceFile) {
-      const start = node.getStart(this.sourceFile);
-      const { line, character } = this.sourceFile.getLineAndCharacterOfPosition(start);
-      this.sourceMap[id] = { line: line + 1, column: character };
-    }
+    const location = runtimeSourceLocation(node, this.replacementSourceFiles, helperOrigins, path.resolve,
+      file => sourceIdentity(this.entryPath, file));
+    if (location) this.sourceMap[id] = location;
     return id;
   }
 
   addBlockWithId(id, block, sourceNode) {
     if (this.target.name === "kitten4") this.targetBlocks.push([block, sourceNode || this.currentStatementNode]);
     this.blocks[id] = { id, ...block };
+    const location = runtimeSourceLocation(sourceNode || this.currentStatementNode, this.replacementSourceFiles, helperOrigins, path.resolve,
+      file => sourceIdentity(this.entryPath, file));
+    if (location) this.sourceMap[id] = location;
     return id;
   }
 
@@ -8003,7 +8018,7 @@ export function compileFile(inputPath, host = defaultHost, { target = "kitten-n"
     );
     rejectParseDiagnostics(sourceFile);
     sourceFile = lowerFrontendFeatures(sourceFile,
-      path.relative(path.dirname(path.resolve(inputPath)), path.resolve(inputPath)).replaceAll("\\", "/"),
+      sourceIdentity(inputPath, inputPath),
       host.readFile(DECLARATIONS) ?? defaultHost.readFile(DECLARATIONS) ?? "");
     compiler = new WorkspaceCompiler(inputPath, sourceFile, host, compileTarget(target));
     const report = compiler.compile(sourceFile);

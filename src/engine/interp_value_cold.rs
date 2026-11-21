@@ -227,7 +227,7 @@ impl Engine {
             }
             ValueExpr::K4DomainError(message) => {
                 let message = self.eval_value(message, actor).text();
-                self.value_error = Some(format!("K4 domain error: {message}"));
+                self.value_error = Some(format!("K4 domain error: {message}").into());
                 Cell::Null
             }
             ValueExpr::Answer => self.answer.clone(),

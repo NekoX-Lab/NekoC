@@ -55,7 +55,7 @@ fn deep_reporter_recursion_reports_the_origin_once() {
         let error = recursion_error(false, jit);
         assert_eq!(
             error,
-            "reporter procedure recursion exceeds 200 at block b7"
+            "reporter procedure recursion exceeds 200 [actor Sprite (nekoc-default-actor)] at block b7"
         );
     }
 }
@@ -66,7 +66,7 @@ fn mutual_reporter_recursion_does_not_accumulate_distinct_call_sites() {
         let error = recursion_error(true, jit);
         assert_eq!(
             error,
-            "reporter procedure recursion exceeds 200 at block b8"
+            "reporter procedure recursion exceeds 200 [actor Sprite (nekoc-default-actor)] at block b8"
         );
     }
 }

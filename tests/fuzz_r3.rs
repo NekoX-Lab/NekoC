@@ -294,8 +294,10 @@ fn join(parts: Vec<Value>) -> Value {
 }
 
 fn assert_resource_error(p: &Value, block: &str) {
+    let mut p = p.clone();
+    p["sourceMap"] = json!({block:{"file":"resource-limit.ts","line":7,"column":9}});
     for interpreted in [true, false] {
-        let mut vm = Engine::new(Program::compile(p).unwrap());
+        let mut vm = Engine::new(Program::compile(&p).unwrap());
         if interpreted {
             vm.disable_jit();
         }
@@ -311,6 +313,12 @@ fn assert_resource_error(p: &Value, block: &str) {
             "{message}"
         );
         assert!(message.contains(&format!("at block {block}")), "{message}");
+        assert!(
+            message.ends_with(&format!(
+                "[actor Sprite (nekoc-default-actor), resource-limit.ts:7:9] at block {block}"
+            )),
+            "{message}"
+        );
     }
 }
 
@@ -467,7 +475,8 @@ fn doubling(kind: usize) -> Json {
 #[test]
 fn exponential_text_growth_is_a_readable_vm_error() {
     for kind in 0..3 {
-        let p = doubling(kind);
+        let mut p = doubling(kind);
+        p["sourceMap"] = json!({"double":{"file":"resource-growth.ts","line":11,"column":5}});
         for interpreted in [true, false] {
             let mut vm = Engine::new(Program::compile(&p).unwrap());
             if interpreted {
@@ -480,6 +489,12 @@ fn exponential_text_growth_is_a_readable_vm_error() {
             let error = vm.advance(1.0 / 60.0, 10_000, Duration::ZERO).unwrap_err();
             assert!(
                 format!("{error:#}").contains("text size exceeds VM safety limit"),
+                "{kind}: {error:#}"
+            );
+            assert!(
+                format!("{error:#}").ends_with(
+                    "[actor Sprite (nekoc-default-actor), resource-growth.ts:11:5] at block double"
+                ),
                 "{kind}: {error:#}"
             );
             if !interpreted {

@@ -845,6 +845,9 @@ pub struct Program {
     /// `expression_starts[p - 1] - 1`, so evaluation needs no runtime value stack.
     expression_starts: Vec<u32>,
     sources: Vec<String>,
+    error_locations: BTreeMap<String, error_location::Location>,
+    value_sources: BTreeMap<usize, String>,
+    expression_sources: BTreeMap<usize, String>,
     strings: Vec<String>,
     texts: Vec<Vec<TextPart>>,
     ranges: Vec<RangeSpec>,
@@ -1118,6 +1121,9 @@ impl Program {
                 expressions: vec![],
                 expression_starts: vec![],
                 sources: vec![],
+                error_locations: error_location::collect(project),
+                value_sources: BTreeMap::new(),
+                expression_sources: BTreeMap::new(),
                 strings: vec![],
                 texts: vec![],
                 ranges: vec![],
@@ -1209,6 +1215,7 @@ impl Program {
             parameters: BTreeMap::new(),
             loops: vec![],
             expression_work: vec![],
+            expression_work_sources: BTreeMap::new(),
             compile_work: false,
             compile_depth: 0,
             actor_ids: vec![],
@@ -1652,6 +1659,7 @@ struct Compiler {
     parameters: BTreeMap<String, usize>,
     loops: Vec<Vec<usize>>,
     expression_work: Vec<ExprOp>,
+    expression_work_sources: BTreeMap<usize, String>,
     /// Actor ids of the scene whose scripts are being compiled (front to back).
     actor_ids: Vec<String>,
     owner_scene: usize,
@@ -1934,7 +1942,7 @@ impl Compiler {
         self.compile_depth += 1;
         let result = self.value_one(b);
         self.compile_depth -= 1;
-        result
+        self.locate_value_result(b, result)
     }
     fn value_one(&mut self, b: &Value) -> Result<usize> {
         if b["type"] == "_compiled_value" {
@@ -2649,10 +2657,17 @@ impl Compiler {
     }
     fn expr_one(&mut self, block: &Value) -> Result<Expr> {
         let outer = std::mem::take(&mut self.expression_work);
+        let outer_sources = std::mem::take(&mut self.expression_work_sources);
         self.expression(block, 0)?;
         let start = self.program.expressions.len();
         self.program.expressions.append(&mut self.expression_work);
         self.expression_work = outer;
+        for (offset, source) in std::mem::replace(&mut self.expression_work_sources, outer_sources)
+        {
+            self.program
+                .expression_sources
+                .insert(start + offset, source);
+        }
         // Fold only fully constant expressions; no cross-statement propagation.
         let slice = &self.program.expressions[start..];
         if slice.iter().all(|op| {
@@ -3345,6 +3360,12 @@ impl Compiler {
             }
             _ => bail!("unsupported expression {kind} at block {}", b["id"]),
         };
+        if matches!(op, ExprOp::ListItem(..) | ExprOp::ListLength(..))
+            && let Some(id) = b["id"].as_str()
+        {
+            self.expression_work_sources
+                .insert(self.expression_work.len(), id.to_owned());
+        }
         self.expression_work.push(op);
         if self.program.semantics == RuntimeSemantics::Kitten4
             && matches!(kind, "math_trig" | "math_arc_trig")
@@ -5364,7 +5385,7 @@ pub struct Engine {
     ready: VecDeque<usize>,
     dirty: Vec<bool>,
     reset: bool,
-    value_error: Option<String>,
+    value_error: Option<error_location::Diagnostic>,
     stopped: bool,
     restart: bool,
     reporter_depth: usize,
@@ -6410,6 +6431,11 @@ impl Engine {
         self.node_one::<true>(pc, actor)
     }
     fn node_one<const CACHED: bool>(&mut self, pc: usize, actor: usize) -> f64 {
+        let value = self.node_inner::<CACHED>(pc, actor);
+        self.locate_expression_error(pc, actor);
+        value
+    }
+    fn node_inner<const CACHED: bool>(&mut self, pc: usize, actor: usize) -> f64 {
         // The common scalar fast path remains allocation-free. Composite numeric
         // trees are already postfix, so no traversal/call stack is necessary.
         if pc - self.program.expression_starts[pc] as usize >= 64
@@ -6487,6 +6513,7 @@ impl Engine {
                 }
                 _ => self.operand(at, actor),
             };
+            self.locate_expression_error(at, actor);
             values.push(value);
         }
         values.pop().unwrap()
@@ -6787,7 +6814,7 @@ impl Engine {
             let result = self.exec(index, pc, op, actor);
             self.trace_list_changes(index, pc, lengths);
             if let Err(error) = result {
-                self.value_error = Some(format!("{error:#}"));
+                self.value_error = Some(error.into());
                 break;
             }
             if self.value_error.is_some() {
@@ -7783,10 +7810,13 @@ impl Engine {
         {
             value.clone()
         } else {
-            self.value_error = Some(format!(
-                "entity_variable_operation_out_of_scope: {}",
-                self.program.actor_variable_names[slot]
-            ));
+            self.value_error = Some(
+                format!(
+                    "entity_variable_operation_out_of_scope: {}",
+                    self.program.actor_variable_names[slot]
+                )
+                .into(),
+            );
             Cell::Null
         }
     }
@@ -7799,10 +7829,13 @@ impl Engine {
         {
             *cell = value;
         } else {
-            self.value_error = Some(format!(
-                "entity_variable_operation_out_of_scope: {}",
-                self.program.actor_variable_names[slot]
-            ));
+            self.value_error = Some(
+                format!(
+                    "entity_variable_operation_out_of_scope: {}",
+                    self.program.actor_variable_names[slot]
+                )
+                .into(),
+            );
         }
     }
     fn clone_sprite(&mut self, source: usize, split: Option<(f64, f64)>) -> Result<()> {
@@ -8145,7 +8178,7 @@ impl Engine {
                 {
                     #[cfg(feature = "interp-profile")]
                     let _profile = interp_profile::span("value", &expression);
-                    match expression {
+                    let value = match expression {
                         ValueExpr::ActorVariable(target, slot, None) => self.read_actor_variable(
                             if target == usize::MAX { actor } else { target },
                             slot,
@@ -8156,7 +8189,9 @@ impl Engine {
                             .cloned()
                             .unwrap_or(Cell::Number(f64::NAN)),
                         _ => unreachable!(),
-                    }
+                    };
+                    self.locate_value_error(i as usize, actor);
+                    value
                 } else {
                     self.eval_value(i as usize, actor)
                 }
@@ -8166,10 +8201,13 @@ impl Engine {
             Some(v)
         } else {
             if self.value_error.is_none() {
-                self.value_error = Some(format!(
-                    "list operation received a non-list value ({})",
-                    value.text().chars().take(80).collect::<String>()
-                ));
+                self.value_error = Some(
+                    format!(
+                        "list operation received a non-list value ({})",
+                        value.text().chars().take(80).collect::<String>()
+                    )
+                    .into(),
+                );
             }
             None
         }
@@ -8186,14 +8224,14 @@ impl Engine {
         match Cell::try_concat(a, b) {
             Ok(value) => value,
             Err(error) => {
-                self.value_error.get_or_insert_with(|| error.to_string());
+                self.value_error.get_or_insert_with(|| error.into());
                 Cell::Undefined
             }
         }
     }
     fn append_join_text(&mut self, text: &mut String, value: &Cell) {
         if let Err(error) = value.append_bounded_text(text) {
-            self.value_error.get_or_insert_with(|| error.to_string());
+            self.value_error.get_or_insert_with(|| error.into());
         }
     }
     fn eval_deep_value(&mut self, root: usize, actor: usize) -> Cell {
@@ -8353,7 +8391,7 @@ impl Engine {
         }
         children
     }
-    fn eval_value_one<const PREPARED: bool>(&mut self, i: usize, actor: usize) -> Cell {
+    fn eval_value_inner<const PREPARED: bool>(&mut self, i: usize, actor: usize) -> Cell {
         #[cfg(feature = "interp-profile")]
         let _profile = interp_profile::span("value", &self.program.values[i]);
         // Keep dispatch and the ordinary evaluator in one function. The deep
@@ -8537,11 +8575,14 @@ impl Engine {
                             if self.program.semantics == RuntimeSemantics::Kitten4
                                 && self.value_error.is_none()
                             {
-                                self.value_error = Some(format!(
-                                    "lists_get_value_bad_index (index {:?}, length {})",
-                                    at.and_then(|i| i.checked_add(1)),
-                                    v.len()
-                                ));
+                                self.value_error = Some(
+                                    format!(
+                                        "lists_get_value_bad_index (index {:?}, length {})",
+                                        at.and_then(|i| i.checked_add(1)),
+                                        v.len()
+                                    )
+                                    .into(),
+                                );
                             }
                             Cell::Number(f64::NAN)
                         }
@@ -8844,7 +8885,7 @@ impl Engine {
                 TextPart::Literal(index) => {
                     let literal = &self.program.strings[index];
                     if let Err(error) = value::check_text_growth(value.len(), literal.len()) {
-                        self.value_error.get_or_insert_with(|| error.to_string());
+                        self.value_error.get_or_insert_with(|| error.into());
                     } else {
                         value.push_str(literal);
                     }
@@ -9096,16 +9137,6 @@ impl Engine {
 
     /// Executes one instruction of task `index`. Returns false when the task yields
     /// (or finishes) for this tick.
-    #[inline(always)]
-    fn exec(&mut self, index: usize, pc: usize, op: Op, actor: usize) -> Result<bool> {
-        // All early returns (including cold ops and waiting/broadcast yields)
-        // must pass the same reporter-error boundary as ordinary instructions.
-        let result = self.exec_inner(index, pc, op, actor);
-        if let Some(error) = self.value_error.take() {
-            bail!(error_location::at_block(&error, &self.program.sources[pc]));
-        }
-        result
-    }
     #[inline(always)]
     fn exec_inner(&mut self, index: usize, pc: usize, op: Op, actor: usize) -> Result<bool> {
         #[cfg(feature = "interp-profile")]
@@ -9551,11 +9582,7 @@ impl Engine {
             Op::AppendList(list, e) => {
                 let value = self.eval_value(e, actor);
                 if let Some(list) = self.resolve_list(list) {
-                    ensure!(
-                        !contains_list(&value, &list),
-                        "cyclic list at {}",
-                        self.program.sources[pc]
-                    );
+                    ensure!(!contains_list(&value, &list), "cyclic list");
                     list.borrow_mut().push(value);
                 }
             }
@@ -9582,11 +9609,7 @@ impl Engine {
                 let value_index = self.eval(e, actor);
                 let value = self.eval_value(value, actor);
                 if let Some(list) = self.resolve_list(list) {
-                    ensure!(
-                        !contains_list(&value, &list),
-                        "cyclic list at {}",
-                        self.program.sources[pc]
-                    );
+                    ensure!(!contains_list(&value, &list), "cyclic list");
                     let mut list = list.borrow_mut();
                     let at = if self.program.semantics == RuntimeSemantics::Kitten4 {
                         if value_index <= -1.0 && value_index > -2.0 {
@@ -9607,11 +9630,7 @@ impl Engine {
                 let at = e.map(|e| self.eval(e, actor));
                 let value = self.eval_value(value, actor);
                 if let Some(list) = self.resolve_list(list) {
-                    ensure!(
-                        !contains_list(&value, &list),
-                        "cyclic list at {}",
-                        self.program.sources[pc]
-                    );
+                    ensure!(!contains_list(&value, &list), "cyclic list");
                     let mut list = list.borrow_mut();
                     let at = at.map_or_else(
                         || Some(list.len().saturating_sub(1)),
@@ -9886,11 +9905,7 @@ impl Engine {
                     parameters.push(self.eval_value(value, actor));
                 }
                 let task = &mut self.tasks[index];
-                ensure!(
-                    task.calls.len() < 10_000,
-                    "procedure stack limit at {}",
-                    self.program.sources[pc]
-                );
+                ensure!(task.calls.len() < 10_000, "procedure stack limit");
                 task.calls.push(CallFrame {
                     pc: task.pc,
                     parameters: std::mem::replace(&mut task.parameters, parameters),

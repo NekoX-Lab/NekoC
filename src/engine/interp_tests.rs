@@ -150,6 +150,30 @@ fn list_resolution_leaves_preserve_identity_errors_and_prepared_queues() {
 }
 
 #[test]
+fn r2_srcmap_replacement_errors_keep_the_later_reporter_location() {
+    let mut e = engine(vec![Op::Halt], RuntimeSemantics::Kitten4);
+    e.program.actor_variable_names = vec!["first".into(), "second".into()];
+    e.program.values = vec![
+        ValueExpr::ActorVariable(usize::MAX, 0, None),
+        ValueExpr::ActorVariable(usize::MAX, 1, None),
+        ValueExpr::Join(value::Span { start: 0, len: 2 }),
+    ];
+    e.program.value_args = vec![0, 1];
+    e.program.value_sources = BTreeMap::from([
+        (0, "first-input".into()),
+        (1, "second-input".into()),
+        (2, "join".into()),
+    ]);
+    e.eval_value(2, 1);
+    let error = e.value_error.take().unwrap().to_string();
+    assert!(
+        error.starts_with("entity_variable_operation_out_of_scope: second [actor"),
+        "{error}"
+    );
+    assert!(error.ends_with("at block second-input"), "{error}");
+}
+
+#[test]
 fn hot_and_cold_fallthrough_take_pending_value_error_at_original_source() {
     for semantics in [RuntimeSemantics::KnCurrent, RuntimeSemantics::Kitten4] {
         for op in [Op::SetValue(Target::Global(0), 0), Op::Ranking(None, false)] {
@@ -158,9 +182,12 @@ fn hot_and_cold_fallthrough_take_pending_value_error_at_original_source() {
             e.value_error = Some("pending-layout-error".into());
 
             let error = exec_at(&mut e, 0).unwrap_err();
-            assert_eq!(
-                error.to_string(),
-                "pending-layout-error at block interp-layout-block-0"
+            let message = error.to_string();
+            assert!(message.starts_with("pending-layout-error"));
+            assert!(message.contains("[actor "), "{message}");
+            assert!(
+                message.ends_with("at block interp-layout-block-0"),
+                "{message}"
             );
             assert!(e.value_error.is_none());
             assert_eq!(e.tasks[0].pc, 1);
@@ -186,7 +213,7 @@ fn cold_direct_helper_return_reports_pending_value_error_even_when_true() {
 
         assert_eq!(
             exec_at(&mut e, 0).unwrap_err().to_string(),
-            "pending-layout-error at block interp-layout-block-0"
+            "pending-layout-error [actor Sprite (nekoc-default-actor)] at block interp-layout-block-0"
         );
         assert!(e.value_error.is_none());
         assert_eq!(e.tasks[0].pc, 1);
@@ -206,7 +233,7 @@ fn cold_blocking_early_returns_report_pending_error_and_keep_request_side_effect
 
             assert_eq!(
                 exec_at(&mut e, 0).unwrap_err().to_string(),
-                "pending-layout-error at block interp-layout-block-0"
+                "pending-layout-error [actor Sprite (nekoc-default-actor)] at block interp-layout-block-0"
             );
             assert!(e.value_error.is_none());
             assert_eq!(e.tasks[0].pc, 1);
@@ -260,7 +287,7 @@ fn cold_physics_argument_error_reaches_tail_without_allocating_world() {
             let error = exec_at(&mut e, 0).unwrap_err();
             assert_eq!(
                 error.to_string(),
-                "block_bad_math_expression at block interp-layout-block-0"
+                "block_bad_math_expression [actor Sprite (nekoc-default-actor)] at block interp-layout-block-0"
             );
             assert!(e.value_error.is_none());
             assert!(e.physics.is_none());
