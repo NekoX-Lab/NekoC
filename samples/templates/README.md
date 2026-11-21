@@ -36,6 +36,8 @@ node tools/editor-compat.mjs dist/movement-collision.bcmkn
 
 新增进阶模板回归：`cargo test --test r4_templates2`。对两个模板分别检查 TS 类型、编译产物结构、空跑 600 帧，并在优化/非优化、JIT/解释器组合下重放输入：三场景往返、达标结算、重玩与中途退出、满包拒绝、左右循环选格、使用/丢弃中间和末尾物品、空包操作、清空后继续拾取及重新启动重置。上述操作语义由 NekoC 本地引擎验证；官方编辑器 `editor-compat` 仅证明积木结构可载入，完整官方交互行为仍为**未验证**，不据此声称官方运行逐帧一致。
 
+审查补充回归 `template_parameter_boundaries_preserve_state_and_visible_feedback` 会从实际模板源码构建 `TARGET_SCORE=1`、`CAPACITY=1`、空包初始化三个变体，仍覆盖两种优化设置和 JIT/解释器组合。目标分数为 1 时连续重玩三局并验证结算气泡；两个背包变体各重放固定种子的 120 次操作，以独立列表模型核对物品、选中格、使用次数及实际帧输出中的气泡文字。固定种子与帧数保证可复现，不使用墙钟性能断言。
+
 两个进阶模板可以独立构建，不依赖基础版源文件：
 
 ```bash
